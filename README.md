@@ -11,7 +11,7 @@ attest run your-run.json
 
 ## The problem
 
-Most ways of grading an AI agent just ask *another* AI: "is this answer good?" That's easy
+The more common ways grading an AI agent ask *another* AI: "is this answer good?" That's easy
 to fool. A confident, well-written answer can sail through even when a specific detail
 buried inside it is wrong — because the grader is reacting to the *story*, not checking the
 *facts*. Research bears this out: just rewriting an agent's reasoning — while leaving what
