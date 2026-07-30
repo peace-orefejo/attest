@@ -3,6 +3,33 @@
 All notable changes to `agent-attest` are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Machine-readable `--json` output for the `run`, `tools`, `injection`, and `role` commands.
+- Provenance-aware `Artifact`, `TextSegment`, and `Detection` models for untrusted content.
+- Extensible named regex detectors with categories, confidence, severity, bounded execution,
+  match offsets, custom JSON pattern packs, and `--patterns-only`.
+- Injection coverage metadata and a measured benign/malicious regression corpus.
+
+### Changed
+- API clients are created lazily, so deterministic tool-use and shallow injection checks run
+  without an API key or provider client.
+- Deep injection evaluation always checks novel payloads while receiving only a bounded,
+  deduplicated, escaped, and explicitly delimited view of untrusted content.
+- Low-confidence and educationally quoted matches are reported as `possible_injection` rather
+  than being suppressed.
+
+### Fixed
+- Invalid, empty, or duplicate check selections and unsupported answer kinds now fail loudly
+  instead of allowing an empty report to pass with a perfect score.
+- Malformed trajectory files now report concise filename and JSONL line-number errors.
+- User-uploaded artifact text can no longer enter the faithfulness evidence set.
+- Catastrophic custom regular expressions are stopped by mandatory execution timeouts and
+  incomplete scans report the attempted and skipped pattern counts.
+- Attacker-provided deep-context delimiters are escaped so they cannot forge trusted prompt
+  sections.
+
 ## [0.5.1] - 2026-06-25
 
 Judge precision and reproducibility. These changes were driven by red-teaming a live agent

@@ -3,20 +3,22 @@
 from __future__ import annotations
 
 import contextlib
+import json
 from pathlib import Path
 
 import typer
 from dotenv import load_dotenv
+from pydantic import ValidationError
 
 from ._llm import using
 from .checks.judge_baseline import naive_judge
-from .checks.injection import check_injection
+from .checks.injection import DEFAULT_DETECTORS, check_injection, load_regex_detector
 from .checks.role import check_role_adherence
 from .checks.tool_use import check_tool_use
 from .checks.verify import extract_claims, judge_trajectory, verify_claims
 from .providers import DEFAULT_PROVIDER, build_client, list_models, providers, resolve_key
 from .results import CheckResult, Report, Severity
-from .scoring.report import DEFAULT_CHECKS, evaluate
+from .scoring.report import DEFAULT_CHECKS, evaluate, validate_evaluation_options
 from .scoring.stats import wilson_interval
 from .trajectory import Trajectory
 
@@ -40,9 +42,29 @@ def _llm_ctx(provider: str, model: str | None):
 
 
 def _load(path: Path) -> list[Trajectory]:
-    raw = path.read_text().strip()
-    lines = [raw] if path.suffix == ".json" else raw.splitlines()
-    return [Trajectory.model_validate_json(ln) for ln in lines if ln.strip()]
+    try:
+        raw = path.read_text().strip()
+    except OSError as exc:
+        raise typer.BadParameter(f"Could not read trajectory file {path}: {exc}") from exc
+    if not raw:
+        raise typer.BadParameter(f"Trajectory file {path} is empty.")
+
+    lines = [(1, raw)] if path.suffix.lower() == ".json" else list(enumerate(raw.splitlines(), 1))
+    trajectories: list[Trajectory] = []
+    for line_number, line in lines:
+        if not line.strip():
+            continue
+        try:
+            trajectories.append(Trajectory.model_validate_json(line))
+        except (ValidationError, ValueError) as exc:
+            location = f"{path}" if path.suffix.lower() == ".json" else f"{path}, line {line_number}"
+            detail = exc.errors()[0]["msg"] if isinstance(exc, ValidationError) else str(exc)
+            raise typer.BadParameter(f"Invalid trajectory in {location}: {detail}") from exc
+    return trajectories
+
+
+def _emit_json(value) -> None:
+    typer.echo(json.dumps(value, indent=2))
 
 
 def _render_check(r: CheckResult, indent: str = "") -> None:
@@ -80,15 +102,21 @@ def tools(
                                       help="Also run the LLM tool-choice check (needs a key)."),
     provider: str = _PROVIDER_OPT,
     model: str = _MODEL_OPT,
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Tool-use correctness only — deterministic, NO API key (unless --appropriate)."""
     if appropriate:
         _require_key(provider)
     ctx = _llm_ctx(provider, model) if appropriate else contextlib.nullcontext()
     with ctx:
-        for traj in _load(path):
+        trajectories = _load(path)
+        results = [(traj, check_tool_use(traj, appropriate=appropriate)) for traj in trajectories]
+        if json_output:
+            _emit_json([{"task": traj.task, "result": result.model_dump(mode="json")} for traj, result in results])
+            return
+        for traj, result in results:
             typer.echo(f"- {traj.task[:70]!r}")
-            _render_check(check_tool_use(traj, appropriate=appropriate), indent="  ")
+            _render_check(result, indent="  ")
             typer.echo("")
 
 
@@ -99,15 +127,38 @@ def injection(
                               help="Also LLM-check whether the agent FOLLOWED each payload (needs a key)."),
     provider: str = _PROVIDER_OPT,
     model: str = _MODEL_OPT,
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    patterns: Path | None = typer.Option(
+        None, "--patterns", help="JSON file containing additional named regex patterns."
+    ),
+    patterns_only: bool = typer.Option(
+        False, "--patterns-only", help="Use --patterns instead of the built-in detectors."
+    ),
 ) -> None:
     """Flag prompt-injection payloads in tool outputs — deterministic, NO API key (unless --deep)."""
     if deep:
         _require_key(provider)
+    if patterns_only and patterns is None:
+        raise typer.BadParameter("--patterns-only requires --patterns.", param_hint="--patterns-only")
+    detectors = [] if patterns_only else list(DEFAULT_DETECTORS)
+    if patterns is not None:
+        try:
+            detectors.append(load_regex_detector(patterns))
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc), param_hint="--patterns") from exc
     ctx = _llm_ctx(provider, model) if deep else contextlib.nullcontext()
     with ctx:
-        for traj in _load(path):
+        trajectories = _load(path)
+        results = [
+            (traj, check_injection(traj, deep=deep, detectors=detectors))
+            for traj in trajectories
+        ]
+        if json_output:
+            _emit_json([{"task": traj.task, "result": result.model_dump(mode="json")} for traj, result in results])
+            return
+        for traj, result in results:
             typer.echo(f"- {traj.task[:70]!r}")
-            _render_check(check_injection(traj, deep=deep), indent="  ")
+            _render_check(result, indent="  ")
             typer.echo("")
 
 
@@ -116,13 +167,19 @@ def role(
     path: Path,
     provider: str = _PROVIDER_OPT,
     model: str = _MODEL_OPT,
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Judge whether the agent stayed within its system-prompt-defined role (needs a key)."""
     _require_key(provider)
     with _llm_ctx(provider, model):
-        for traj in _load(path):
+        trajectories = _load(path)
+        results = [(traj, check_role_adherence(traj)) for traj in trajectories]
+        if json_output:
+            _emit_json([{"task": traj.task, "result": result.model_dump(mode="json")} for traj, result in results])
+            return
+        for traj, result in results:
             typer.echo(f"- {traj.task[:70]!r}")
-            _render_check(check_role_adherence(traj), indent="  ")
+            _render_check(result, indent="  ")
             typer.echo("")
 
 
@@ -137,20 +194,38 @@ def run(
                              help="Answer type: 'factual' (default) or 'plan' (judge fidelity to the plan)."),
     provider: str = _PROVIDER_OPT,
     model: str = _MODEL_OPT,
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Full report on a trajectory (or JSONL): runs the chosen checks + an overall score."""
-    _require_key(provider)
     selected = [c.strip() for c in checks.split(",") if c.strip()]
+    try:
+        validate_evaluation_options(selected, kind)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    _require_key(provider)
     trajectories = _load(path)
-    typer.echo(f"Loaded {len(trajectories)} trajectory(ies) from {path}\n")
+    if not json_output:
+        typer.echo(f"Loaded {len(trajectories)} trajectory(ies) from {path}\n")
 
     overalls: list[float] = []
+    reports: list[tuple[Trajectory, Report]] = []
     with _llm_ctx(provider, model):
         for traj in trajectories:
             report = evaluate(traj, checks=selected, appropriate=appropriate, answer_kind=kind)
-            _render_report(traj, report)
+            reports.append((traj, report))
+            if not json_output:
+                _render_report(traj, report)
             overalls.append(report.overall_score)
 
+    if json_output:
+        _emit_json({
+            "trajectories": [
+                {"task": traj.task, "report": report.model_dump(mode="json")}
+                for traj, report in reports
+            ],
+            "mean_overall_score": sum(overalls) / len(overalls) if overalls else None,
+        })
+        return
     if overalls:
         typer.echo(f"Mean overall score: {sum(overalls) / len(overalls):.0%}")
 

@@ -13,6 +13,32 @@ from ..results import CheckResult, Report
 from ..trajectory import Trajectory
 
 DEFAULT_CHECKS = ("faithfulness", "tool_use")
+SUPPORTED_CHECKS = ("faithfulness", "tool_use", "injection", "role")
+SUPPORTED_ANSWER_KINDS = ("factual", "plan")
+
+
+def validate_evaluation_options(
+    checks: Sequence[str], answer_kind: str
+) -> tuple[str, ...]:
+    """Validate public evaluator options before any checks or LLM calls run."""
+    selected = tuple(checks)
+    if not selected:
+        raise ValueError("At least one check is required.")
+
+    unknown = sorted(set(selected) - set(SUPPORTED_CHECKS))
+    if unknown:
+        raise ValueError(
+            f"Unknown check(s): {', '.join(unknown)}. "
+            f"Choose from: {', '.join(SUPPORTED_CHECKS)}."
+        )
+    if len(set(selected)) != len(selected):
+        raise ValueError("Each check may be selected only once.")
+    if answer_kind not in SUPPORTED_ANSWER_KINDS:
+        raise ValueError(
+            f"Unknown answer kind {answer_kind!r}. "
+            f"Choose from: {', '.join(SUPPORTED_ANSWER_KINDS)}."
+        )
+    return selected
 
 
 def evaluate(
@@ -32,6 +58,8 @@ def evaluate(
     Faithfulness/role and injection's `deep` pass need an API key; the tool-use and
     shallow-injection paths do not. `max_claims` caps how many claims faithfulness checks.
     """
+    selected = validate_evaluation_options(checks, answer_kind)
+
     if verify is None:
         verify = partial(verify_claims, answer_kind=answer_kind)
 
@@ -41,5 +69,5 @@ def evaluate(
         "injection": lambda: check_injection(traj, deep=deep),
         "role": lambda: check_role_adherence(traj),
     }
-    results: list[CheckResult] = [runners[c]() for c in checks if c in runners]
+    results: list[CheckResult] = [runners[c]() for c in selected]
     return Report(results=results)

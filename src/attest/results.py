@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, Field, computed_field
 
 PROMPT_VERSION = "2026.06.25"
 
@@ -22,7 +22,7 @@ class Finding(BaseModel):
     reason: str = ""
     evidence: str | None = None
     step: int | None = None
-    metadata: dict = {}
+    metadata: dict = Field(default_factory=dict)
 
 
 class CheckResult(BaseModel):
@@ -30,7 +30,8 @@ class CheckResult(BaseModel):
     passed: bool
     score: float | None = None
     summary: str = ""
-    findings: list[Finding] = []
+    findings: list[Finding] = Field(default_factory=list)
+    metadata: dict = Field(default_factory=dict)
     prompt_version: str = PROMPT_VERSION
 
     @property

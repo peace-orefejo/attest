@@ -64,11 +64,12 @@ evidence-grounded judgment — not removed judgment. The receipts decide.
 **From the command line:**
 
 ```bash
-attest run   your-run.json        # the full report: all the checks + an overall score
+attest run   your-run.json        # default report: faithfulness + tool use
 attest tools your-run.json        # just the tool-use check  (no API key needed)
 attest injection your-run.json    # just the hidden-instruction scan  (no API key needed)
 attest role  your-run.json        # just the "did it stay on the job?" check
 attest demo  your-run.json        # see attest vs. a plain "does this look good?" grader
+attest tools your-run.json --json # clean, machine-readable output for automation
 ```
 
 **In Python:**
@@ -76,7 +77,7 @@ attest demo  your-run.json        # see attest vs. a plain "does this look good?
 ```python
 from attest import Attest
 
-judge = Attest()                   # reads your API key from the environment
+judge = Attest()                   # creates an API client only when a check needs one
 report = judge.evaluate(run)       # `run`: a recorded agent run (see "Bring your own agent")
 
 print(report.overall_score)
@@ -84,9 +85,39 @@ print(report.model_dump_json(indent=2))   # the full result, as JSON
 
 judge.injection(run, deep=True)    # run a single check on its own
 judge.role_adherence(run)
+judge.tool_use(run)                # fully offline; no client or API key needed
 ```
 
 Set it up once, then grade as many runs as you like.
+
+Injection scanning also accepts named custom regex detectors and provenance-aware artifacts:
+
+```python
+from attest import Artifact, RegexDetector, RegexPattern
+
+run.artifacts.append(Artifact(
+    name="screenshot.png", media_type="image/png", source="user_upload",
+    text=ocr_text,  # extracted text is scanned now; binary OCR support is forthcoming
+))
+detector = RegexDetector([
+    RegexPattern("external-upload", r"upload\s+.*\s+to\s+https?://", "exfiltration")
+])
+judge.injection(run, detectors=[detector])
+```
+
+The same named patterns can be supplied to the offline CLI:
+
+```bash
+attest injection run.json --patterns injection-patterns.json --json
+```
+
+Custom patterns are added to the built-ins by default. Pass `--patterns-only` to replace the
+built-in detector pack, which is useful for isolated policy packs and avoiding overlapping hits.
+Each pattern accepts `name`, `pattern`, `category`, `confidence`, and a `severity` of `low`,
+`medium`, or `high`.
+
+Binary or path-based artifacts that have not been extracted are reported as unscanned warnings,
+never silently treated as clean.
 
 ## Use any model
 
@@ -128,7 +159,7 @@ for a tiny, complete example.
 ## Develop
 
 ```bash
-uv run pytest        # 73 tests — they all run offline, no API key needed
+uv run pytest        # 109 tests — they all run offline, no API key needed
 ```
 
 ## Status

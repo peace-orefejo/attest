@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import Callable, Sequence
 
 import instructor
 
 from ._llm import using
-from .checks.injection import check_injection
+from .checks.injection import DEFAULT_DETECTORS, InjectionDetector, check_injection
 from .checks.role import check_role_adherence
 from .checks.judge_baseline import JudgeVerdict, naive_judge
 from .checks.tool_use import check_tool_use
 from .checks.verify import MAX_CLAIMS, extract_claims
 from .providers import DEFAULT_PROVIDER, build_client, default_model, list_models, providers
 from .results import CheckResult, Report
-from .scoring.report import DEFAULT_CHECKS, evaluate
+from .scoring.report import DEFAULT_CHECKS, evaluate, validate_evaluation_options
 from .scoring.stats import Proportion, wilson_interval
 from .trajectory import Trajectory
 
@@ -32,7 +33,15 @@ class Attest:
     ) -> None:
         self.provider = provider
         self.model = model or default_model(provider)
-        self._client = client or build_client(provider, self.model, key)
+        self._key = key
+        self._client = client
+
+    def _llm_context(self, required: bool = True):
+        if not required:
+            return contextlib.nullcontext()
+        if self._client is None:
+            self._client = build_client(self.provider, self.model, self._key)
+        return using(self._client)
 
     def evaluate(
         self,
@@ -46,10 +55,20 @@ class Attest:
         extract: Callable[[str], list[str]] = extract_claims,
         verify=None,
     ) -> Report:
-        with using(self._client):
+        selected = validate_evaluation_options(checks, answer_kind)
+        faithfulness_needs_llm = (
+            "faithfulness" in selected and (extract is extract_claims or verify is None)
+        )
+        needs_llm = (
+            faithfulness_needs_llm
+            or "role" in selected
+            or ("injection" in selected and deep)
+            or ("tool_use" in selected and appropriate)
+        )
+        with self._llm_context(needs_llm):
             return evaluate(
                 traj,
-                checks=checks,
+                checks=selected,
                 appropriate=appropriate,
                 answer_kind=answer_kind,
                 deep=deep,
@@ -59,19 +78,25 @@ class Attest:
             )
 
     def tool_use(self, traj: Trajectory, *, appropriate: bool = False) -> CheckResult:
-        with using(self._client):
+        with self._llm_context(appropriate):
             return check_tool_use(traj, appropriate=appropriate)
 
-    def injection(self, traj: Trajectory, *, deep: bool = False) -> CheckResult:
-        with using(self._client):
-            return check_injection(traj, deep=deep)
+    def injection(
+        self,
+        traj: Trajectory,
+        *,
+        deep: bool = False,
+        detectors: Sequence[InjectionDetector] = DEFAULT_DETECTORS,
+    ) -> CheckResult:
+        with self._llm_context(deep):
+            return check_injection(traj, deep=deep, detectors=detectors)
 
     def role_adherence(self, traj: Trajectory) -> CheckResult:
-        with using(self._client):
+        with self._llm_context():
             return check_role_adherence(traj)
 
     def judge(self, traj: Trajectory) -> JudgeVerdict:
-        with using(self._client):
+        with self._llm_context():
             return naive_judge(traj)
 
     @staticmethod
