@@ -3,7 +3,7 @@
 All notable changes to `agent-attest` are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.0] - 2026-07-30
 
 ### Added
 - Machine-readable `--json` output for the `run`, `tools`, `injection`, and `role` commands.
@@ -60,4 +60,5 @@ Judge precision and reproducibility. These changes were driven by red-teaming a 
 - **LLM calls are pinned to `temperature=0`** at the chokepoint for reproducibility.
 - **`PROMPT_VERSION` bumped to `2026.06.25`** to reflect the revised role and injection prompts.
 
+[0.6.0]: https://github.com/adepeju4/attest/compare/v0.5.1...v0.6.0
 [0.5.1]: https://pypi.org/project/agent-attest/0.5.1/
