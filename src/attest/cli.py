@@ -134,6 +134,13 @@ def injection(
     patterns_only: bool = typer.Option(
         False, "--patterns-only", help="Use --patterns instead of the built-in detectors."
     ),
+    allow_paths: bool = typer.Option(
+        False, "--allow-paths", help="Allow explicitly referenced local artifact paths."
+    ),
+    extract_files: bool = typer.Option(
+        True, "--extract-files/--no-extract-files",
+        help="Extract supported embedded files before scanning.",
+    ),
 ) -> None:
     """Flag prompt-injection payloads in tool outputs — deterministic, NO API key (unless --deep)."""
     if deep:
@@ -150,7 +157,10 @@ def injection(
     with ctx:
         trajectories = _load(path)
         results = [
-            (traj, check_injection(traj, deep=deep, detectors=detectors))
+            (traj, check_injection(
+                traj, deep=deep, detectors=detectors,
+                extract_files=extract_files, allow_paths=allow_paths,
+            ))
             for traj in trajectories
         ]
         if json_output:

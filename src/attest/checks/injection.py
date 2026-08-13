@@ -17,7 +17,8 @@ import regex
 from pydantic import BaseModel
 
 from .._llm import vote
-from ..content import Detection, TextSegment
+from ..content import Artifact, Detection, TextSegment
+from ..extraction import ExtractionLimits, extract_artifact
 from ..results import CheckResult, Finding, Severity
 from ..trajectory import Trajectory
 
@@ -70,6 +71,8 @@ class RegexDetector:
         max_matches_per_pattern: int = 20,
         possible_threshold: float = POSSIBLE_INJECTION_THRESHOLD,
     ) -> None:
+        if not patterns:
+            raise ValueError("At least one regex pattern is required.")
         if match_timeout_ms <= 0 or segment_budget_ms <= 0:
             raise ValueError("Regex time budgets must be positive.")
         if max_matches_per_pattern <= 0:
@@ -333,15 +336,123 @@ def check_injection(
     deep: bool = False,
     samples: int = 3,
     detectors: Sequence[InjectionDetector] = DEFAULT_DETECTORS,
+    extract_files: bool = True,
+    allow_paths: bool = False,
+    extraction_limits: ExtractionLimits = ExtractionLimits(),
 ) -> CheckResult:
     """Scan untrusted text with configured detectors, then optionally check its effect."""
+    if not detectors:
+        raise ValueError("At least one injection detector is required.")
     findings: list[Finding] = []
 
-    segments = traj.untrusted_text_segments()
+    # Artifact text is routed through extract_artifact below so it receives the same limits
+    # and coverage accounting as embedded files. Tool outputs remain direct segments.
+    segments = [
+        segment for segment in traj.untrusted_text_segments()
+        if segment.source_kind != "artifact_text"
+    ]
+    artifact_entries: list[tuple[Artifact, str, int | None]] = [
+        (artifact, f"artifacts[{index}]", None)
+        for index, artifact in enumerate(traj.artifacts)
+    ]
+    for step, tc in traj.tool_calls():
+        artifact_entries.extend(
+            (artifact, f"steps[{step}].tool_call.artifacts[{index}]", step)
+            for index, artifact in enumerate(tc.artifacts)
+        )
+    extraction_warnings: list[tuple[Artifact, str, str, bool]] = []
+    inspected_locations: set[str] = set()
+    deferred_locations: set[str] = set()
+    extraction_attempts = 0
+    pending_chars = sum(len(segment.text) for segment in segments)
+    pending_segments = len(segments)
+    for entry_index, (artifact, location, step) in enumerate(artifact_entries):
+        if artifact.text is None and not extract_files:
+            continue
+        if (extraction_attempts >= extraction_limits.max_artifacts
+                or pending_segments >= extraction_limits.max_scan_segments
+                or pending_chars >= extraction_limits.max_scan_chars):
+            deferred_locations.update(
+                remaining_location
+                for remaining_artifact, remaining_location, _ in artifact_entries[entry_index:]
+                if remaining_artifact.text is not None or extract_files
+            )
+            break
+        extraction_attempts += 1
+        outcome = extract_artifact(
+            artifact, location, step, limits=extraction_limits, allow_paths=allow_paths
+        )
+        segments.extend(outcome.segments)
+        pending_segments += len(outcome.segments)
+        pending_chars += sum(len(segment.text) for segment in outcome.segments)
+        if outcome.inspected:
+            inspected_locations.add(location)
+        if outcome.warning or outcome.truncated:
+            extraction_warnings.append(
+                (artifact, location, outcome.warning or "Extraction reached its character limit.",
+                 outcome.truncated)
+            )
+    segments, aggregate_warning, aggregate_omitted_locations = _bounded_scan_segments(
+        segments, extraction_limits
+    )
+    aggregate_omitted_locations.update(deferred_locations)
+    if aggregate_warning is not None:
+        findings.append(aggregate_warning)
+    if deferred_locations:
+        findings.append(Finding(
+            severity=Severity.WARN,
+            verdict="unscanned_content",
+            subject="artifacts",
+            reason="Aggregate extraction limits omitted artifacts before parsing.",
+            metadata={
+                "coverage_complete": False,
+                "max_artifacts": extraction_limits.max_artifacts,
+                "artifacts_omitted": len(deferred_locations),
+            },
+        ))
+    detector_incomplete_locations: set[str] = set()
+    detections_emitted = 0
+    detection_cap_reached = False
     for segment in segments:
+        if detection_cap_reached:
+            break
         for detector in detectors:
-            for detection in detector.scan(segment):
+            if detection_cap_reached:
+                break
+            remaining = extraction_limits.max_detections - detections_emitted
+            detector_overflowed = False
+            try:
+                detections: list[Detection] = []
+                for raw_detection in detector.scan(segment):
+                    if len(detections) >= remaining:
+                        detector_overflowed = True
+                        break
+                    detections.append(
+                        raw_detection if isinstance(raw_detection, Detection)
+                        else Detection.model_validate(raw_detection)
+                    )
+            except Exception as exc:
+                if location := segment.metadata.get("artifact_location"):
+                    detector_incomplete_locations.add(location)
+                findings.append(Finding(
+                    severity=Severity.WARN,
+                    verdict="unscanned_content",
+                    subject=segment.subject,
+                    step=segment.step,
+                    reason=(f"Detector {getattr(detector, 'name', type(detector).__name__)!r} "
+                            f"failed: {type(exc).__name__}: {exc}"),
+                    metadata={
+                        "coverage_complete": False,
+                        "detector": getattr(detector, "name", type(detector).__name__),
+                        "location": segment.location,
+                    },
+                ))
+                continue
+            detections_emitted += len(detections)
+            for detection in detections:
                 if detection.verdict == "unscanned_content":
+                    if location := segment.metadata.get("artifact_location"):
+                        detector_incomplete_locations.add(location)
                     findings.append(Finding(
                         severity=Severity.WARN,
                         verdict="unscanned_content",
@@ -371,22 +482,68 @@ def check_injection(
                         "confidence": detection.confidence,
                     },
                 ))
+            if detector_overflowed:
+                detection_cap_reached = True
+                if location := segment.metadata.get("artifact_location"):
+                    detector_incomplete_locations.add(location)
+                findings.append(Finding(
+                    severity=Severity.WARN,
+                    verdict="unscanned_content",
+                    subject=segment.subject,
+                    step=segment.step,
+                    reason="Detector output reached the total detection cap; scanning stopped.",
+                    metadata={
+                        "coverage_complete": False,
+                        "detector": getattr(detector, "name", type(detector).__name__),
+                        "location": segment.location,
+                        "max_detections": extraction_limits.max_detections,
+                        "detections_emitted": detections_emitted,
+                    },
+                ))
+                break
 
-    artifacts = [*traj.artifacts, *(a for _, tc in traj.tool_calls() for a in tc.artifacts)]
-    for artifact in artifacts:
-        if artifact.text is None:
-            findings.append(Finding(
-                severity=Severity.WARN,
-                verdict="unscanned_content",
-                subject=artifact.name or artifact.id or "artifact",
-                reason="Binary and path-based artifact extraction is not enabled yet.",
-                metadata={
-                    "artifact_id": artifact.id,
-                    "media_type": artifact.media_type,
-                    "source": artifact.source,
-                    "coverage_complete": False,
-                },
-            ))
+    artifacts = [entry[0] for entry in artifact_entries]
+    warning_locations = {entry[1] for entry in extraction_warnings}
+    for artifact, location, warning, truncated in extraction_warnings:
+        findings.append(Finding(
+            severity=Severity.WARN, verdict="unscanned_content",
+            subject=artifact.name or artifact.id or "artifact", reason=warning,
+            metadata={"artifact_id": artifact.id, "media_type": artifact.media_type,
+                      "source": artifact.source, "coverage_complete": False,
+                      "truncated": truncated},
+        ))
+    unextractable = [
+        (artifact, location) for artifact, location, _ in artifact_entries
+        if (artifact.text is None and location not in inspected_locations
+            and location not in deferred_locations
+            and location not in warning_locations)
+    ]
+    detail_cap = extraction_limits.max_artifacts
+    for artifact, location in unextractable[:detail_cap]:
+        findings.append(Finding(
+            severity=Severity.WARN,
+            verdict="unscanned_content",
+            subject=artifact.name or artifact.id or "artifact",
+            reason="Artifact produced no extractable text.",
+            metadata={
+                "artifact_id": artifact.id,
+                "media_type": artifact.media_type,
+                "source": artifact.source,
+                "coverage_complete": False,
+            },
+        ))
+    if len(unextractable) > detail_cap:
+        findings.append(Finding(
+            severity=Severity.WARN,
+            verdict="unscanned_content",
+            subject="artifacts",
+            reason="Additional artifacts produced no extractable text and were summarized.",
+            metadata={
+                "coverage_complete": False,
+                "max_detailed_warnings": detail_cap,
+                "artifacts_omitted": len(unextractable) - detail_cap,
+            },
+        ))
 
     deep_context_truncated = False
     if deep:
@@ -394,6 +551,23 @@ def check_injection(
         auth = _check_authorization(
             traj, untrusted_view, samples=samples
         )
+        if deep_context_truncated:
+            deep_incomplete_locations = {
+                location for segment in segments
+                if (location := segment.metadata.get("artifact_location")) is not None
+            }
+            detector_incomplete_locations.update(deep_incomplete_locations)
+            findings.append(Finding(
+                severity=Severity.WARN,
+                verdict="unscanned_content",
+                subject="deep-analysis",
+                reason="The bounded deep-authorization context omitted untrusted content.",
+                metadata={
+                    "coverage_complete": False,
+                    "deep_context_truncated": True,
+                    "artifacts_affected": len(deep_incomplete_locations),
+                },
+            ))
         if auth.unauthorized:
             findings.append(Finding(
                 severity=Severity.FAIL, verdict="compromised", subject=auth.action,
@@ -407,7 +581,12 @@ def check_injection(
     patterns_skipped = sum(
         int(f.metadata.get("patterns_skipped", 0)) for f in findings
     )
-    artifacts_scanned = sum(artifact.text is not None for artifact in artifacts)
+    artifacts_scanned = sum(
+        location in inspected_locations
+        and location not in aggregate_omitted_locations
+        and location not in detector_incomplete_locations
+        for artifact, location, _ in artifact_entries
+    )
     return CheckResult(
         check="injection",
         passed=all(f.severity is not Severity.FAIL for f in findings),
@@ -426,3 +605,53 @@ def check_injection(
             "deep_context_truncated": deep_context_truncated if deep else None,
         },
     )
+
+
+def _bounded_scan_segments(
+    segments: list[TextSegment], limits: ExtractionLimits
+) -> tuple[list[TextSegment], Finding | None, set[str]]:
+    kept: list[TextSegment] = []
+    used = 0
+    omitted_segments = 0
+    omitted_chars = 0
+    omitted_locations: set[str] = set()
+    for index, segment in enumerate(segments):
+        if len(kept) >= limits.max_scan_segments or used >= limits.max_scan_chars:
+            omitted_segments += len(segments) - index
+            omitted_chars += sum(len(item.text) for item in segments[index:])
+            omitted_locations.update(
+                location for item in segments[index:]
+                if (location := item.metadata.get("artifact_location")) is not None
+            )
+            break
+        remaining = limits.max_scan_chars - used
+        if len(segment.text) > remaining:
+            kept.append(segment.model_copy(update={"text": segment.text[:remaining]}))
+            used += remaining
+            omitted_chars += len(segment.text) - remaining
+            if location := segment.metadata.get("artifact_location"):
+                omitted_locations.add(location)
+            omitted_segments += len(segments) - index - 1
+            omitted_chars += sum(len(item.text) for item in segments[index + 1:])
+            omitted_locations.update(
+                location for item in segments[index + 1:]
+                if (location := item.metadata.get("artifact_location")) is not None
+            )
+            break
+        kept.append(segment)
+        used += len(segment.text)
+    if omitted_segments == 0 and omitted_chars == 0:
+        return kept, None, omitted_locations
+    return kept, Finding(
+        severity=Severity.WARN,
+        verdict="unscanned_content",
+        subject="trajectory",
+        reason="Aggregate injection-scan limits omitted part of the untrusted content.",
+        metadata={
+            "coverage_complete": False,
+            "max_scan_chars": limits.max_scan_chars,
+            "max_scan_segments": limits.max_scan_segments,
+            "segments_omitted": omitted_segments,
+            "characters_omitted": omitted_chars,
+        },
+    ), omitted_locations

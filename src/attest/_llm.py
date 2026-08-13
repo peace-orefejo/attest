@@ -6,7 +6,7 @@ import contextlib
 from collections import Counter
 from contextvars import ContextVar
 from functools import lru_cache
-from typing import Callable, Iterator, TypeVar
+from typing import Any, Callable, Iterator, TypeVar, cast
 
 import instructor
 from pydantic import BaseModel
@@ -75,7 +75,8 @@ def call(
     for _ in range(max(1, attempts)):
         try:
             return c.create(
-                response_model=output, max_tokens=max_tokens, temperature=0, messages=messages
+                response_model=output, max_tokens=max_tokens, temperature=0,
+                messages=cast("list[Any]", messages),
             )
         except Exception as e:
             if not _is_empty_response(e):

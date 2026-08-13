@@ -90,6 +90,60 @@ judge.tool_use(run)                # fully offline; no client or API key needed
 
 Set it up once, then grade as many runs as you like.
 
+### Configure project rules once
+
+Attach an evaluation policy to the `Attest` instance and it is enforced automatically for every
+run—callers only pass the trajectory:
+
+```python
+from attest import Attest, EvaluationPolicy, EvaluationRule
+
+policy = EvaluationPolicy(
+    name="customer-support",
+    version="1.0",
+    rules=[
+        EvaluationRule(
+            id="refund-check",
+            description="Check eligibility before sending a refund.",
+            kind="required_tool_order",
+            values=["check_eligibility", "issue_refund"],
+        ),
+        EvaluationRule(
+            id="no-guarantees",
+            description="Do not guarantee a refund outcome.",
+            kind="forbidden_text",
+            values=["guaranteed"],
+        ),
+        EvaluationRule(
+            id="tone",
+            description="The answer must be respectful and concise.",
+            kind="rubric",
+            severity="warn",
+        ),
+    ],
+)
+
+judge = Attest(policy=policy)
+report = judge.evaluate(run)          # policy is automatically included
+another = judge.evaluate(other_run)  # no policy plumbing through the call chain
+```
+
+Policies may also be loaded once from YAML or JSON:
+
+```python
+judge = Attest(policy="support-policy.yaml")
+judge.policy_check(run)  # policy only
+```
+
+Supported rule kinds are `required_text`, `forbidden_text`, `required_tools`,
+`required_tool_order`, `allowed_tools`, `evidence`, and `rubric`. `required_tools` checks
+presence; `required_tool_order` checks that the listed calls occur in sequence. Neither claims a
+tool succeeded unless a semantic `evidence` rule evaluates its output. Deterministic-only policies
+remain fully offline. Semantic `evidence` and `rubric` rules use the configured judge model.
+Reports include the policy name, version, and stable SHA-256 hash for reproducibility. A
+configured policy can only be skipped explicitly with
+`judge.evaluate(run, enforce_policy=False)`.
+
 Injection scanning also accepts named custom regex detectors and provenance-aware artifacts:
 
 ```python
@@ -124,7 +178,7 @@ never silently treated as clean.
 attest can do its grading with **Anthropic, OpenAI, or Gemini** — your choice:
 
 ```python
-Attest(provider="openai", model="gpt-4o-mini")    # uses your OPENAI_API_KEY
+Attest(provider="openai", model="gpt-5.6-luna")   # uses your OPENAI_API_KEY
 Attest(provider="gemini")                          # uses your GEMINI_API_KEY or GOOGLE_API_KEY
 Attest.models("openai")                            # which models can I use?
 ```
@@ -137,6 +191,22 @@ pip install "agent-attest[openai]"   # + OpenAI
 pip install "agent-attest[gemini]"   # + Gemini
 pip install "agent-attest[all]"      # everything
 ```
+
+To inspect embedded documents and images:
+
+```bash
+pip install "agent-attest[files]"    # PDF, safe XML, image OCR, metadata, and QR
+attest injection run.json --json
+```
+
+Visible-text OCR also requires the system `tesseract` executable (`brew install tesseract` on
+macOS or `apt install tesseract-ocr` on Debian/Ubuntu). If it is unavailable, Attest still scans
+image metadata and QR content and reports OCR as incomplete coverage.
+
+Embedded JSON, CSV, XML, HTML, PDF, PNG, JPEG, and WebP artifacts are extracted with byte,
+character, page, pixel, and OCR-time limits before the same injection detectors run. Local
+artifact paths remain disabled unless `--allow-paths` is passed explicitly. Extraction failures
+and limit truncation are reported as incomplete coverage, never as clean scans.
 
 Each provider reads its own key from the environment (a local `.env` file works too), and
 grading uses a small, fast, cheap model by default — think cents, not dollars.
@@ -159,7 +229,7 @@ for a tiny, complete example.
 ## Develop
 
 ```bash
-uv run pytest        # 109 tests — they all run offline, no API key needed
+uv run pytest        # all tests run offline; no API key needed
 ```
 
 ## Status

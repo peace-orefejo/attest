@@ -1,6 +1,6 @@
 [project]
 name = "agent-attest"
-version = "0.6.0"
+version = "0.7.0"
 description = "Evidence-grounded evaluator for AI agent trajectories — judge by verifying claims against real tool outputs, not LLM-judge vibes."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -26,12 +26,28 @@ dependencies = [
     "python-dotenv>=1.0",
     "instructor>=1.15.3",
     "regex>=2024.11.6",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
 openai = ["openai>=1.40"]
 gemini = ["instructor[google-genai]>=1.15.3"]
-all = ["openai>=1.40", "instructor[google-genai]>=1.15.3"]
+all = [
+    "openai>=1.40",
+    "instructor[google-genai]>=1.15.3",
+    "defusedxml>=0.7.1",
+    "pillow>=11.0",
+    "pypdf>=5.0",
+    "pytesseract>=0.3.13",
+    "zxing-cpp>=2.3",
+]
+files = [
+    "defusedxml>=0.7.1",
+    "pillow>=11.0",
+    "pypdf>=5.0",
+    "pytesseract>=0.3.13",
+    "zxing-cpp>=2.3",
+]
 
 [project.urls]
 Homepage = "https://github.com/adepeju4/attest"
@@ -42,7 +58,15 @@ Issues = "https://github.com/adepeju4/attest/issues"
 attest = "attest.cli:app"
 
 [dependency-groups]
-dev = ["pytest>=8.0"]
+dev = [
+    "pytest>=8.0",
+    "instructor[google-genai]>=1.15.3",
+    "defusedxml>=0.7.1",
+    "pillow>=11.0",
+    "pypdf>=5.0",
+    "pytesseract>=0.3.13",
+    "zxing-cpp>=2.3",
+]
 
 [build-system]
 requires = ["hatchling"]

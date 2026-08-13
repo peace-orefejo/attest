@@ -2,6 +2,8 @@
 
 from .trajectory import Trajectory, Step, ToolCall
 from .content import Artifact, Detection, TextSegment
+from .extraction import ExtractionLimits, ExtractionOutcome, extract_artifact
+from .policy import EvaluationPolicy, EvaluationRule, check_policy, load_policy
 from .results import Report, CheckResult, Finding, Severity, PROMPT_VERSION
 from .checks.verify import judge_trajectory, extract_claims, grounded_verifier, verify_claims
 from .checks.judge_baseline import naive_judge, JudgeVerdict
@@ -24,6 +26,8 @@ __all__ = [
     "Attest",
     "list_providers", "list_models", "default_model",
     "Trajectory", "Step", "ToolCall", "Artifact", "Detection", "TextSegment",
+    "ExtractionLimits", "ExtractionOutcome", "extract_artifact",
+    "EvaluationPolicy", "EvaluationRule", "check_policy", "load_policy",
     "Report", "CheckResult", "Finding", "Severity", "PROMPT_VERSION",
     "judge_trajectory", "extract_claims", "grounded_verifier", "verify_claims",
     "naive_judge", "JudgeVerdict",
@@ -35,4 +39,4 @@ __all__ = [
     "wilson_interval", "difference_is_real", "Proportion",
 ]
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"

@@ -25,21 +25,27 @@ _REGISTRY: dict[str, _Provider] = {
         prefix="anthropic",
         env_keys=("ANTHROPIC_API_KEY",),
         default_model="claude-haiku-4-5",
-        models=("claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-8"),
+        models=(
+            "claude-opus-5", "claude-sonnet-5",
+            "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5",
+        ),
     ),
     "openai": _Provider(
         name="openai",
         prefix="openai",
         env_keys=("OPENAI_API_KEY",),
-        default_model="gpt-4o-mini",
-        models=("gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"),
+        default_model="gpt-5.6-luna",
+        models=("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"),
     ),
     "gemini": _Provider(
         name="gemini",
         prefix="google",
         env_keys=("GEMINI_API_KEY", "GOOGLE_API_KEY"),
-        default_model="gemini-2.0-flash",
-        models=("gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash"),
+        default_model="gemini-3.6-flash",
+        models=(
+            "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite",
+            "gemini-2.5-pro",
+        ),
     ),
 }
 
@@ -84,8 +90,10 @@ def build_client(
     spec = _spec(provider)
     model = model or spec.default_model
     resolved = resolve_key(provider, key)
-    kwargs = {"api_key": resolved} if resolved else {}
-    return instructor.from_provider(f"{spec.prefix}/{model}", **kwargs)
+    target = f"{spec.prefix}/{model}"
+    if resolved:
+        return instructor.from_provider(target, api_key=resolved)
+    return instructor.from_provider(target)
 
 
 def _gemini_chat_models(models) -> list[str]:

@@ -3,6 +3,32 @@
 All notable changes to `agent-attest` are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+## [0.7.0] - 2026-08-13
+
+### Added
+- Instance-bound evaluation policies with YAML/JSON loading, deterministic text/tool rules,
+  evidence-grounded and rubric rules, automatic enforcement, and stable policy identity hashes.
+- Bounded extraction of JSON, CSV, XML, HTML, PDF, image OCR, image metadata, and QR content for
+  prompt-injection scanning through the optional `files` dependency bundle.
+- `--extract-files/--no-extract-files` and `--allow-paths` flags on the `injection` command, and
+  matching `extract_files`, `allow_paths`, and `extraction_limits` options on `Attest.injection`.
+- Total detection cap (`ExtractionLimits.max_detections`) that bounds custom detector output and
+  terminates unbounded or infinite detector iterables, emitting `unscanned_content`.
+- `examples/pdf_agent.py` end-to-end demo evaluating a PDF-reading agent for injection resistance,
+  including "held" versus "compromised" trajectories.
+
+### Changed
+- Refreshed the provider model registry: Anthropic Claude 5 family, OpenAI GPT-5.6, and Gemini 3.x
+  defaults and curated model lists.
+- Disabled-extraction warnings are capped per artifact and summarized with an omitted count, so a
+  large binary-artifact trajectory can no longer emit unbounded findings.
+
+### Fixed
+- `policy.py` no longer uses Python 3.12-only f-string syntax, restoring the declared 3.11 floor.
+- Resolved static type errors across the injection, extraction, policy, API, and provider modules.
+
 ## [0.6.0] - 2026-07-30
 
 ### Added
