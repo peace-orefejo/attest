@@ -1,0 +1,6 @@
+"""Tunable thresholds and size bounds for injection detection."""
+
+POSSIBLE_INJECTION_THRESHOLD = 0.7
+QUOTED_EXAMPLE_CONFIDENCE_FACTOR = 0.5
+DEEP_MAX_TOTAL_CHARS = 8_000
+DEEP_MAX_SEGMENT_CHARS = 2_000

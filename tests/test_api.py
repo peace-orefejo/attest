@@ -1,6 +1,6 @@
 """The Attest facade — all offline."""
 
-import attest.checks.injection as inj
+import attest.checks.injection.authorization as inj
 from attest import Attest
 from attest._llm import _resolve_client, using
 from attest.trajectory import Step, ToolCall, Trajectory

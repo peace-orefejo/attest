@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from .content import Artifact, TextSegment
+from .utils import artifact_subject
 
 
 class ToolCall(BaseModel):
@@ -66,7 +67,7 @@ class Trajectory(BaseModel):
 
 
 def _artifact_segment(artifact: Artifact, location: str, step: int | None) -> TextSegment:
-    label = artifact.name or artifact.id or "artifact"
+    label = artifact_subject(artifact)
     return TextSegment(
         text=artifact.text or "",
         location=location,
