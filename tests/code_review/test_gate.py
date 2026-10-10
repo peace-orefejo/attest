@@ -13,10 +13,12 @@ def faithfulness(*verdicts: str) -> Report:
     return Report(results=[CheckResult(check="faithfulness", passed=passed, findings=findings)])
 
 
-def injection(*entries: tuple[str, str | None]) -> CheckResult:
+def injection(*entries: tuple) -> CheckResult:
     findings = []
-    for verdict, file in entries:
+    for verdict, file, *affected in entries:
         metadata = {} if file is None else {"file": file}
+        if affected:
+            metadata["affected_outputs"] = affected[0]
         severity = Severity.FAIL if verdict in {"payload", "compromised"} else Severity.WARN
         findings.append(Finding(severity=severity, verdict=verdict, subject=f"{verdict} in {file}", metadata=metadata))
     return CheckResult(check="code_injection", passed=not findings, findings=findings)
@@ -170,6 +172,77 @@ def test_empty_paths_matches_no_file():
 def test_injection_finding_without_file_applies_to_any_paths():
     decision = gate(faithfulness("supported"), "issue", injection=injection(("payload", None)), paths=["app/a.py"])
     assert not decision.keep
+
+
+def test_compromised_drops_the_affected_output():
+    decision = gate(faithfulness("supported"), "issue",
+                    injection=injection(("compromised", "app/a.py", [1])), paths=["app/a.py"], output_index=1)
+    assert not decision.keep
+    assert [f.verdict for f in decision.reasons] == ["compromised"]
+
+
+def test_compromised_keeps_an_unaffected_output_on_the_same_file_with_a_note():
+    decision = gate(faithfulness("supported"), "issue",
+                    injection=injection(("compromised", "app/a.py", [1])), paths=["app/a.py"], output_index=0)
+    assert decision.keep
+    assert [f.verdict for f in decision.reasons] == ["compromised"]
+
+
+def test_compromised_for_another_file_adds_no_note_to_an_unaffected_output():
+    decision = gate(faithfulness("supported"), "issue",
+                    injection=injection(("compromised", "app/other.py", [1])), paths=["app/a.py"], output_index=0)
+    assert decision.keep
+    assert decision.reasons == []
+
+
+def test_compromised_drops_an_affected_output_even_outside_paths():
+    decision = gate(faithfulness("supported"), "issue",
+                    injection=injection(("compromised", "app/other.py", [0, 2])), paths=["app/a.py"], output_index=2)
+    assert not decision.keep
+
+
+def test_compromised_without_output_index_keeps_file_based_drop():
+    decision = gate(faithfulness("supported"), "issue",
+                    injection=injection(("compromised", "app/a.py", [1])), paths=["app/a.py"])
+    assert not decision.keep
+
+
+@pytest.mark.parametrize("affected", [None, []])
+def test_compromised_without_affected_outputs_keeps_file_based_drop(affected):
+    entry = ("compromised", "app/a.py") if affected is None else ("compromised", "app/a.py", affected)
+    decision = gate(faithfulness("supported"), "issue", injection=injection(entry),
+                    paths=["app/a.py"], output_index=0)
+    assert not decision.keep
+
+
+def test_payload_drops_every_output_on_its_file_whatever_the_index():
+    decision = gate(faithfulness("supported"), "issue",
+                    injection=injection(("payload", "app/a.py")), paths=["app/a.py"], output_index=3)
+    assert not decision.keep
+    assert [f.verdict for f in decision.reasons] == ["payload"]
+
+
+def test_payload_still_drops_when_a_compromised_finding_spares_this_output():
+    decision = gate(faithfulness("supported"), "issue",
+                    injection=injection(("compromised", "app/a.py", [1]), ("payload", "app/a.py")),
+                    paths=["app/a.py"], output_index=0)
+    assert not decision.keep
+    assert [f.verdict for f in decision.reasons] == ["compromised", "payload"]
+
+
+def test_unaffected_compromised_note_does_not_rescue_a_faithfulness_drop():
+    decision = gate(faithfulness("unsupported"), "issue",
+                    injection=injection(("compromised", "app/a.py", [1])), paths=["app/a.py"], output_index=0)
+    assert not decision.keep
+    assert [f.verdict for f in decision.reasons] == ["unsupported", "compromised"]
+
+
+def test_output_index_does_not_change_suspicious_or_clean():
+    decision = gate(faithfulness("supported"), "issue",
+                    injection=injection(("suspicious", "app/a.py"), ("clean", "app/a.py")),
+                    paths=["app/a.py"], output_index=0)
+    assert decision.keep
+    assert [f.verdict for f in decision.reasons] == ["suspicious"]
 
 
 def test_wrong_injection_check_name_is_rejected():
