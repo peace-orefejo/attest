@@ -70,7 +70,7 @@ flowchart LR
 | Extractor wiring | `src/attest/scoring/report.py` | Changed | Pass `answer_kind` to the extractor as well as the verifier. |
 | Code review package | `src/attest/code_review/` | New folder | Input models, the adapter, evidence building, lockfile summaries, and the gate. |
 | Code injection check | `src/attest/code_review/injection/` | New folder | Code-aware segmenting, code-review patterns, the targeted model question, and the effect check. |
-| Generic injection detectors | `src/attest/checks/injection/detectors/` | New files | Hidden-Unicode and encoded-payload detectors, usable by any run, not just code review. |
+| Generic text scanners | `src/attest/utils/unicode_scan.py`, `src/attest/utils/encoded_scan.py` | New | Hidden-Unicode and encoded-payload scanning, usable by any run. Thin detector wrappers move into `checks/injection/detectors/` after the injection split refactor merges. |
 | Shared diff utilities | `src/attest/utils/diff.py` | New | Parse unified diffs into files and hunks, count changed lines, cut a diff at a size limit. |
 | Eval harness | `examples/code_review_eval.py` | New | Score attest against labeled cases, per kind, gate and model. |
 | Isolation tests | `tests/checks/test_profiles.py` | New | Pin the factual and plan prompts so code work cannot change them. |
@@ -133,12 +133,11 @@ src/attest/
       confirm.py               targeted model question for uncertain hits
       effect.py                phrase overlap and hunk coverage, model fallback
       verdict.py               clean, suspicious, payload, compromised
-  checks/injection/detectors/   from the separate split refactor
-    unicode.py                 bidirectional controls, zero-width characters, mixed scripts
-    encoded.py                 bounded base64 and hex decoding, then rescan
   utils/
     __init__.py
     diff.py                    unified diff parsing, hunk splitting, cutting at a limit
+    unicode_scan.py            bidirectional controls, zero-width characters, mixed scripts
+    encoded_scan.py            bounded base64 and hex decoding, then rescan
 
 tests/
   checks/
@@ -374,8 +373,9 @@ Ordered so each step is testable on its own:
 5. **Adapter.** Build `ReviewOutput` to `Trajectory`, with diff size limits and the completeness
    rule. Offline tests only.
 6. **Gate helper.** Pure function over a `Report`, fully offline tests.
-6b. **Code injection check.** Needs the injection split refactor merged first, because it adds
-   detectors to the new package. Layers 1, 2 and 4 are deterministic and fully tested offline.
+6b. **Code injection check.** Built beside the injection split refactor, not on top of it. The
+   generic scanners live in shared utils, and detector wrappers are added to the new injection
+   package once the split merges. Layers 1, 2 and 4 are deterministic and fully tested offline.
    Layer 3 gets wiring tests like the verifier's. Add labeled cases with planted payloads to the
    eval set, including ones that look like payloads but are harmless, such as a test that checks
    injection handling.
