@@ -120,6 +120,7 @@ src/attest/
       __init__.py              re-exports gate, GateDecision
       defaults.py              default mode per output type
       decide.py                gate(): report to keep or drop
+      injection.py             injection findings: drop, note or ignore per output
     detect.py                  deterministic code-evidence detector for auto mode
     injection/
       __init__.py              re-exports check_code_injection
@@ -264,7 +265,8 @@ attest reports verdicts. The pipeline decides what to hide. A small helper makes
 explicit and testable:
 
 ```python
-gate(report, output_type="issue", mode=None) -> GateDecision(keep: bool, reasons: list[Finding])
+gate(report, output_type="issue", mode=None, injection=None, paths=None, output_index=None)
+    -> GateDecision(keep: bool, reasons: list[Finding])
 ```
 
 Defaults per output type, to be confirmed by the labeled set:
@@ -276,6 +278,14 @@ Defaults per output type, to be confirmed by the labeled set:
 | `canvas_answer` | strict | An answer that cites something not read should not be trusted. |
 
 An injection verdict of `payload` or `compromised` drops the affected outputs whatever the mode. A `suspicious` verdict only attaches a note. See the injection section below.
+
+`paths` names the files the output covers, and `output_index` is the output's position in the list passed to
+`check_code_injection`. A `payload` finding drops every output whose paths include its file. A `compromised`
+finding lists the outputs that repeated or obeyed the payload in `affected_outputs`. With `output_index` set, it
+drops only those outputs, even when `paths` leaves out the file. Another output on the same file is kept, and the
+finding is attached as a note. Without
+`output_index`, or when the finding has no `affected_outputs`, a `compromised` finding drops every output for its
+file, like `payload`.
 
 ### Injection check for code (hybrid)
 
@@ -314,7 +324,7 @@ Verdicts and what the gate does with them:
 | `clean` | No hits | None |
 | `suspicious` | Deterministic hit the model did not confirm, or the model was not run | Keep outputs, attach a note |
 | `payload` | Confirmed attempt to steer a reviewer | Drop review outputs for that file, and raise the payload itself as a security finding |
-| `compromised` | A review output repeated or obeyed the payload | Drop the affected outputs and raise a security finding |
+| `compromised` | A review output repeated or obeyed the payload | Drop the outputs listed in `affected_outputs`, attach a note to other outputs for that file, and raise a security finding |
 
 A confirmed payload is itself worth showing to humans. Someone trying to manipulate the reviewer
 is a finding, even if the reviewer was not fooled.
