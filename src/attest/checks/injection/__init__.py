@@ -13,7 +13,12 @@ from .constants import (
 )
 from .loader import load_regex_detector
 from .models import InjectionDetector, RegexPattern
-from .detectors import DEFAULT_DETECTORS, RegexDetector
+from .detectors import (
+    DEFAULT_DETECTORS,
+    EncodedPayloadDetector,
+    RegexDetector,
+    UnicodeDetector,
+)
 
 __all__ = [
     "check_injection",
@@ -21,5 +26,5 @@ __all__ = [
     "POSSIBLE_INJECTION_THRESHOLD", "QUOTED_EXAMPLE_CONFIDENCE_FACTOR",
     "load_regex_detector",
     "InjectionDetector", "RegexPattern",
-    "DEFAULT_DETECTORS", "RegexDetector",
+    "DEFAULT_DETECTORS", "EncodedPayloadDetector", "RegexDetector", "UnicodeDetector",
 ]

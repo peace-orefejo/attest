@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-import unicodedata
 from dataclasses import dataclass
 
-from ...checks.injection import DEFAULT_DETECTORS, InjectionDetector, RegexDetector
+from ...checks.injection import (
+    DEFAULT_DETECTORS,
+    EncodedPayloadDetector,
+    InjectionDetector,
+    RegexDetector,
+    UnicodeDetector,
+)
+from ...checks.injection.detectors.hidden_unicode import first_bidi, suspicious_unicode
 from ...content import TextSegment
 from ...utils.encoded_scan import find_encoded
-from ...utils.unicode_scan import UnicodeHit, scan_unicode
 from .context import GENERIC_FACTOR, PROSE_BAIT_FACTOR, REFERENCE_FACTOR, reference_example
 from .patterns import APPROVAL_BAIT, CODE_REVIEW_PATTERNS
 from .segments import Segment
@@ -16,7 +21,7 @@ from .segments import Segment
 DIRECTIVE_KINDS = frozenset({"comment", "docstring", "string", "prose"})
 WINDOW_CHARS = 300
 _CODE_REVIEW = RegexDetector(CODE_REVIEW_PATTERNS)
-_JOINER_NEIGHBOURS = frozenset({"So", "Sk", "Mn", "Me", "Lo"})
+_SCORED_HERE = (UnicodeDetector, EncodedPayloadDetector)
 
 
 @dataclass(frozen=True)
@@ -48,7 +53,9 @@ def _window(text: str, start: int, end: int) -> str:
 
 def _regex_matches(text: str) -> tuple[list[_Match], bool]:
     segment = TextSegment(text=text, location="", source_kind="code_review", subject="")
-    sources: list[tuple[str, InjectionDetector]] = [("regex", d) for d in DEFAULT_DETECTORS]
+    sources: list[tuple[str, InjectionDetector]] = [
+        ("regex", d) for d in DEFAULT_DETECTORS if not isinstance(d, _SCORED_HERE)
+    ]
     sources.append(("code_review", _CODE_REVIEW))
     matches: list[_Match] = []
     incomplete = False
@@ -95,15 +102,6 @@ def _directive_hits(segment: Segment) -> tuple[list[Hit], bool]:
     return hits, incomplete
 
 
-def _benign_unicode(text: str, hit: UnicodeHit, segment: Segment) -> bool:
-    if hit.text == "﻿" and hit.start == 0 and segment.line == 1:
-        return True
-    if hit.text in ("‌", "‍"):
-        neighbours = text[max(0, hit.start - 1):hit.start] + text[hit.end:hit.end + 1]
-        return any(unicodedata.category(ch) in _JOINER_NEIGHBOURS for ch in neighbours)
-    return False
-
-
 def _unicode_confidence(kind: str, segment_kind: str) -> float:
     if kind == "bidi_control":
         return 1.0
@@ -111,10 +109,7 @@ def _unicode_confidence(kind: str, segment_kind: str) -> float:
 
 
 def _unicode_hits(segment: Segment) -> list[Hit]:
-    grouped: dict[str, list[UnicodeHit]] = {}
-    for hit in scan_unicode(segment.text):
-        if not _benign_unicode(segment.text, hit, segment):
-            grouped.setdefault(hit.kind, []).append(hit)
+    grouped = suspicious_unicode(segment.text, bom_allowed=segment.line == 1)
     hits: list[Hit] = []
     for kind, found in grouped.items():
         first = found[0]
@@ -136,7 +131,7 @@ def _encoded_hits(segment: Segment) -> tuple[list[Hit], bool]:
             hits.append(Hit(segment, "encoded", f"{blob.encoding}:{m.pattern}", m.category,
                             m.confidence, line, blob.decoded[m.start:m.end].strip(),
                             _window(blob.decoded, m.start, m.end)))
-        if any(h.kind == "bidi_control" for h in scan_unicode(blob.decoded)):
+        if first_bidi(blob.decoded) is not None:
             hits.append(Hit(segment, "encoded", f"{blob.encoding}:bidi_control",
                             "hidden_unicode", 1.0, line, "bidi control in decoded text",
                             blob.decoded[:2 * WINDOW_CHARS]))
