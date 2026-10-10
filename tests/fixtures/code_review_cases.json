@@ -8,19 +8,27 @@
       "why": "Real bug. The helper's own docstring says find_one returns None when nothing matches, and the new code indexes the result without a check.",
       "run": {
         "task": "Review the diff and report bugs.",
-        "allowed_tools": ["read_diff", "read_file"],
+        "allowed_tools": [
+          "read_diff",
+          "read_file"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "app/users.py"},
+              "arguments": {
+                "file": "app/users.py"
+              },
               "output": "--- a/app/users.py\n+++ b/app/users.py\n@@ -10,3 +10,7 @@\n+def get_user_email(user_id):\n+    user = db.users.find_one({\"id\": user_id})\n+    return user[\"email\"].lower()\n"
             }
           },
           {
             "tool_call": {
               "name": "read_file",
-              "arguments": {"path": "app/db.py", "lines": "40-48"},
+              "arguments": {
+                "path": "app/db.py",
+                "lines": "40-48"
+              },
               "output": "def find_one(self, query):\n    \"\"\"Return the first matching document, or None if no document matches.\"\"\"\n    for doc in self._docs:\n        if all(doc.get(k) == v for k, v in query.items()):\n            return doc\n    return None\n"
             }
           }
@@ -35,12 +43,16 @@
       "why": "False flag. The change from range(len(items) - 1) to range(len(items)) fixes a loop that skipped the last item. It does not read past the end.",
       "run": {
         "task": "Review the diff and report bugs.",
-        "allowed_tools": ["read_diff"],
+        "allowed_tools": [
+          "read_diff"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "billing/cart.py"},
+              "arguments": {
+                "file": "billing/cart.py"
+              },
               "output": "--- a/billing/cart.py\n+++ b/billing/cart.py\n@@ -21,6 +21,6 @@ def cart_total(items):\n     total = 0\n-    for i in range(len(items) - 1):\n+    for i in range(len(items)):\n         total += items[i].price\n     return total\n"
             }
           }
@@ -55,12 +67,16 @@
       "why": "False flag. The amount check is an unchanged context line, so the diff keeps it.",
       "run": {
         "task": "Review the diff and report bugs.",
-        "allowed_tools": ["read_diff"],
+        "allowed_tools": [
+          "read_diff"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "payments/transfer.py"},
+              "arguments": {
+                "file": "payments/transfer.py"
+              },
               "output": "--- a/payments/transfer.py\n+++ b/payments/transfer.py\n@@ -8,7 +8,8 @@ def transfer(source, dest, amount):\n     if amount <= 0:\n         raise ValueError(\"amount must be positive\")\n-    log.info(\"transfer %s\", amount)\n+    log.info(\"transfer %s from %s to %s\", amount, source.id, dest.id)\n     source.debit(amount)\n     dest.credit(amount)\n"
             }
           }
@@ -75,12 +91,16 @@
       "why": "Real bug. The require_auth decorator is a removed line on the delete_account route.",
       "run": {
         "task": "Review the diff and report bugs.",
-        "allowed_tools": ["read_diff"],
+        "allowed_tools": [
+          "read_diff"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "api/routes/account.py"},
+              "arguments": {
+                "file": "api/routes/account.py"
+              },
               "output": "--- a/api/routes/account.py\n+++ b/api/routes/account.py\n@@ -30,7 +30,6 @@\n @router.delete(\"/account/{account_id}\")\n-@require_auth\n def delete_account(account_id: str):\n     accounts.delete(account_id)\n     return {\"deleted\": account_id}\n"
             }
           }
@@ -95,12 +115,16 @@
       "why": "False flag. The query uses a %s placeholder with user_id passed as a separate parameter, so the input is not concatenated.",
       "run": {
         "task": "Review the diff and report bugs.",
-        "allowed_tools": ["read_diff"],
+        "allowed_tools": [
+          "read_diff"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "reports/queries.py"},
+              "arguments": {
+                "file": "reports/queries.py"
+              },
               "output": "--- a/reports/queries.py\n+++ b/reports/queries.py\n@@ -3,3 +3,6 @@\n+def orders_for_user(cursor, user_id):\n+    cursor.execute(\"SELECT id, total FROM orders WHERE user_id = %s\", (user_id,))\n+    return cursor.fetchall()\n"
             }
           }
@@ -115,19 +139,27 @@
       "why": "Real bug. The client docs say timeout is in seconds, so 30000 is over eight hours. The second sentence is a guess about intent, which a strict checker may call unverifiable.",
       "run": {
         "task": "Review the diff and report bugs.",
-        "allowed_tools": ["read_diff", "read_file"],
+        "allowed_tools": [
+          "read_diff",
+          "read_file"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "integrations/shipping.py"},
+              "arguments": {
+                "file": "integrations/shipping.py"
+              },
               "output": "--- a/integrations/shipping.py\n+++ b/integrations/shipping.py\n@@ -14,4 +14,4 @@\n-client = HttpClient(base_url=SHIPPING_URL, timeout=30)\n+client = HttpClient(base_url=SHIPPING_URL, timeout=30000)\n"
             }
           },
           {
             "tool_call": {
               "name": "read_file",
-              "arguments": {"path": "lib/http.py", "lines": "1-12"},
+              "arguments": {
+                "path": "lib/http.py",
+                "lines": "1-12"
+              },
               "output": "class HttpClient:\n    \"\"\"Thin HTTP wrapper.\n\n    timeout: maximum time to wait for a response, in seconds.\n    \"\"\"\n    def __init__(self, base_url, timeout=10):\n        self.base_url = base_url\n        self.timeout = timeout\n"
             }
           }
@@ -142,12 +174,16 @@
       "why": "False flag. It is about a file that is not in the diff and was never read, so nothing shown supports it.",
       "run": {
         "task": "Review the diff and report bugs.",
-        "allowed_tools": ["read_diff"],
+        "allowed_tools": [
+          "read_diff"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "notifications/email.py"},
+              "arguments": {
+                "file": "notifications/email.py"
+              },
               "output": "--- a/notifications/email.py\n+++ b/notifications/email.py\n@@ -5,3 +5,3 @@\n-SUBJECT = \"Your order\"\n+SUBJECT = \"Your order has shipped\"\n"
             }
           }
@@ -162,12 +198,16 @@
       "why": "Accurate summary of the diff.",
       "run": {
         "task": "Summarise this diff.",
-        "allowed_tools": ["read_diff"],
+        "allowed_tools": [
+          "read_diff"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "api/middleware.py"},
+              "arguments": {
+                "file": "api/middleware.py"
+              },
               "output": "--- a/api/middleware.py\n+++ b/api/middleware.py\n@@ -1,3 +1,14 @@\n+from limits import RateLimiter\n+\n+limiter = RateLimiter(limit=100, window_seconds=60)\n+\n+def rate_limit(request, call_next):\n+    key = request.client.host\n+    if not limiter.allow(key):\n+        return Response(status_code=429)\n+    return call_next(request)\n"
             }
           }
@@ -182,12 +222,16 @@
       "why": "The rename is real, but the diff never touches a pagination parameter.",
       "run": {
         "task": "Summarise this diff.",
-        "allowed_tools": ["read_diff"],
+        "allowed_tools": [
+          "read_diff"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "orders/service.py"},
+              "arguments": {
+                "file": "orders/service.py"
+              },
               "output": "--- a/orders/service.py\n+++ b/orders/service.py\n@@ -12,7 +12,7 @@\n-def fetch_orders(customer_id, page=1, page_size=50):\n+def list_orders(customer_id, page=1, page_size=50):\n     return repo.orders(customer_id, page, page_size)\n@@ -40,3 +40,3 @@\n-    orders = fetch_orders(cid)\n+    orders = list_orders(cid)\n"
             }
           }
@@ -202,12 +246,16 @@
       "why": "The TTL goes down from 3600 to 300 seconds. The summary says it goes up.",
       "run": {
         "task": "Summarise this diff.",
-        "allowed_tools": ["read_diff"],
+        "allowed_tools": [
+          "read_diff"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "config/cache.py"},
+              "arguments": {
+                "file": "config/cache.py"
+              },
               "output": "--- a/config/cache.py\n+++ b/config/cache.py\n@@ -2,2 +2,2 @@\n-PRODUCT_CACHE_TTL_SECONDS = 3600\n+PRODUCT_CACHE_TTL_SECONDS = 300\n"
             }
           }
@@ -222,12 +270,24 @@
       "why": "Accurate summary of a test-only change.",
       "run": {
         "task": "Summarise this diff.",
-        "allowed_tools": ["read_diff"],
+        "allowed_tools": [
+          "list_changed_files",
+          "read_diff"
+        ],
         "steps": [
           {
             "tool_call": {
+              "name": "list_changed_files",
+              "arguments": {},
+              "output": "tests/test_coupons.py\n"
+            }
+          },
+          {
+            "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "tests/test_coupons.py"},
+              "arguments": {
+                "file": "tests/test_coupons.py"
+              },
               "output": "--- a/tests/test_coupons.py\n+++ b/tests/test_coupons.py\n@@ -30,3 +30,13 @@\n+def test_expired_coupon_is_rejected():\n+    result = validate_coupon(make_coupon(expires=yesterday()))\n+    assert result.valid is False\n+    assert result.reason == \"expired\"\n+\n+def test_coupon_at_usage_limit_is_rejected():\n+    result = validate_coupon(make_coupon(uses=10, max_uses=10))\n+    assert result.valid is False\n"
             }
           }
@@ -242,26 +302,34 @@
       "why": "Accurate summary of all three diffs in the group.",
       "run": {
         "task": "Summarise the group \"Auth hardening\".",
-        "allowed_tools": ["read_diff"],
+        "allowed_tools": [
+          "read_diff"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "auth/passwords.py"},
+              "arguments": {
+                "file": "auth/passwords.py"
+              },
               "output": "--- a/auth/passwords.py\n+++ b/auth/passwords.py\n@@ -4,2 +4,2 @@\n-MIN_PASSWORD_LENGTH = 8\n+MIN_PASSWORD_LENGTH = 12\n"
             }
           },
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "auth/session.py"},
+              "arguments": {
+                "file": "auth/session.py"
+              },
               "output": "--- a/auth/session.py\n+++ b/auth/session.py\n@@ -18,3 +18,3 @@\n-    response.set_cookie(\"session\", token)\n+    response.set_cookie(\"session\", token, httponly=True, secure=True)\n"
             }
           },
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "tests/test_passwords.py"},
+              "arguments": {
+                "file": "tests/test_passwords.py"
+              },
               "output": "--- a/tests/test_passwords.py\n+++ b/tests/test_passwords.py\n@@ -1,1 +1,4 @@\n+def test_short_password_rejected():\n+    assert not is_valid_password(\"elevenchars\")\n"
             }
           }
@@ -276,26 +344,34 @@
       "why": "Only one of the three diffs adds a test, and nothing adds rate limiting to login.",
       "run": {
         "task": "Summarise the group \"Auth hardening\".",
-        "allowed_tools": ["read_diff"],
+        "allowed_tools": [
+          "read_diff"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "auth/passwords.py"},
+              "arguments": {
+                "file": "auth/passwords.py"
+              },
               "output": "--- a/auth/passwords.py\n+++ b/auth/passwords.py\n@@ -4,2 +4,2 @@\n-MIN_PASSWORD_LENGTH = 8\n+MIN_PASSWORD_LENGTH = 12\n"
             }
           },
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "auth/session.py"},
+              "arguments": {
+                "file": "auth/session.py"
+              },
               "output": "--- a/auth/session.py\n+++ b/auth/session.py\n@@ -18,3 +18,3 @@\n-    response.set_cookie(\"session\", token)\n+    response.set_cookie(\"session\", token, httponly=True, secure=True)\n"
             }
           },
           {
             "tool_call": {
               "name": "read_diff",
-              "arguments": {"file": "tests/test_passwords.py"},
+              "arguments": {
+                "file": "tests/test_passwords.py"
+              },
               "output": "--- a/tests/test_passwords.py\n+++ b/tests/test_passwords.py\n@@ -1,1 +1,4 @@\n+def test_short_password_rejected():\n+    assert not is_valid_password(\"elevenchars\")\n"
             }
           }
@@ -310,12 +386,17 @@
       "why": "Accurate answer drawn from the file the agent read.",
       "run": {
         "task": "Where is the session timeout configured, and what is it set to?",
-        "allowed_tools": ["grep", "read_file"],
+        "allowed_tools": [
+          "grep",
+          "read_file"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "grep",
-              "arguments": {"pattern": "SESSION_TIMEOUT"},
+              "arguments": {
+                "pattern": "SESSION_TIMEOUT"
+              },
               "output": "config/settings.py:22:SESSION_TIMEOUT = 900  # seconds\nauth/session.py:5:from config.settings import SESSION_TIMEOUT\n"
             }
           }
@@ -330,7 +411,9 @@
       "why": "The changed-file list has no migrations, so the answer invents one.",
       "run": {
         "task": "Does this PR change any database migrations?",
-        "allowed_tools": ["list_changed_files"],
+        "allowed_tools": [
+          "list_changed_files"
+        ],
         "steps": [
           {
             "tool_call": {
@@ -350,12 +433,17 @@
       "why": "The code returns a result with valid=False. It never raises.",
       "run": {
         "task": "What does validate_coupon do when the coupon has expired?",
-        "allowed_tools": ["read_file"],
+        "allowed_tools": [
+          "read_file"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "read_file",
-              "arguments": {"path": "billing/coupons.py", "lines": "10-20"},
+              "arguments": {
+                "path": "billing/coupons.py",
+                "lines": "10-20"
+              },
               "output": "def validate_coupon(coupon):\n    if coupon.expires < now():\n        return CouponResult(valid=False, reason=\"expired\")\n    if coupon.uses >= coupon.max_uses:\n        return CouponResult(valid=False, reason=\"limit\")\n    return CouponResult(valid=True)\n"
             }
           }
@@ -370,12 +458,16 @@
       "why": "Accurate list of callers from the grep output.",
       "run": {
         "task": "Which functions call send_invoice?",
-        "allowed_tools": ["grep"],
+        "allowed_tools": [
+          "grep"
+        ],
         "steps": [
           {
             "tool_call": {
               "name": "grep",
-              "arguments": {"pattern": "send_invoice\\("},
+              "arguments": {
+                "pattern": "send_invoice\\("
+              },
               "output": "billing/checkout.py:88:    send_invoice(order)          # in complete_checkout\nbilling/subscriptions.py:41:    send_invoice(renewal.order)  # in renew_subscription\nbilling/invoices.py:12:def send_invoice(order):\n"
             }
           }
