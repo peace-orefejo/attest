@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from ...extraction import ExtractionLimits
-from ...results import Finding
-from ...utils import artifact_subject
+from ...core import Finding, artifact_subject
 from .collect import CollectedSegments
 from .findings import unscanned_finding
 

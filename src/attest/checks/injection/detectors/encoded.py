@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ....content import Detection, TextSegment
+from ....core import Detection, TextSegment
 from ....utils.encoded_scan import MAX_BLOBS, MAX_DECODED_BYTES, EncodedBlob, find_encoded
 from .hidden_unicode import first_bidi, reveal
 from .regex_detector import RegexDetector

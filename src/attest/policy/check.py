@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from ..results import CheckResult, Finding, Severity
-from ..trajectory import Trajectory
+from ..core import CheckResult, Finding, Severity, Trajectory
 from .deterministic import _evaluate_deterministic_rule
 from .models import EvaluationPolicy
 from .rule import EvaluationRule

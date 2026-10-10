@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from .._llm import call
-from ..trajectory import Trajectory
+from ..core import Trajectory
 
 _JUDGE_SYSTEM = (
     "You are evaluating an AI agent's work. You are shown the agent's full "

@@ -12,8 +12,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from .._llm import vote
-from ..results import CheckResult, Finding, Severity
-from ..trajectory import Trajectory
+from ..core import CheckResult, Finding, Severity, Trajectory
 
 _SEVERITY = {
     "in_scope": Severity.PASS,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...results import CheckResult, Finding
+from ...core import CheckResult, Finding
 from ..models import PullRequest, ReviewOutput
 from .bounded import CharBudget
 from .confirm import ConfirmOut, confirm

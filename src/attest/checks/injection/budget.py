@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from ...content import TextSegment
+from ...core import Finding, TextSegment, artifact_location, artifact_locations
 from ...extraction import ExtractionLimits
-from ...results import Finding
-from ...utils import artifact_location, artifact_locations
 from .findings import unscanned_finding
 
 

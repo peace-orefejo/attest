@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..content import TextSegment
+from ..core import TextSegment
 
 
 @dataclass

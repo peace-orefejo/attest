@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from ..content import Artifact, TextSegment
-from ..utils import ARTIFACT_LOCATION_KEY, artifact_subject
+from ..core import ARTIFACT_LOCATION_KEY, Artifact, TextSegment, artifact_subject
 from .outcome import ExtractionOutcome
 
 

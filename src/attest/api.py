@@ -16,10 +16,8 @@ from .providers import (
     DEFAULT_PROVIDER, LLMClient, build_client, default_model, list_models, providers,
 )
 from .policy import PolicyInput, check_policy, load_policy
-from .results import CheckResult, Report
+from .core import CheckResult, Proportion, Report, Trajectory, wilson_interval
 from .scoring.report import DEFAULT_CHECKS, evaluate, validate_evaluation_options
-from .scoring.stats import Proportion, wilson_interval
-from .trajectory import Trajectory
 
 
 class Attest:

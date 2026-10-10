@@ -11,8 +11,7 @@ from ..checks.role import check_role_adherence
 from ..checks.tool_use import check_tool_use
 from ..checks.verify import MAX_CLAIMS, extract_claims, judge_trajectory, verify_claims
 from ..code_review.detect import detect_answer_kind
-from ..results import CheckResult, Report
-from ..trajectory import Trajectory
+from ..core import CheckResult, Report, Trajectory
 
 DEFAULT_CHECKS = ("faithfulness", "tool_use")
 SUPPORTED_CHECKS = ("faithfulness", "tool_use", "injection", "role")

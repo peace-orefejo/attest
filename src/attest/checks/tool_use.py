@@ -5,8 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from .._llm import call
-from ..results import CheckResult, Finding, Severity
-from ..trajectory import ToolCall, Trajectory
+from ..core import CheckResult, Finding, Severity, ToolCall, Trajectory
 
 
 def _looks_like_error(output: str) -> bool:

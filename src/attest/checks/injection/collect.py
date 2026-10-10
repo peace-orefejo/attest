@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ...content import Artifact, TextSegment
+from ...core import Artifact, TextSegment, Trajectory
 from ...extraction import ExtractionLimits, extract_artifact
-from ...trajectory import Trajectory
 
 ArtifactEntry = tuple[Artifact, str, int | None]
 ExtractionWarning = tuple[Artifact, str, str, bool]

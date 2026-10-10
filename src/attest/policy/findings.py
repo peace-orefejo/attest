@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..results import Finding, Severity
+from ..core import Finding, Severity
 from .rule import EvaluationRule
 
 

@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from ...content import TextSegment
-from ...results import CheckResult, Finding, Severity
+from ...core import CheckResult, Finding, Severity, TextSegment
 from .collect import ArtifactEntry
 
 

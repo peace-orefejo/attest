@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..trajectory import Step, ToolCall, Trajectory
+from ..core import Step, ToolCall, Trajectory
 from .evidence.large_files import EvidenceLimits, Omission, render_diffs
 from .evidence.scoping import read_label, scope_evidence
 from .models import ReviewOutput

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ...results import CheckResult, Finding, Report
+from ...core import CheckResult, Finding, Report
 from ..models import GateDecision, GateMode, OutputType
 from .defaults import DROPPING_VERDICTS, default_mode
 from .injection import injection_reasons

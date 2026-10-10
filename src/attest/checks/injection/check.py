@@ -5,8 +5,7 @@ from __future__ import annotations
 from typing import Sequence
 
 from ...extraction import ExtractionLimits
-from ...results import CheckResult, Finding
-from ...trajectory import Trajectory
+from ...core import CheckResult, Finding, Trajectory
 from .budget import bounded_scan_segments
 from .collect import collect_segments
 from .coverage import deferred_artifacts_finding, extraction_coverage_findings

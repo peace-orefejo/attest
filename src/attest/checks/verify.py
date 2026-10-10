@@ -7,8 +7,7 @@ from typing import Callable, Literal
 from pydantic import BaseModel
 
 from .._llm import call
-from ..results import CheckResult, Finding, Severity
-from ..trajectory import Trajectory
+from ..core import CheckResult, Finding, Severity, Trajectory
 from .profiles import get_profile
 from .profiles.registry import PROFILE_KINDS
 
