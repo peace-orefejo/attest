@@ -202,7 +202,7 @@ def run(
     appropriate: bool = typer.Option(False, "--appropriate",
                                      help="Also run the LLM tool-choice check (1 call per tool call)."),
     kind: str = typer.Option("factual", "--kind",
-                             help="Answer type: 'factual' (default) or 'plan' (judge fidelity to the plan)."),
+                             help="Answer type: 'factual' (default), 'plan' (judge fidelity to the plan), 'code' (judge against diffs and source), or 'auto' (pick factual or code from the evidence)."),
     provider: str = _PROVIDER_OPT,
     model: str = _MODEL_OPT,
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
