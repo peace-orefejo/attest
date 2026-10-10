@@ -431,9 +431,8 @@ shape and are about a day together. Step 7 is open-ended and driven by data.
 
 - Get 50 to 100 real outputs from the review pipeline, labeled correct or wrong, including past
   false flags. Seventeen synthetic cases give intervals too wide to tune against.
-- Merge the dependency and Claude 5 compatibility fix on `fix/deps-claude5-dotenv` first. It
-  touches `_llm.py`, `providers.py`, `api.py` and `cli.py`. This branch avoids those files,
-  except for one line of `--kind` help text in `cli.py`, which should be added after that merge.
+- Done: the dependency and Claude 5 compatibility fix is merged into this branch, along with the
+  injection, extraction and policy package splits.
 - Done: the `core/` package now holds the shared data models (`trajectory.py`, `results.py`,
   `content.py`), statistics (`stats.py`), the artifact helpers that used attest types (moved
   from `utils/`), and model calls and providers under `core/llm/`, split into calls, client
