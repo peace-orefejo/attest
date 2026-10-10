@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 
 import typer
-from dotenv import load_dotenv
 from pydantic import ValidationError
 
 from ._llm import using
@@ -16,13 +15,15 @@ from .checks.injection import DEFAULT_DETECTORS, check_injection, load_regex_det
 from .checks.role import check_role_adherence
 from .checks.tool_use import check_tool_use
 from .checks.verify import extract_claims, judge_trajectory, verify_claims
-from .providers import DEFAULT_PROVIDER, build_client, list_models, providers, resolve_key
+from .providers import (
+    DEFAULT_PROVIDER, build_client, list_models, load_env, providers, resolve_key,
+)
 from .results import CheckResult, Report, Severity
 from .scoring.report import DEFAULT_CHECKS, evaluate, validate_evaluation_options
 from .scoring.stats import wilson_interval
 from .trajectory import Trajectory
 
-load_dotenv()
+load_env()
 app = typer.Typer(help="Evidence-grounded evaluation for AI agent trajectories.")
 
 _PROVIDER_OPT = typer.Option(DEFAULT_PROVIDER, "--provider", "-p",
