@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from ..._llm import vote
+from ...core.llm import vote
 from ...core import Trajectory
 
 

@@ -1,8 +1,8 @@
 import pytest
 
-import attest.providers as providers
+import attest.core.llm.env as env
 
 
 @pytest.fixture(autouse=True)
 def _no_dotenv(monkeypatch):
-    monkeypatch.setattr(providers, "load_env", lambda: None)
+    monkeypatch.setattr(env, "load_env", lambda: None)

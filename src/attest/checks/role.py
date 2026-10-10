@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from .._llm import vote
+from ..core.llm import vote
 from ..core import CheckResult, Finding, Severity, Trajectory
 
 _SEVERITY = {

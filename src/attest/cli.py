@@ -9,16 +9,15 @@ from pathlib import Path
 import typer
 from pydantic import ValidationError
 
-from ._llm import using
+from .core import CheckResult, Report, Severity, Trajectory, wilson_interval
+from .core.llm import (
+    DEFAULT_PROVIDER, build_client, list_models, load_env, providers, resolve_key, using,
+)
 from .checks.judge_baseline import naive_judge
 from .checks.injection import DEFAULT_DETECTORS, check_injection, load_regex_detector
 from .checks.role import check_role_adherence
 from .checks.tool_use import check_tool_use
 from .checks.verify import extract_claims, judge_trajectory, verify_claims
-from .providers import (
-    DEFAULT_PROVIDER, build_client, list_models, load_env, providers, resolve_key,
-)
-from .core import CheckResult, Report, Severity, Trajectory, wilson_interval
 from .scoring.report import DEFAULT_CHECKS, evaluate, validate_evaluation_options
 
 load_env()

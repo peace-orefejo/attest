@@ -19,7 +19,7 @@ from .checks.role import check_role_adherence
 from .scoring.report import evaluate
 from .adapters.langgraph import from_langgraph_messages
 from .core.stats import wilson_interval, difference_is_real, Proportion
-from .providers import providers as list_providers, list_models, default_model
+from .core.llm import providers as list_providers, list_models, default_model
 from .api import Attest
 
 __all__ = [

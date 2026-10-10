@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from .._llm import call
+from ..core.llm import call
 from ..core import Trajectory
 
 _JUDGE_SYSTEM = (

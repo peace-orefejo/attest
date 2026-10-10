@@ -1,6 +1,6 @@
 """Self-consistency voting: majority over repeated samples, to dampen judge non-determinism."""
 
-import attest._llm as llm
+import attest.core.llm.calls as llm
 from pydantic import BaseModel
 
 

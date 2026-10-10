@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from ..._llm import call
+from ...core.llm import call
 from ..models import PullRequest, ReviewOutput
 from .bounded import CharBudget, frame_untrusted
 from .segments import PR_FILE, file_diffs
