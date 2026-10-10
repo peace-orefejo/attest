@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..trajectory import Step, ToolCall, Trajectory
+from ..core import Step, ToolCall, Trajectory
 
 
 def _flatten(content) -> str:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 import json
 
-from ..trajectory import Trajectory
+from ..core import Trajectory
 from .limits import (
     POLICY_MAX_ANSWER_CHARS,
     POLICY_MAX_ARGUMENT_CHARS,

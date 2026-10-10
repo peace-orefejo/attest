@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..content import Artifact
+from ..core import Artifact
 from .dispatch import parse_parts
 from .limits import ExtractionLimits
 from .media import guess_media, sniff_media

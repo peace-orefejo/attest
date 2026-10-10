@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ....content import Detection, TextSegment
+from ....core import Detection, TextSegment
 from ....utils.unicode_scan import UnicodeHit, UnicodeKind
 from ..constants import POSSIBLE_INJECTION_THRESHOLD
 from .hidden_unicode import reveal, suspicious_unicode

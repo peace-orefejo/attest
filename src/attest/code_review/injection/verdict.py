@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable, Literal, cast
 
-from ...results import Severity
+from ...core import Severity
 from ..models import INJECTION_VERDICTS, InjectionVerdict
 
 HIGH_CONFIDENCE = 0.9

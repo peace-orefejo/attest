@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from ...results import CheckResult, Finding
+from ...core import CheckResult, Finding
 from ..models import INJECTION_VERDICTS
 
 INJECTION_CHECK = "code_injection"

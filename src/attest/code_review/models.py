@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from ..results import Finding
+from ..core import Finding
 
 OutputType = Literal["issue", "diff_summary", "group_summary", "canvas_answer"]
 GateMode = Literal["lenient", "strict"]

@@ -12,7 +12,7 @@ from ...checks.injection import (
     UnicodeDetector,
 )
 from ...checks.injection.detectors.hidden_unicode import first_bidi, suspicious_unicode
-from ...content import TextSegment
+from ...core import TextSegment
 from ...utils.encoded_scan import find_encoded
 from .context import GENERIC_FACTOR, PROSE_BAIT_FACTOR, REFERENCE_FACTOR, reference_example
 from .patterns import APPROVAL_BAIT, CODE_REVIEW_PATTERNS

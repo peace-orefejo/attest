@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-from ...content import Detection, TextSegment
+from ...core import Detection, TextSegment
 
 
 @dataclass(frozen=True)

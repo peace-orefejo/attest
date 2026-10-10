@@ -6,7 +6,7 @@ import html
 import json
 from typing import Sequence
 
-from ...content import TextSegment
+from ...core import TextSegment
 from .constants import DEEP_MAX_SEGMENT_CHARS, DEEP_MAX_TOTAL_CHARS
 
 

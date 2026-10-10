@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from ..results import Finding
-from ..trajectory import Trajectory
+from ..core import Finding, Trajectory
 from .findings import _finding
 from .rule import EvaluationRule
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 
-from ..trajectory import ToolCall, Trajectory
+from ..core import ToolCall, Trajectory
 from .tool_names import LIST_CHANGED_FILES, READ_DIFF
 
 CODE_TOOLS: tuple[str, ...] = (READ_DIFF, LIST_CHANGED_FILES)

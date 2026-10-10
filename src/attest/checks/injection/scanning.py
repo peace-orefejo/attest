@@ -5,10 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Sequence
 
-from ...content import Detection, TextSegment
+from ...core import Detection, Finding, Severity, TextSegment, artifact_location
 from ...extraction import ExtractionLimits
-from ...results import Finding, Severity
-from ...utils import artifact_location
 from .findings import detector_name, unscanned_finding
 from .models import InjectionDetector
 

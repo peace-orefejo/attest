@@ -7,9 +7,8 @@ import json
 
 from pydantic import BaseModel
 
-from .._llm import vote
-from ..results import Finding
-from ..trajectory import Trajectory
+from ..core.llm import vote
+from ..core import Finding, Trajectory
 from .context import _bounded_policy_context
 from .findings import _finding, _violation_severity
 from .rule import EvaluationRule

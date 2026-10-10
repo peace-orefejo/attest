@@ -5,17 +5,10 @@ import types
 
 import pytest
 
-from attest.providers import (
-    _gemini_chat_models,
-    build_client,
-    curated_models,
-    default_model,
-    fetch_models,
-    list_models,
-    load_env,
-    providers,
-    resolve_key,
-)
+from attest.core.llm.catalog import _gemini_chat_models, fetch_models, list_models
+from attest.core.llm.clients import build_client
+from attest.core.llm.env import load_env, resolve_key
+from attest.core.llm.providers import curated_models, default_model, providers
 
 
 def test_registry_basics():
@@ -122,7 +115,7 @@ def real_dotenv(tmp_path, monkeypatch):
     (tmp_path / ".env").write_text("ANTHROPIC_API_KEY=from-dotenv\n")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "placeholder")
-    monkeypatch.setattr("attest.providers.load_env", load_env)
+    monkeypatch.setattr("attest.core.llm.env.load_env", load_env)
     load_env.cache_clear()
     yield
     load_env.cache_clear()
@@ -155,7 +148,7 @@ class _FakeMessages:
 
 
 def _anthropic_client(model, result):
-    from attest.providers import AnthropicClient
+    from attest.core.llm.clients import AnthropicClient
 
     client = AnthropicClient(model, api_key="sk-ant-fake")
     fake = _FakeMessages(result)

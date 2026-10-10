@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from ..._llm import call
+from ...core.llm import call
 from .bounded import CharBudget, frame_untrusted
 
 

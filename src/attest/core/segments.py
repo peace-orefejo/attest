@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from ..content import TextSegment
+from .content import TextSegment
 
 ARTIFACT_LOCATION_KEY = "artifact_location"
 

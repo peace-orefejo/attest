@@ -5,10 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Sequence
 
-from ...content import TextSegment
-from ...results import Finding, Severity
-from ...trajectory import Trajectory
-from ...utils import artifact_locations
+from ...core import Finding, Severity, TextSegment, Trajectory, artifact_locations
 from .authorization import check_authorization
 from .findings import unscanned_finding
 from .untrusted_view import bounded_untrusted_view

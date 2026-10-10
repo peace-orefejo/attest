@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
-from ..content import Artifact
+from ..core import Artifact
 from .limits import ExtractionLimits
 
 

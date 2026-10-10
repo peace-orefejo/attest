@@ -7,7 +7,7 @@ from typing import Sequence
 
 import regex
 
-from ....content import Detection, TextSegment
+from ....core import Detection, TextSegment
 from ..constants import POSSIBLE_INJECTION_THRESHOLD, QUOTED_EXAMPLE_CONFIDENCE_FACTOR
 from ..models import RegexPattern
 from ..packs import DEFAULT_PATTERNS

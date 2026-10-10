@@ -82,13 +82,39 @@ Rules for this branch:
 - No source file over 300 lines. Split by responsibility before a file reaches that size.
 - One responsibility per module. Models, building evidence, parsing, and decisions live in
   separate files.
-- Anything used by more than one feature goes in `src/attest/utils/`. Anything used by one
-  feature stays inside that feature's folder.
+- Shared code that uses attest's own types, such as `Trajectory`, `TextSegment` or `Artifact`,
+  goes in `src/attest/core/`. Plain helpers that know nothing about attest types, used by more
+  than one feature, go in `src/attest/utils/`. Anything used by one feature stays inside that
+  feature's folder.
+- Layers only import downward. `core/` never imports from `checks/`, `code_review/`, `policy/`,
+  `extraction/`, `adapters/`, `scoring/`, `api.py` or `cli.py`, and `utils/` never imports attest
+  types. `tests/core/test_core_boundary.py` enforces both rules.
 - Each folder's `__init__.py` only re-exports its public names. No logic lives there.
 - Tests mirror the source tree, one test file per module.
 
 ```
 src/attest/
+  core/                        shared foundation, imports nothing above it
+    __init__.py                re-exports the models, statistics and artifact helpers
+    trajectory.py              Trajectory, Step, ToolCall
+    results.py                 Report, CheckResult, Finding, Severity, PROMPT_VERSION
+    content.py                 Artifact, TextSegment, Detection
+    stats.py                   Wilson intervals and two-proportion significance
+    artifacts.py               artifact_subject, moved from utils/
+    segments.py                artifact provenance on text segments, moved from utils/
+    llm/
+      __init__.py              re-exports call, vote, using, build_client and the registry
+      calls.py                 call() with retries and the untrusted-data guard, vote()
+      context.py               using() and the lazily built default client
+      clients.py               LLMClient, AnthropicClient, build_client
+      env.py                   .env loading and API key resolution
+      providers.py             provider registry, default and curated models
+      catalog.py               live model listing with the curated fallback
+  trajectory.py, results.py,   re-export modules kept so old import paths work
+  content.py, providers.py,
+  _llm.py, scoring/stats.py
+  scoring/
+    report.py                  evaluate(): runs the checks, so it sits above core
   checks/
     verify.py                  extraction and batched verification, prompts come from profiles
     profiles/
@@ -135,12 +161,18 @@ src/attest/
       effect.py                phrase overlap and hunk coverage, model fallback
       verdict.py               clean, suspicious, payload, compromised
   utils/
-    __init__.py
+    __init__.py                re-exports the strict JSON and YAML loaders
+    strict_parsing.py          loaders that reject duplicate keys
     diff.py                    unified diff parsing, hunk splitting, cutting at a limit
     unicode_scan.py            bidirectional controls, zero-width characters, mixed scripts
     encoded_scan.py            bounded base64 and hex decoding, then rescan
 
 tests/
+  core/
+    test_core_boundary.py      core imports nothing above it; utils import no attest types
+    test_content.py, test_stats.py
+    llm/
+      test_providers.py, test_vote.py, test_llm_resilience.py
   checks/
     test_profiles.py           prompt snapshots and registry lookups
   code_review/
@@ -364,7 +396,7 @@ runner reports both kinds side by side.
   to 15 claims per verification call against the full scoped evidence. Cost per output is two
   model calls in the common case.
 - **Eval metrics:** caught rate on bad outputs and blocked rate on good outputs, each with a
-  Wilson 95% interval from `attest.scoring.stats`. A prompt change is accepted only if neither
+  Wilson 95% interval from `attest.core.stats`. A prompt change is accepted only if neither
   interval moves the wrong way on the full set.
 
 ## Implementation plan
@@ -402,11 +434,16 @@ shape and are about a day together. Step 7 is open-ended and driven by data.
 - Merge the dependency and Claude 5 compatibility fix on `fix/deps-claude5-dotenv` first. It
   touches `_llm.py`, `providers.py`, `api.py` and `cli.py`. This branch avoids those files,
   except for one line of `--kind` help text in `cli.py`, which should be added after that merge.
-- After the in-flight branches merge, add a small `core/` package for the shared data models,
-  model calls, providers and statistics. Core never imports from checks or features, and a test
-  enforces that. Checks, code review and policy sit above it, and the API and command line sit
-  on top. Helpers that use attest types, such as the split refactor's segment utilities, move
-  from `utils/` into `core/`. Public imports from `attest` stay the same.
+- Done: the `core/` package now holds the shared data models (`trajectory.py`, `results.py`,
+  `content.py`), statistics (`stats.py`), the artifact helpers that used attest types (moved
+  from `utils/`), and model calls and providers under `core/llm/`, split into calls, client
+  context, clients, `.env` and key loading, the provider registry and live model listing.
+  `tests/core/test_core_boundary.py` fails if any core module imports from checks, code review,
+  policy, extraction, adapters, scoring, the API or the command line, or if a `utils/` module
+  imports attest types. Checks, code review and policy sit above core, and the API and command
+  line sit on top. Public imports from `attest` are unchanged. The old paths `attest.trajectory`,
+  `attest.results`, `attest.content`, `attest.providers`, `attest._llm` and
+  `attest.scoring.stats` remain as re-export modules; internal code imports from `attest.core`.
 - Grouping consistency is a separate component. It would compare two groupings of the same diffs
   by how often each pair of diffs lands in the same group, and use attest's existing statistics
   to tell real differences from noise.

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..content import Artifact
+from .content import Artifact
 
 
 def artifact_subject(artifact: Artifact) -> str:
