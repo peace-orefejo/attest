@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 from attest.cli import app
 
 
-runner = CliRunner()
+runner = CliRunner(env={"COLUMNS": "200", "TERMINAL_WIDTH": "200"})
 
 
 def _trajectory() -> dict:
