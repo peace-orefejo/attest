@@ -4,10 +4,11 @@ from pathlib import Path
 import pytest
 
 from attest import Trajectory
+from attest.code_review.models import OUTPUT_TYPES
 
-CASES_PATH = Path(__file__).parent / "fixtures" / "code_review_cases.json"
+CASES_PATH = Path(__file__).parent.parent / "fixtures" / "code_review_cases.json"
 CASES = json.loads(CASES_PATH.read_text())["cases"]
-KINDS = {"issue", "diff_summary", "group_summary", "canvas_answer"}
+KINDS = set(OUTPUT_TYPES)
 
 
 def test_case_ids_are_unique():
