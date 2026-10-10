@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from .._llm import call
 from ..results import CheckResult, Finding, Severity
 from ..trajectory import Trajectory
+from .profiles import get_profile
+from .profiles.registry import PROFILE_KINDS
 
 _SEVERITY = {
     "supported": Severity.PASS,
@@ -77,56 +79,25 @@ def judge_trajectory(traj: Trajectory, extract: ExtractFn, verify: VerifyFn,
     )
 
 
-_EXTRACT_SYSTEM = (
-    "You split an AI agent's final answer into atomic factual claims to fact-check. "
-    "Each claim must be a single, self-contained, independently-checkable statement. "
-    "Consolidate: do NOT split one fact into several near-duplicate sub-claims, do NOT "
-    "emit every sentence or clause, and merge overlapping points into one claim. Drop "
-    "hedges, opinions, filler, questions, and generic advice. Keep only distinct, "
-    "verifiable assertions of fact, and prefer a short list of meaningful claims over a "
-    "long list of fragments. Preserve the original meaning; add nothing."
-)
+_EXTRACT_SYSTEM = get_profile("factual").extract_prompt
+_VERIFY_SYSTEM = {kind: get_profile(kind).verify_prompt for kind in PROFILE_KINDS}
 
 
-def extract_claims(final_answer: str) -> list[str]:
-    """Split a final answer into atomic, individually-checkable factual claims."""
+def extract_claims(final_answer: str, *, answer_kind: str = "factual") -> list[str]:
+    """Split a final answer into atomic, individually-checkable claims for `answer_kind`."""
+    system = get_profile(answer_kind).extract_prompt
     if not final_answer.strip():
         return []
     return call(
-        system=_EXTRACT_SYSTEM,
+        system=system,
         user=f"Final answer to decompose:\n\n{final_answer}",
         output=ClaimsOut,
     ).claims
 
 
-_VERIFY_SYSTEM = {
-    "factual": (
-        "You are a strict fact-checker. Decide whether the EVIDENCE supports the CLAIM, "
-        "using ONLY the evidence — no outside knowledge, no assumptions.\n"
-        "- supported: the evidence directly entails the claim.\n"
-        "- unsupported: the evidence contradicts the claim.\n"
-        "- unverifiable: the evidence is silent or unrelated, so it cannot be judged.\n"
-        "Give a clear, complete reason for your verdict, and quote the exact deciding "
-        "span from the evidence. Watch direction and magnitude carefully (e.g. 'X is "
-        "larger than Y' is unsupported if the evidence shows Y is larger)."
-    ),
-    "plan": (
-        "The answer being checked is a PLAN or recommendation, NOT a report of completed "
-        "work. Decide whether the CLAIM faithfully reflects the plan in the EVIDENCE, using "
-        "ONLY the evidence.\n"
-        "- supported: the plan states or directly implies the claim (treat 'X will intercept "
-        "requests' / 'the plan covers X' as supported if the plan describes X — even though "
-        "nothing has run yet).\n"
-        "- unsupported: the plan contradicts the claim.\n"
-        "- unverifiable: the plan is silent on it.\n"
-        "Do NOT require runtime proof; judge fidelity to the plan. Give a clear reason and "
-        "quote the deciding span from the plan."
-    ),
-}
-
-
 def grounded_verifier(claim: str, evidence: str, *, answer_kind: str = "factual") -> Finding:
     """Decide whether `evidence` entails one `claim`. Sees no agent reasoning."""
+    system = get_profile(answer_kind).verify_prompt
     if not evidence.strip():
         return Finding(
             severity=Severity.WARN,
@@ -135,7 +106,7 @@ def grounded_verifier(claim: str, evidence: str, *, answer_kind: str = "factual"
             reason="No tool-output evidence was recorded.",
         )
     out = call(
-        system=_VERIFY_SYSTEM.get(answer_kind, _VERIFY_SYSTEM["factual"]),
+        system=system,
         user=f"CLAIM:\n{claim}\n\nEVIDENCE (the agent's real tool outputs):\n{evidence}",
         output=VerdictOut,
     )
@@ -157,14 +128,14 @@ _BATCH_INSTRUCTION = (
 
 
 def _batch_system(answer_kind: str) -> str:
-    return _BATCH_INSTRUCTION + _VERIFY_SYSTEM.get(answer_kind, _VERIFY_SYSTEM["factual"])
+    return _BATCH_INSTRUCTION + get_profile(answer_kind).verify_prompt
 
 
-def _verify_batch(batch: list[str], evidence: str, answer_kind: str) -> list[Finding]:
+def _verify_batch(batch: list[str], evidence: str, system: str) -> list[Finding]:
     numbered = "\n".join(f"{i}. {c}" for i, c in enumerate(batch, start=1))
     try:
         out = call(
-            system=_batch_system(answer_kind),
+            system=system,
             user=f"CLAIMS:\n{numbered}\n\nEVIDENCE (the agent's real tool outputs):\n{evidence}",
             output=_BatchOut,
             max_tokens=8192,
@@ -189,6 +160,7 @@ def _verify_batch(batch: list[str], evidence: str, answer_kind: str) -> list[Fin
 def verify_claims(claims: list[str], evidence: str, *, answer_kind: str = "factual",
                   batch_size: int = BATCH_SIZE) -> list[Finding]:
     """Verify many claims against the evidence in batched calls (one call per batch)."""
+    system = _batch_system(answer_kind)
     if not claims:
         return []
     if not evidence.strip():
@@ -196,5 +168,5 @@ def verify_claims(claims: list[str], evidence: str, *, answer_kind: str = "factu
                         reason="No tool-output evidence was recorded.") for c in claims]
     findings: list[Finding] = []
     for start in range(0, len(claims), batch_size):
-        findings.extend(_verify_batch(claims[start:start + batch_size], evidence, answer_kind))
+        findings.extend(_verify_batch(claims[start:start + batch_size], evidence, system))
     return findings

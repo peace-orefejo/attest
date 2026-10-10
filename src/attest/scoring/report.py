@@ -6,15 +6,16 @@ from functools import partial
 from typing import Callable, Sequence
 
 from ..checks.injection import check_injection
+from ..checks.profiles import SUPPORTED_ANSWER_KINDS
 from ..checks.role import check_role_adherence
 from ..checks.tool_use import check_tool_use
 from ..checks.verify import MAX_CLAIMS, extract_claims, judge_trajectory, verify_claims
+from ..code_review.detect import detect_answer_kind
 from ..results import CheckResult, Report
 from ..trajectory import Trajectory
 
 DEFAULT_CHECKS = ("faithfulness", "tool_use")
 SUPPORTED_CHECKS = ("faithfulness", "tool_use", "injection", "role")
-SUPPORTED_ANSWER_KINDS = ("factual", "plan")
 
 
 def validate_evaluation_options(
@@ -41,6 +42,16 @@ def validate_evaluation_options(
     return selected
 
 
+def resolve_answer_kind(traj: Trajectory, answer_kind: str) -> tuple[str, dict]:
+    """Resolve "auto" to a concrete kind and return it with the report metadata to record."""
+    if answer_kind == "auto":
+        kind, reason = detect_answer_kind(traj)
+        return kind, {"answer_kind": kind, "answer_kind_reason": reason}
+    if answer_kind == "factual" and detect_answer_kind(traj)[0] == "code":
+        return answer_kind, {"answer_kind_hint": "code"}
+    return answer_kind, {}
+
+
 def evaluate(
     traj: Trajectory,
     *,
@@ -59,9 +70,12 @@ def evaluate(
     shallow-injection paths do not. `max_claims` caps how many claims faithfulness checks.
     """
     selected = validate_evaluation_options(checks, answer_kind)
+    kind, metadata = resolve_answer_kind(traj, answer_kind)
 
+    if extract is extract_claims:
+        extract = partial(extract_claims, answer_kind=kind)
     if verify is None:
-        verify = partial(verify_claims, answer_kind=answer_kind)
+        verify = partial(verify_claims, answer_kind=kind)
 
     runners = {
         "faithfulness": lambda: judge_trajectory(traj, extract, verify, max_claims=max_claims),
@@ -70,4 +84,4 @@ def evaluate(
         "role": lambda: check_role_adherence(traj),
     }
     results: list[CheckResult] = [runners[c]() for c in selected]
-    return Report(results=results)
+    return Report(results=results, metadata=metadata)
