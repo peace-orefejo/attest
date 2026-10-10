@@ -5,6 +5,21 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+### Changed
+- Anthropic grading now uses native structured outputs (`messages.parse`) instead of instructor's
+  forced tool call, so Claude 5.5-generation models such as `claude-sonnet-5-5` work.
+- Sampling parameters are sent only to Anthropic models that accept them (Claude 4.6 and older);
+  Claude Opus 4.7+ and the Claude 5 family run without `temperature`.
+- Dependency bounds: `anthropic>=0.77,<2` and `instructor>=1.15.3,<2`.
+- Added `claude-opus-5-5`, `claude-sonnet-5-5`, and `claude-haiku-5-5` to the curated Anthropic
+  model list.
+
+### Fixed
+- Fresh installs that resolve `anthropic` 1.x and `instructor` 1.17 no longer fail every LLM call
+  with `Messages.create() got an unexpected keyword argument 'temperature'`.
+- A `.env` file in the working directory (or a parent) is now loaded by both the library and the
+  CLI. Previously only the CLI loaded it, and it searched from the installed package's location.
+
 ## [0.7.0] - 2026-08-13
 
 ### Added

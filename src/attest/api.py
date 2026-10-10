@@ -5,8 +5,6 @@ from __future__ import annotations
 import contextlib
 from typing import Callable, Sequence
 
-import instructor
-
 from ._llm import using
 from .checks.injection import DEFAULT_DETECTORS, InjectionDetector, check_injection
 from .extraction import ExtractionLimits
@@ -14,7 +12,9 @@ from .checks.role import check_role_adherence
 from .checks.judge_baseline import JudgeVerdict, naive_judge
 from .checks.tool_use import check_tool_use
 from .checks.verify import MAX_CLAIMS, extract_claims
-from .providers import DEFAULT_PROVIDER, build_client, default_model, list_models, providers
+from .providers import (
+    DEFAULT_PROVIDER, LLMClient, build_client, default_model, list_models, providers,
+)
 from .policy import PolicyInput, check_policy, load_policy
 from .results import CheckResult, Report
 from .scoring.report import DEFAULT_CHECKS, evaluate, validate_evaluation_options
@@ -31,7 +31,7 @@ class Attest:
         *,
         provider: str = DEFAULT_PROVIDER,
         model: str | None = None,
-        client: instructor.Instructor | None = None,
+        client: LLMClient | None = None,
         policy: PolicyInput = None,
         enforce_policy: bool = True,
     ) -> None:

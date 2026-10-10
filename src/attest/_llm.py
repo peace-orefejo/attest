@@ -1,4 +1,4 @@
-"""Provider-agnostic structured output via instructor. The single LLM chokepoint."""
+"""Structured LLM output (native Anthropic, instructor elsewhere). The single LLM chokepoint."""
 
 from __future__ import annotations
 
@@ -8,29 +8,28 @@ from contextvars import ContextVar
 from functools import lru_cache
 from typing import Any, Callable, Iterator, TypeVar, cast
 
-import instructor
 from pydantic import BaseModel
 
-from .providers import DEFAULT_PROVIDER, build_client
+from .providers import DEFAULT_PROVIDER, LLMClient, build_client
 
 T = TypeVar("T", bound=BaseModel)
 
-_active_client: ContextVar[instructor.Instructor | None] = ContextVar(
+_active_client: ContextVar[LLMClient | None] = ContextVar(
     "attest_client", default=None
 )
 
 
 @lru_cache(maxsize=1)
-def _default_client() -> instructor.Instructor:
+def _default_client() -> LLMClient:
     return build_client(DEFAULT_PROVIDER)
 
 
-def _resolve_client() -> instructor.Instructor:
+def _resolve_client() -> LLMClient:
     return _active_client.get() or _default_client()
 
 
 @contextlib.contextmanager
-def using(client: instructor.Instructor) -> Iterator[None]:
+def using(client: LLMClient) -> Iterator[None]:
     """Run the enclosed calls against a specific provider-bound client."""
     token = _active_client.set(client)
     try:
@@ -56,7 +55,7 @@ def call(
     user: str,
     output: type[T],
     max_tokens: int = 4096,
-    client: instructor.Instructor | None = None,
+    client: LLMClient | None = None,
     attempts: int = 3,
 ) -> T:
     """
@@ -96,7 +95,7 @@ def vote(
     output: type[T],
     key: Callable[[T], object],
     samples: int = 3,
-    client: instructor.Instructor | None = None,
+    client: LLMClient | None = None,
 ) -> T:
     """Self-consistency: sample the judge `samples` times and return the result whose `key(...)`
     value is the majority. Dampens LLM-judge non-determinism (e.g. Gemini is not truly greedy
