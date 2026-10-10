@@ -392,6 +392,11 @@ shape and are about a day together. Step 7 is open-ended and driven by data.
 - Merge the dependency and Claude 5 compatibility fix on `fix/deps-claude5-dotenv` first. It
   touches `_llm.py`, `providers.py`, `api.py` and `cli.py`. This branch avoids those files,
   except for one line of `--kind` help text in `cli.py`, which should be added after that merge.
+- After the in-flight branches merge, add a small `core/` package for the shared data models,
+  model calls, providers and statistics. Core never imports from checks or features, and a test
+  enforces that. Checks, code review and policy sit above it, and the API and command line sit
+  on top. Helpers that use attest types, such as the split refactor's segment utilities, move
+  from `utils/` into `core/`. Public imports from `attest` stay the same.
 - Grouping consistency is a separate component. It would compare two groupings of the same diffs
   by how often each pair of diffs lands in the same group, and use attest's existing statistics
   to tell real differences from noise.
