@@ -13,7 +13,7 @@ from .constants import (
 )
 from .loader import load_regex_detector
 from .models import InjectionDetector, RegexPattern
-from .regex_detector import DEFAULT_DETECTORS, RegexDetector
+from .detectors import DEFAULT_DETECTORS, RegexDetector
 
 __all__ = [
     "check_injection",

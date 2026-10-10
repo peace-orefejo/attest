@@ -1,6 +1,6 @@
-"""The built-in regex pattern pack."""
+"""The built-in default regex pattern pack."""
 
-from .models import RegexPattern
+from ..models import RegexPattern
 
 DEFAULT_PATTERNS = [
     RegexPattern("ignore-instructions", r"ignore\s+(?:all\s+|the\s+|your\s+|any\s+)?(?:previous|above|prior|earlier)\s+instructions"),

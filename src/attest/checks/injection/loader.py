@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from .models import RegexPattern
-from .regex_detector import RegexDetector
+from .detectors import RegexDetector
 
 
 def load_regex_detector(path: Path) -> RegexDetector:

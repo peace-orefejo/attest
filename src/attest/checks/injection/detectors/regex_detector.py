@@ -7,11 +7,11 @@ from typing import Sequence
 
 import regex
 
-from ...content import Detection, TextSegment
-from .constants import POSSIBLE_INJECTION_THRESHOLD, QUOTED_EXAMPLE_CONFIDENCE_FACTOR
+from ....content import Detection, TextSegment
+from ..constants import POSSIBLE_INJECTION_THRESHOLD, QUOTED_EXAMPLE_CONFIDENCE_FACTOR
+from ..models import RegexPattern
+from ..packs import DEFAULT_PATTERNS
 from .framing import quoted_educational_framing
-from .models import InjectionDetector, RegexPattern
-from .patterns import DEFAULT_PATTERNS
 
 
 class RegexDetector:
@@ -142,5 +142,3 @@ def _timeout_detection(
         },
     )
 
-
-DEFAULT_DETECTORS: tuple[InjectionDetector, ...] = (RegexDetector(),)

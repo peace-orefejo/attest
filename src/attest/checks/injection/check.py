@@ -12,7 +12,7 @@ from .collect import collect_segments
 from .coverage import deferred_artifacts_finding, extraction_coverage_findings
 from .deep import run_deep_pass
 from .models import InjectionDetector
-from .regex_detector import DEFAULT_DETECTORS
+from .detectors import DEFAULT_DETECTORS
 from .scanning import scan_segments
 from .verdict import build_result
 
