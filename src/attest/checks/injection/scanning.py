@@ -106,7 +106,7 @@ def _detection_finding(detection: Detection) -> Finding:
         subject=detection.subject,
         step=detection.step,
         evidence=detection.matched_text,
-        reason="Untrusted content contains instruction-like text.",
+        reason=_reason(detection),
         metadata={
             **detection.metadata,
             "detector": detection.detector,
@@ -115,3 +115,13 @@ def _detection_finding(detection: Detection) -> Finding:
             "confidence": detection.confidence,
         },
     )
+
+
+_REASONS = {
+    "unicode": "Untrusted content contains hidden or look-alike Unicode characters.",
+    "encoded": "Untrusted content contains encoded text that decodes to instruction-like text.",
+}
+
+
+def _reason(detection) -> str:
+    return _REASONS.get(detection.detector, "Untrusted content contains instruction-like text.")
