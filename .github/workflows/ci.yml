@@ -61,6 +61,4 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv build
       - name: Check metadata renders on PyPI
-        run: |
-          uv pip install --system twine
-          twine check dist/*
+        run: uvx twine check dist/*
