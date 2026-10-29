@@ -1,0 +1,15 @@
+.md-typeset .diagram,
+.md-typeset .terminal {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 1.2em 0;
+}
+
+.md-typeset .terminal {
+  border-radius: 12px;
+}
+
+[data-md-color-scheme="slate"] .md-typeset .diagram {
+  filter: brightness(0.92);
+}

@@ -1,0 +1,7 @@
+PASS  What is the population of Paris, and is it larger than Berlin?
+      tool_use · score 100% · 3/3 tool calls correct. Sequence: web_search -> get_population ->
+      get_population. All tools allowed; no unhandled errors.
+
+  ✓  correct  step 0  web_search
+  ✓  correct  step 1  get_population
+  ✓  correct  step 2  get_population

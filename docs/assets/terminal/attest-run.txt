@@ -1,0 +1,21 @@
+FAIL  What is the population of Paris, and is it larger than Berlin?
+      overall 83% · 2 checks
+
+CHECK          SCORE   RESULT   SUMMARY
+────────────────────────────────────────────────────────────────────────────────────────────────
+faithfulness     67%   FAIL     2/3 checkable claims grounded.
+tool_use        100%   PASS     3/3 tool calls correct. Sequence: web_search -> get_population
+                                -> get_population. All tools allowed; no unhandled errors.
+
+  faithfulness
+    ✓  supported    Paris is the capital of France
+    ✓  supported    Paris has a population of about 2.1 million
+    ✗  unsupported  Paris is larger than Berlin
+                    The evidence shows Berlin has a population of 3,677,000 while Paris has 
+                    2,103,000, meaning Berlin is larger than Paris, not the other way around.
+                    evidence  Paris population (city proper): 2,103,000
+
+  tool_use
+    ✓  correct  step 0  web_search
+    ✓  correct  step 1  get_population
+    ✓  correct  step 2  get_population
