@@ -10,14 +10,13 @@ import typer
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
-from ._budget import Budget, BudgetExceeded
-from ._llm import using
 from .api import Attest
 from .checks.injection import DEFAULT_DETECTORS, check_injection, load_regex_detector
 from .checks.judge_baseline import naive_judge
 from .checks.role import check_role_adherence
 from .checks.tool_use import check_tool_use
 from .checks.verify import extract_claims, judge_trajectory, verify_claims
+from .llm import Budget, BudgetExceeded, using
 from .providers import DEFAULT_PROVIDER, build_client, list_models, providers, resolve_key
 from .results import CheckResult, Report, Severity
 from .scoring.report import DEFAULT_CHECKS, validate_evaluation_options

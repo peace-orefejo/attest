@@ -2,7 +2,7 @@
 
 import pytest
 
-import attest._llm as llm
+import attest.llm.structured as llm
 from attest.checks.verify import VerdictOut
 
 _EMPTY = AttributeError("'NoneType' object has no attribute 'parts'")

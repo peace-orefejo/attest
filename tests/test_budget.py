@@ -7,12 +7,14 @@ import pytest
 from pydantic import BaseModel
 from typer.testing import CliRunner
 
-import attest._llm as llm
 import attest.api as api
+import attest.llm as llm_pkg
+import attest.llm.structured as llm
 from attest import Attest, Budget, BudgetExceeded, DiskCache, Usage
-from attest._budget import TokenCounts, metering, token_counts
 from attest.checks.verify import ClaimsOut, _BatchOut, _ClaimVerdict, verify_claims
 from attest.cli import app
+from attest.llm.budget import metering
+from attest.llm.usage import TokenCounts, token_counts
 from attest.trajectory import Step, ToolCall, Trajectory
 
 
@@ -78,7 +80,7 @@ def test_token_budget_blocks_an_oversized_prompt():
 def test_cache_hits_are_counted_and_free():
     client = _MeteredClient()
     usage = Usage()
-    with metering(usage, Budget(max_calls=1)), llm.using_cache({}):
+    with metering(usage, Budget(max_calls=1)), llm_pkg.using_cache({}):
         llm.call(system="s", user="u", output=_V, client=client)
         llm.call(system="s", user="u", output=_V, client=client)
     assert usage.calls == 1
@@ -141,10 +143,10 @@ def test_token_counts_normalizes_providers():
 
 def test_disk_cache_persists_across_instances(tmp_path):
     first = _MeteredClient()
-    with llm.using_cache(DiskCache(tmp_path, provider="anthropic", model="m")):
+    with llm_pkg.using_cache(DiskCache(tmp_path, provider="anthropic", model="m")):
         llm.call(system="s", user="u", output=_V, client=first)
     second = _MeteredClient()
-    with llm.using_cache(DiskCache(tmp_path, provider="anthropic", model="m")):
+    with llm_pkg.using_cache(DiskCache(tmp_path, provider="anthropic", model="m")):
         out = llm.call(system="s", user="u", output=_V, client=second)
     assert isinstance(out, _V)
     assert second.calls == 0

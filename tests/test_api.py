@@ -2,7 +2,8 @@
 
 import attest.checks.injection as inj
 from attest import Attest
-from attest._llm import _resolve_client, using
+from attest.llm import using
+from attest.llm.client import resolve_client as _resolve_client
 from attest.trajectory import Step, ToolCall, Trajectory
 
 

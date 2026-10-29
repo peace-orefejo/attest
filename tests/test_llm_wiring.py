@@ -2,6 +2,7 @@
 
 import attest.checks.judge_baseline as jb
 import attest.checks.verify as v
+from attest.prompts.judge import judge_user
 from attest.trajectory import Trajectory
 
 
@@ -66,7 +67,7 @@ def test_naive_judge_renders_full_trajectory():
         ],
         final_answer="the answer is 42",
     )
-    rendered = jb._render(traj)
+    rendered = judge_user(traj)
     assert "secret reasoning" in rendered
     assert "42" in rendered
     assert "the answer is 42" in rendered

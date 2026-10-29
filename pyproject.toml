@@ -91,6 +91,13 @@ src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+allowed-confusables = ["–"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Option", "typer.Argument", "attest.extraction.limits.ExtractionLimits", "attest.extraction.ExtractionLimits", "attest.ExtractionLimits"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/attest/prompts/*" = ["E501"]
 
 [tool.pyright]
 include = ["src"]

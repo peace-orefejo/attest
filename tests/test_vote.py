@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 
-import attest._llm as llm
+import attest.llm.structured as llm
 
 
 class _V(BaseModel):

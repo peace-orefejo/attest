@@ -8,15 +8,13 @@ from collections.abc import Callable, Sequence
 
 import instructor
 
-from ._budget import Budget, Usage, metering
-from ._cache import DiskCache
-from ._llm import using, using_cache
 from .checks.injection import DEFAULT_DETECTORS, InjectionDetector, check_injection
 from .checks.judge_baseline import JudgeVerdict, naive_judge
 from .checks.role import check_role_adherence
 from .checks.tool_use import check_tool_use
 from .checks.verify import MAX_CLAIMS, extract_claims
 from .extraction import ExtractionLimits
+from .llm import Budget, DiskCache, Usage, metering, using, using_cache
 from .policy import PolicyInput, check_policy, load_policy
 from .providers import DEFAULT_PROVIDER, build_client, default_model, list_models, providers
 from .results import CheckResult, Report
@@ -101,7 +99,7 @@ class Attest:
             or ("tool_use" in selected and appropriate)
             or (policy is not None and enforce and policy.needs_llm)
         )
-        before = self.usage.copy()
+        before = self.usage.model_copy()
         with self._llm_context(needs_llm):
             report = evaluate(
                 traj,
