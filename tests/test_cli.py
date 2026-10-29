@@ -1,6 +1,7 @@
 """CLI output formats and trajectory-loading errors."""
 
 import json
+import re
 
 from typer.testing import CliRunner
 
@@ -8,6 +9,17 @@ from attest.cli import app
 
 
 runner = CliRunner()
+
+
+def _flat(output: str) -> str:
+    """Collapse whitespace so assertions survive Rich's error-panel wrapping.
+
+    Click renders usage errors inside a bordered panel sized to the terminal,
+    so a long temporary path can push a message onto two lines and split a
+    phrase across them. Matching on flattened text keeps these assertions
+    about the message rather than about how wide the runner's terminal is.
+    """
+    return re.sub(r"\s+", " ", output.replace("│", " "))
 
 
 def _trajectory() -> dict:
@@ -47,8 +59,8 @@ def test_jsonl_error_identifies_line(tmp_path):
     result = runner.invoke(app, ["tools", str(path)])
 
     assert result.exit_code == 2
-    assert "line 2" in result.output
-    assert "Invalid trajectory" in result.output
+    assert "line 2" in _flat(result.output)
+    assert "Invalid trajectory" in _flat(result.output)
 
 
 def test_empty_trajectory_file_has_friendly_error(tmp_path):
@@ -58,7 +70,7 @@ def test_empty_trajectory_file_has_friendly_error(tmp_path):
     result = runner.invoke(app, ["tools", str(path)])
 
     assert result.exit_code == 2
-    assert "is empty" in result.output
+    assert "is empty" in _flat(result.output)
 
 
 def test_injection_accepts_custom_pattern_file(tmp_path):
@@ -97,7 +109,7 @@ def test_injection_rejects_invalid_pattern_file(tmp_path):
     result = runner.invoke(app, ["injection", str(path), "--patterns", str(patterns)])
 
     assert result.exit_code == 2
-    assert "Invalid regex pattern 'broken'" in result.output
+    assert "Invalid regex pattern 'broken'" in _flat(result.output)
 
 
 def test_injection_patterns_only_replaces_builtins(tmp_path):
@@ -123,7 +135,7 @@ def test_injection_patterns_only_requires_pattern_file(tmp_path):
     path.write_text(json.dumps(_trajectory()))
     result = runner.invoke(app, ["injection", str(path), "--patterns-only"])
     assert result.exit_code == 2
-    assert "requires --patterns" in result.output
+    assert "requires --patterns" in _flat(result.output)
 
 
 def test_injection_rejects_unknown_pattern_severity(tmp_path):
@@ -135,5 +147,4 @@ def test_injection_rejects_unknown_pattern_severity(tmp_path):
     }))
     result = runner.invoke(app, ["injection", str(path), "--patterns", str(patterns)])
     assert result.exit_code == 2
-    assert "severity must be low" in result.output
-    assert "medium, or high" in result.output
+    assert "severity must be low, medium, or high" in _flat(result.output)
