@@ -1,0 +1,82 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import typer
+
+from ...api import Attest
+from ...llm import Budget
+from ...scoring.report import DEFAULT_CHECKS, validate_evaluation_options
+from ..context import require_key
+from ..evaluation import EvaluationSettings, evaluate_all
+from ..loading import load_trajectories
+from ..options import JSON_OPTION, MODEL_OPTION, PROVIDER_OPTION
+from ..rendering import emit_json, render_run_summary, render_task_report
+
+
+def run(
+    path: Path,
+    checks: str = typer.Option(
+        ",".join(DEFAULT_CHECKS),
+        "--checks",
+        help="Comma-separated: faithfulness,tool_use,injection,role.",
+    ),
+    appropriate: bool = typer.Option(
+        False, "--appropriate", help="Also run the LLM tool-choice check (1 call per tool call)."
+    ),
+    kind: str = typer.Option(
+        "factual",
+        "--kind",
+        help="Answer type: 'factual' (default) or 'plan' (judge fidelity to the plan).",
+    ),
+    provider: str = PROVIDER_OPTION,
+    model: str | None = MODEL_OPTION,
+    json_output: bool = JSON_OPTION,
+    max_calls: int | None = typer.Option(
+        None, "--max-calls", help="Stop before exceeding this many judge calls."
+    ),
+    max_tokens: int | None = typer.Option(
+        None, "--max-tokens", help="Stop before exceeding this many tokens."
+    ),
+    cache_dir: Path | None = typer.Option(
+        None, "--cache-dir", help="Reuse judge verdicts from this directory across runs."
+    ),
+) -> None:
+    """Full report on a trajectory (or JSONL): runs the chosen checks + an overall score."""
+    selected = _selected_checks(checks, kind)
+    require_key(provider)
+    trajectories = load_trajectories(path)
+    if not json_output:
+        typer.echo(f"Loaded {len(trajectories)} trajectory(ies) from {path}\n")
+
+    judge = Attest(
+        provider=provider,
+        model=model,
+        budget=_budget(max_calls, max_tokens),
+        cache=cache_dir or False,
+    )
+    settings = EvaluationSettings(checks=selected, appropriate=appropriate, kind=kind)
+    on_report = None if json_output else render_task_report
+    outcome = evaluate_all(judge, trajectories, settings, on_report=on_report)
+
+    if json_output:
+        emit_json(outcome.to_json())
+    else:
+        render_run_summary(outcome)
+    if outcome.stopped:
+        raise typer.Exit(code=2)
+
+
+def _selected_checks(checks: str, kind: str) -> list[str]:
+    selected = [c.strip() for c in checks.split(",") if c.strip()]
+    try:
+        validate_evaluation_options(selected, kind)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    return selected
+
+
+def _budget(max_calls: int | None, max_tokens: int | None) -> Budget | None:
+    if not (max_calls or max_tokens):
+        return None
+    return Budget(max_calls=max_calls, max_tokens=max_tokens)

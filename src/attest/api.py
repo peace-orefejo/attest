@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import contextlib
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import Generator, Sequence
+from contextlib import AbstractContextManager
 
 import instructor
 
@@ -12,23 +13,19 @@ from .checks.injection import DEFAULT_DETECTORS, InjectionDetector, check_inject
 from .checks.judge_baseline import JudgeVerdict, naive_judge
 from .checks.role import check_role_adherence
 from .checks.tool_use import check_tool_use
-from .checks.verify import MAX_CLAIMS, extract_claims
+from .checks.verify import MAX_CLAIMS, ExtractFn, VerifyFn, extract_claims
 from .extraction import ExtractionLimits
 from .llm import Budget, DiskCache, Usage, metering, using, using_cache
-from .policy import PolicyInput, check_policy, load_policy
+from .llm.response_cache import ResponseStore
+from .policy import EvaluationPolicy, PolicyInput, check_policy, load_policy
 from .providers import DEFAULT_PROVIDER, build_client, default_model, list_models, providers
 from .results import CheckResult, Report
 from .scoring.report import DEFAULT_CHECKS, evaluate, validate_evaluation_options
 from .scoring.stats import Proportion, wilson_interval
 from .trajectory import Trajectory
+from .utils.json_types import JsonObject
 
-
-@contextlib.contextmanager
-def _combine(*managers):
-    with contextlib.ExitStack() as stack:
-        for manager in managers:
-            stack.enter_context(manager)
-        yield
+CacheOption = bool | ResponseStore | str | os.PathLike[str]
 
 
 class Attest:
@@ -43,7 +40,7 @@ class Attest:
         client: instructor.Instructor | None = None,
         policy: PolicyInput = None,
         enforce_policy: bool = True,
-        cache: bool | dict | str | os.PathLike = False,
+        cache: CacheOption = False,
         budget: Budget | None = None,
     ) -> None:
         self.provider = provider
@@ -52,26 +49,9 @@ class Attest:
         self._client = client
         self.policy = load_policy(policy)
         self.enforce_policy = enforce_policy
-        if cache is True:
-            self._cache: dict | None = {}
-        elif cache is False:
-            self._cache = None
-        elif isinstance(cache, (str, os.PathLike)):
-            self._cache = DiskCache(cache, provider=provider, model=self.model)
-        else:
-            self._cache = cache
+        self._cache = _response_store(cache, provider=provider, model=self.model)
         self.budget = budget
         self.usage = Usage()
-
-    def _llm_context(self, required: bool = True):
-        if not required:
-            return contextlib.nullcontext()
-        if self._client is None:
-            self._client = build_client(self.provider, self.model, self._key)
-        managers = [using(self._client), metering(self.usage, self.budget)]
-        if self._cache is not None:
-            managers.append(using_cache(self._cache))
-        return _combine(*managers)
 
     def evaluate(
         self,
@@ -82,23 +62,15 @@ class Attest:
         answer_kind: str = "factual",
         deep: bool = True,
         max_claims: int = MAX_CLAIMS,
-        extract: Callable[[str], list[str]] = extract_claims,
-        verify=None,
+        extract: ExtractFn = extract_claims,
+        verify: VerifyFn | None = None,
         enforce_policy: bool | None = None,
     ) -> Report:
         selected = validate_evaluation_options(checks, answer_kind)
-        faithfulness_needs_llm = "faithfulness" in selected and (
-            extract is extract_claims or verify is None
-        )
-        policy = self.policy
-        enforce = self.enforce_policy if enforce_policy is None else enforce_policy
-        needs_llm = (
-            faithfulness_needs_llm
-            or "role" in selected
-            or ("injection" in selected and deep)
-            or ("tool_use" in selected and appropriate)
-            or (policy is not None and enforce and policy.needs_llm)
-        )
+        policy = self._active_policy(enforce_policy)
+        needs_llm = _checks_need_llm(
+            selected, appropriate=appropriate, deep=deep, extract=extract, verify=verify
+        ) or (policy is not None and policy.needs_llm)
         before = self.usage.model_copy()
         with self._llm_context(needs_llm):
             report = evaluate(
@@ -111,7 +83,7 @@ class Attest:
                 extract=extract,
                 verify=verify,
             )
-            if policy is not None and enforce:
+            if policy is not None:
                 report.results.append(check_policy(traj, policy))
                 report.metadata.update(self.policy_identity())
         report.metadata["usage"] = self.usage.since(before).as_dict()
@@ -124,7 +96,7 @@ class Attest:
         with self._llm_context(self.policy.needs_llm):
             return check_policy(traj, self.policy)
 
-    def policy_identity(self) -> dict:
+    def policy_identity(self) -> JsonObject:
         if self.policy is None:
             return {}
         return {
@@ -178,3 +150,53 @@ class Attest:
     @staticmethod
     def models(provider: str, key: str | None = None) -> list[str]:
         return list_models(provider, key)
+
+    def _active_policy(self, enforce_policy: bool | None) -> EvaluationPolicy | None:
+        enforce = self.enforce_policy if enforce_policy is None else enforce_policy
+        return self.policy if enforce else None
+
+    def _llm_context(self, required: bool = True) -> AbstractContextManager[None]:
+        if not required:
+            return contextlib.nullcontext()
+        return self._scoped_llm(self._resolved_client())
+
+    def _resolved_client(self) -> instructor.Instructor:
+        if self._client is None:
+            self._client = build_client(self.provider, self.model, self._key)
+        return self._client
+
+    @contextlib.contextmanager
+    def _scoped_llm(self, client: instructor.Instructor) -> Generator[None, None, None]:
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(using(client))
+            stack.enter_context(metering(self.usage, self.budget))
+            if self._cache is not None:
+                stack.enter_context(using_cache(self._cache))
+            yield
+
+
+def _response_store(cache: CacheOption, *, provider: str, model: str) -> ResponseStore | None:
+    if cache is True:
+        return {}
+    if cache is False:
+        return None
+    if isinstance(cache, str | os.PathLike):
+        return DiskCache(cache, provider=provider, model=model)
+    return cache
+
+
+def _checks_need_llm(
+    selected: Sequence[str],
+    *,
+    appropriate: bool,
+    deep: bool,
+    extract: ExtractFn,
+    verify: VerifyFn | None,
+) -> bool:
+    faithfulness = "faithfulness" in selected and (extract is extract_claims or verify is None)
+    return (
+        faithfulness
+        or "role" in selected
+        or ("injection" in selected and deep)
+        or ("tool_use" in selected and appropriate)
+    )
