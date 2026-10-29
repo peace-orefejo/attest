@@ -6,7 +6,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, computed_field
 
-PROMPT_VERSION = "2026.08.12"
+PROMPT_VERSION = "2026.10.29"
 
 
 class Severity(str, Enum):

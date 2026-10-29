@@ -42,18 +42,20 @@ _APPROPRIATE_SYSTEM = (
 )
 
 
-def _check_appropriate(traj: Trajectory, tc: ToolCall) -> _AppropriatenessOut:
-    user = (
+def _check_appropriate(traj: Trajectory, tc: ToolCall,
+                       *, shared: bool = False) -> _AppropriatenessOut:
+    prefix = (
         f"TASK:\n{traj.task}\n\n"
         f"TOOLS AVAILABLE (from the agent's system prompt):\n"
-        f"{traj.system_prompt or '(no tool descriptions provided)'}\n\n"
-        f"TOOL CALL:\n{tc.name}({tc.arguments})"
+        f"{traj.system_prompt or '(no tool descriptions provided)'}"
     )
-    return call(system=_APPROPRIATE_SYSTEM, user=user, output=_AppropriatenessOut)
+    return call(system=_APPROPRIATE_SYSTEM, prefix=prefix,
+                user=f"TOOL CALL:\n{tc.name}({tc.arguments})", output=_AppropriatenessOut,
+                reuse="prefix" if shared else None)
 
 
 def _review_call(traj: Trajectory, idx: int, tc: ToolCall,
-                 allowed_set: set[str], appropriate: bool) -> Finding:
+                 allowed_set: set[str], appropriate: bool, shared: bool = False) -> Finding:
     allowed = (not allowed_set) or (tc.name in allowed_set)
     is_error = _looks_like_error(tc.output)
     error_handled = _handled_later(traj, idx) if is_error else None
@@ -61,7 +63,7 @@ def _review_call(traj: Trajectory, idx: int, tc: ToolCall,
     appropriate_flag: bool | None = None
     appr_reason = ""
     if appropriate:
-        out = _check_appropriate(traj, tc)
+        out = _check_appropriate(traj, tc, shared=shared)
         appropriate_flag, appr_reason = out.appropriate, out.reason
 
     meta = {"allowed": allowed, "error_handled": error_handled, "appropriate": appropriate_flag}
@@ -101,8 +103,9 @@ def _summarize(findings: list[Finding]) -> str:
 def check_tool_use(traj: Trajectory, *, appropriate: bool = False) -> CheckResult:
     """Review each tool call. `appropriate=True` adds the LLM tool-choice check."""
     allowed_set = set(traj.allowed_tools or [])
-    findings = [_review_call(traj, idx, tc, allowed_set, appropriate)
-                for idx, tc in traj.tool_calls()]
+    calls = traj.tool_calls()
+    findings = [_review_call(traj, idx, tc, allowed_set, appropriate, shared=len(calls) > 1)
+                for idx, tc in calls]
     total = len(findings)
     correct = sum(f.verdict == "correct" for f in findings)
     rate = correct / total if total else 1.0

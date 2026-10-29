@@ -21,9 +21,11 @@ from .adapters.langgraph import from_langgraph_messages
 from .scoring.stats import wilson_interval, difference_is_real, Proportion
 from .providers import providers as list_providers, list_models, default_model
 from .api import Attest
+from ._budget import Budget, BudgetExceeded, Usage
+from ._cache import DiskCache
 
 __all__ = [
-    "Attest",
+    "Attest", "Budget", "BudgetExceeded", "Usage", "DiskCache",
     "list_providers", "list_models", "default_model",
     "Trajectory", "Step", "ToolCall", "Artifact", "Detection", "TextSegment",
     "ExtractionLimits", "ExtractionOutcome", "extract_artifact",

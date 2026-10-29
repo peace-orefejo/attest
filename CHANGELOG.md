@@ -5,6 +5,33 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+- Opt-in response caching via `Attest(cache=True)` (or a shared dict), so re-evaluating an
+  identical run reuses judge calls without collapsing `vote` self-consistency.
+- Spend controls: `Attest(budget=Budget(max_calls=..., max_tokens=...))` fails closed with
+  `BudgetExceeded` before a call that would pass the limit; every `Report.metadata["usage"]`
+  and `Attest.usage` record calls, input/output tokens, and cache hits.
+- Persistent response cache: `Attest(cache="path/")` stores verdicts on disk via `DiskCache`,
+  namespaced by provider and model, so reruns across processes reuse them.
+- Provider prompt caching: shared context (faithfulness evidence across claim batches, the task and
+  tool list across tool-choice calls, the whole prompt across `vote` samples) now leads the
+  prompt so Gemini and OpenAI implicit caches reuse it, with explicit `cache_control`
+  breakpoints on Anthropic only when the prefix will be resent. `Usage` reports
+  `cached_input_tokens` and `cache_write_tokens`.
+- `attest run --max-calls/--max-tokens/--cache-dir`, with a usage line (or `usage` in `--json`);
+  exits with code 2 when the budget stops a run.
+
+### Changed
+- Faithfulness and tool-choice prompts put the shared evidence before the per-call text;
+  `PROMPT_VERSION` is now `2026.10.29`.
+- `vote` stops sampling once a verdict holds a strict majority (2 of 3 agreeing skips the third
+  call), cutting self-consistency spend by up to a third with identical verdicts.
+
+### Fixed
+- Hard provider errors (auth, billing, bad request) are no longer retried as "empty responses":
+  `call` raises the provider's own error after one attempt instead of three retries ending in a
+  misleading "no parseable content" message. Empty candidates and unparseable output still retry.
+
 ## [0.7.0] - 2026-08-13
 
 ### Added
