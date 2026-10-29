@@ -60,7 +60,7 @@ def summarize(rows: list[dict], strict: bool) -> dict:
     for row in rows:
         by_kind[row["kind"]].append(row)
     out = {}
-    for kind, items in list(by_kind.items()) + [("all", rows)]:
+    for kind, items in [*by_kind.items(), ("all", rows)]:
         should_flag = [r for r in items if r["expect"] == "flag"]
         should_pass = [r for r in items if r["expect"] == "pass"]
         caught = sum(flagged(r["call"], strict) for r in should_flag)
@@ -127,9 +127,11 @@ def main() -> None:
         return
 
     for row in rows:
-        marks = f"lenient {'ok ' if row['lenient_ok'] else 'MISS'}  strict {'ok ' if row['strict_ok'] else 'MISS'}"
+        lenient = "ok " if row["lenient_ok"] else "MISS"
+        strict = "ok " if row["strict_ok"] else "MISS"
         print(
-            f"{row['id']:<38} expect={row['expect']:<4} attest={row['call']:<12} {marks}  {row['verdicts']}"
+            f"{row['id']:<38} expect={row['expect']:<4} attest={row['call']:<12} "
+            f"lenient {lenient}  strict {strict}  {row['verdicts']}"
         )
     for mode, table in summary.items():
         print(f"\n{mode}")

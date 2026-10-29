@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field, computed_field
 
 from .prompts.version import PROMPT_VERSION
+from .utils.json_types import JsonObject
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     PASS = "pass"
     WARN = "warn"
     FAIL = "fail"
@@ -22,7 +23,7 @@ class Finding(BaseModel):
     reason: str = ""
     evidence: str | None = None
     step: int | None = None
-    metadata: dict = Field(default_factory=dict)
+    metadata: JsonObject = Field(default_factory=dict)
 
 
 class CheckResult(BaseModel):
@@ -30,8 +31,8 @@ class CheckResult(BaseModel):
     passed: bool
     score: float | None = None
     summary: str = ""
-    findings: list[Finding] = Field(default_factory=list)
-    metadata: dict = Field(default_factory=dict)
+    findings: list[Finding] = Field(default_factory=list[Finding])
+    metadata: JsonObject = Field(default_factory=dict)
     prompt_version: str = PROMPT_VERSION
 
     @property
@@ -41,7 +42,7 @@ class CheckResult(BaseModel):
 
 class Report(BaseModel):
     results: list[CheckResult]
-    metadata: dict = Field(default_factory=dict)
+    metadata: JsonObject = Field(default_factory=dict)
 
     @computed_field
     @property

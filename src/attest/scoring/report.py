@@ -8,7 +8,14 @@ from functools import partial
 from ..checks.injection import check_injection
 from ..checks.role import check_role_adherence
 from ..checks.tool_use import check_tool_use
-from ..checks.verify import MAX_CLAIMS, extract_claims, judge_trajectory, verify_claims
+from ..checks.verify import (
+    MAX_CLAIMS,
+    ExtractFn,
+    VerifyFn,
+    extract_claims,
+    judge_trajectory,
+    verify_claims,
+)
 from ..results import CheckResult, Report
 from ..trajectory import Trajectory
 
@@ -46,8 +53,8 @@ def evaluate(
     answer_kind: str = "factual",
     deep: bool = True,
     max_claims: int = MAX_CLAIMS,
-    extract: Callable[[str], list[str]] = extract_claims,
-    verify=None,
+    extract: ExtractFn = extract_claims,
+    verify: VerifyFn | None = None,
 ) -> Report:
     """
     Run the chosen checks and return one Report. `checks` picks any of
@@ -57,11 +64,10 @@ def evaluate(
     """
     selected = validate_evaluation_options(checks, answer_kind)
 
-    if verify is None:
-        verify = partial(verify_claims, answer_kind=answer_kind)
+    verifier: VerifyFn = verify or partial(verify_claims, answer_kind=answer_kind)
 
-    runners = {
-        "faithfulness": lambda: judge_trajectory(traj, extract, verify, max_claims=max_claims),
+    runners: dict[str, Callable[[], CheckResult]] = {
+        "faithfulness": lambda: judge_trajectory(traj, extract, verifier, max_claims=max_claims),
         "tool_use": lambda: check_tool_use(traj, appropriate=appropriate),
         "injection": lambda: check_injection(traj, deep=deep),
         "role": lambda: check_role_adherence(traj),

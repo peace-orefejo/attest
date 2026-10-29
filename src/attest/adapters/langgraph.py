@@ -2,17 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from ..trajectory import Step, ToolCall, Trajectory
-
-
-def _flatten(content) -> str:
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = [b.get("text", "") if isinstance(b, dict) else str(b) for b in content]
-        return "\n".join(p for p in parts if p)
-    return "" if content is None else str(content)
-
+from .guards import is_object_dict, is_object_list, str_attr
 
 _CLASS_ROLES = {
     "SystemMessage": "system",
@@ -24,20 +17,8 @@ _CLASS_ROLES = {
 }
 
 
-def _role(m) -> str:
-    """LangChain's stable message role (``BaseMessage.type``), class name as a fallback."""
-    role = getattr(m, "type", None)
-    if isinstance(role, str) and role:
-        return role
-    name = type(m).__name__
-    if name == "ChatMessage":
-        chat_role = getattr(m, "role", None)
-        return chat_role if isinstance(chat_role, str) and chat_role else "chat"
-    return _CLASS_ROLES.get(name, name)
-
-
 def from_langgraph_messages(
-    messages,
+    messages: Sequence[object],
     *,
     task: str | None = None,
     final_answer: str | None = None,
@@ -52,11 +33,7 @@ def from_langgraph_messages(
     text (pass it for structured responses); `system_prompt` to a SystemMessage if
     present. `response_tool` names a structured-output synthetic tool to skip.
     """
-    outputs: dict[str, str] = {}
-    for m in messages:
-        tcid = getattr(m, "tool_call_id", None)
-        if tcid is not None:
-            outputs[tcid] = _flatten(getattr(m, "content", ""))
+    outputs = _tool_outputs(messages)
 
     steps: list[Step] = []
     first_human: str | None = None
@@ -64,25 +41,16 @@ def from_langgraph_messages(
     last_ai_text = ""
     for m in messages:
         role = _role(m)
-        content = _flatten(getattr(m, "content", ""))
+        content = _content(m)
         if role == "system" and detected_system is None:
             detected_system = content
         if role == "human" and first_human is None:
             first_human = content
-        tool_calls = getattr(m, "tool_calls", None) or []
+        tool_calls = _tool_call_dicts(m)
         for tc in tool_calls:
             if response_tool and tc.get("name") == response_tool:
                 continue
-            steps.append(
-                Step(
-                    thought=content or None,
-                    tool_call=ToolCall(
-                        name=tc.get("name", "tool"),
-                        arguments=tc.get("args", {}) or {},
-                        output=outputs.get(tc.get("id", ""), ""),
-                    ),
-                )
-            )
+            steps.append(Step(thought=content or None, tool_call=_tool_call(tc, outputs)))
         if role == "ai" and not tool_calls and content:
             last_ai_text = content
 
@@ -93,3 +61,61 @@ def from_langgraph_messages(
         steps=steps,
         final_answer=final_answer if final_answer is not None else last_ai_text,
     )
+
+
+def _tool_outputs(messages: Sequence[object]) -> dict[str, str]:
+    outputs: dict[str, str] = {}
+    for m in messages:
+        tool_call_id = str_attr(m, "tool_call_id")
+        if tool_call_id is not None:
+            outputs[tool_call_id] = _content(m)
+    return outputs
+
+
+def _tool_call(tc: dict[str, object], outputs: dict[str, str]) -> ToolCall:
+    name = tc.get("name", "tool")
+    args = tc.get("args")
+    call_id = tc.get("id", "")
+    return ToolCall(
+        name=name if isinstance(name, str) else "tool",
+        arguments=args if is_object_dict(args) else {},
+        output=outputs.get(call_id, "") if isinstance(call_id, str) else "",
+    )
+
+
+def _tool_call_dicts(m: object) -> list[dict[str, object]]:
+    tool_calls: object = getattr(m, "tool_calls", None)
+    if not is_object_list(tool_calls):
+        return []
+    return [tc for tc in tool_calls if is_object_dict(tc)]
+
+
+def _content(m: object) -> str:
+    return _flatten(getattr(m, "content", ""))
+
+
+def _flatten(content: object) -> str:
+    if isinstance(content, str):
+        return content
+    if is_object_list(content):
+        parts = [_block_text(block) for block in content]
+        return "\n".join(p for p in parts if p)
+    return "" if content is None else str(content)
+
+
+def _block_text(block: object) -> str:
+    if not is_object_dict(block):
+        return str(block)
+    text = block.get("text", "")
+    return text if isinstance(text, str) else str(text)
+
+
+def _role(m: object) -> str:
+    """LangChain's stable message role (``BaseMessage.type``), class name as a fallback."""
+    role = str_attr(m, "type")
+    if role:
+        return role
+    name = type(m).__name__
+    if name == "ChatMessage":
+        return str_attr(m, "role") or "chat"
+    return _CLASS_ROLES.get(name, name)

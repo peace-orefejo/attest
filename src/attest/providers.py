@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from collections.abc import Iterable
 
 import instructor
+from pydantic import BaseModel, ConfigDict
 
 DEFAULT_PROVIDER = "anthropic"
 
 
-@dataclass(frozen=True)
-class _Provider:
+class _Provider(BaseModel):
+    model_config = ConfigDict(frozen=True, strict=True)
+
     name: str
     prefix: str
     env_keys: tuple[str, ...]
@@ -101,13 +103,20 @@ def build_client(
     return instructor.from_provider(target)
 
 
-def _gemini_chat_models(models) -> list[str]:
-    names = []
-    for m in models:
-        actions = getattr(m, "supported_actions", None)
-        if actions is None or "generateContent" in actions:
-            names.append(m.name.removeprefix("models/"))
+def _gemini_chat_models(models: Iterable[object]) -> list[str]:
+    names: list[str] = []
+    for model in models:
+        name = getattr(model, "name", None)
+        if isinstance(name, str) and _supports_generation(model):
+            names.append(name.removeprefix("models/"))
     return names
+
+
+def _supports_generation(model: object) -> bool:
+    actions: object = getattr(model, "supported_actions", None)
+    if actions is None:
+        return True
+    return isinstance(actions, list | tuple | set | frozenset) and "generateContent" in actions
 
 
 def fetch_models(provider: str, key: str | None = None) -> list[str]:

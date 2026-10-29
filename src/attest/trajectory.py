@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 from pydantic import BaseModel, Field
 
 from .content import Artifact, TextSegment
+from .utils.json_types import JsonObject
 
 
 class ToolCall(BaseModel):
     name: str
-    arguments: dict = Field(default_factory=dict)
+    arguments: JsonObject = Field(default_factory=dict)
     output: str = ""
-    artifacts: list[Artifact] = Field(default_factory=list)
+    artifacts: list[Artifact] = Field(default_factory=list[Artifact])
 
 
 class Step(BaseModel):
@@ -19,12 +22,17 @@ class Step(BaseModel):
     tool_call: ToolCall | None = None
 
 
+class IndexedToolCall(NamedTuple):
+    step: int
+    call: ToolCall
+
+
 class Trajectory(BaseModel):
     task: str
     system_prompt: str | None = None
     allowed_tools: list[str] | None = None
-    steps: list[Step] = Field(default_factory=list)
-    artifacts: list[Artifact] = Field(default_factory=list)
+    steps: list[Step] = Field(default_factory=list[Step])
+    artifacts: list[Artifact] = Field(default_factory=list[Artifact])
     final_answer: str
 
     def evidence(self) -> str:
@@ -39,8 +47,13 @@ class Trajectory(BaseModel):
     def has_evidence(self) -> bool:
         return bool(self.artifacts) or any(s.tool_call is not None for s in self.steps)
 
-    def tool_calls(self) -> list[tuple[int, ToolCall]]:
-        return [(i, s.tool_call) for i, s in enumerate(self.steps) if s.tool_call is not None]
+    def tool_calls(self) -> list[IndexedToolCall]:
+        """Every tool call paired with the index of the step that made it."""
+        return [
+            IndexedToolCall(step=i, call=s.tool_call)
+            for i, s in enumerate(self.steps)
+            if s.tool_call is not None
+        ]
 
     def untrusted_text_segments(self) -> list[TextSegment]:
         """Return directly available text. Binary artifact extraction is a later stage."""

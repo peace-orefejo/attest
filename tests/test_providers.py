@@ -2,6 +2,7 @@
 
 import sys
 import types
+from typing import ClassVar
 
 import pytest
 
@@ -66,7 +67,7 @@ class _Model:
 
 
 class _FakeSDK:
-    instances = []
+    instances: ClassVar[list["_FakeSDK"]] = []
 
     def __init__(self, *, api_key, items):
         self.api_key = api_key
