@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
-from collections.abc import Iterator, MutableMapping
+from collections.abc import Generator, MutableMapping
 from contextvars import ContextVar
 
 from pydantic import BaseModel
@@ -16,7 +16,7 @@ response_cache: ContextVar[ResponseStore | None] = ContextVar("attest_response_c
 
 
 @contextlib.contextmanager
-def using_cache(store: ResponseStore | None) -> Iterator[None]:
+def using_cache(store: ResponseStore | None) -> Generator[None]:
     """Memoize identical judge calls into `store`, so re-evaluating a run is free.
 
     The key includes the sample index, so `vote`'s independent samples stay distinct within a

@@ -66,6 +66,9 @@ dev = [
     "pypdf>=5.0",
     "pytesseract>=0.3.13",
     "zxing-cpp>=2.3",
+    "types-pyyaml>=6.0.12.20260906",
+    "pyright>=1.1.414",
+    "ruff>=0.17.3",
 ]
 
 [build-system]

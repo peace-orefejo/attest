@@ -33,10 +33,11 @@ def test_evidence_excludes_thoughts():
 
 
 def test_judge_aggregates_verdicts():
-    fake_extract = lambda answer: [
-        "Paris has about 2.1 million people",
-        "Paris is larger than Berlin",
-    ]
+    def fake_extract(answer):
+        return [
+            "Paris has about 2.1 million people",
+            "Paris is larger than Berlin",
+        ]
 
     def fake_verify(claims, evidence):
         out = []
@@ -62,7 +63,8 @@ def test_judge_aggregates_verdicts():
 
 
 def test_unverifiable_excluded_from_rate():
-    fake_extract = lambda a: ["c1", "c2", "c3"]
+    def fake_extract(a):
+        return ["c1", "c2", "c3"]
 
     def fake_verify(claims, evidence):
         m = {
@@ -78,7 +80,9 @@ def test_unverifiable_excluded_from_rate():
 
 
 def test_max_claims_caps_the_work():
-    fake_extract = lambda a: [f"claim {i}" for i in range(100)]
+    def fake_extract(a):
+        return [f"claim {i}" for i in range(100)]
+
     seen = {}
 
     def fake_verify(claims, evidence):

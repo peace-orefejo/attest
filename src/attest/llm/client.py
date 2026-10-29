@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextvars import ContextVar
 from functools import lru_cache
 
@@ -24,7 +24,7 @@ def resolve_client() -> instructor.Instructor:
 
 
 @contextlib.contextmanager
-def using(client: instructor.Instructor) -> Iterator[None]:
+def using(client: instructor.Instructor) -> Generator[None]:
     """Run the enclosed calls against a specific provider-bound client."""
     token = _active_client.set(client)
     try:

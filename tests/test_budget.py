@@ -71,9 +71,11 @@ def test_call_budget_fails_closed_before_spending():
 
 def test_token_budget_blocks_an_oversized_prompt():
     client = _MeteredClient()
-    with metering(Usage(), Budget(max_tokens=50)):
-        with pytest.raises(BudgetExceeded, match="Token budget"):
-            llm.call(system="s", user="x" * 1000, output=_V, client=client)
+    with (
+        metering(Usage(), Budget(max_tokens=50)),
+        pytest.raises(BudgetExceeded, match="Token budget"),
+    ):
+        llm.call(system="s", user="x" * 1000, output=_V, client=client)
     assert client.calls == 0
 
 

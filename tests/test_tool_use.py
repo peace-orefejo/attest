@@ -39,7 +39,7 @@ def test_disallowed_tool_is_incorrect():
             allowed=["search", "summarize"],
         )
     )
-    bad = [f for f in result.findings if f.subject == "delete_everything"][0]
+    bad = next(f for f in result.findings if f.subject == "delete_everything")
     assert bad.verdict == "incorrect"
     assert bad.metadata["allowed"] is False
     assert "not in the agent's allowed tools" in bad.reason
@@ -54,7 +54,7 @@ def test_unhandled_error_is_incorrect():
             allowed=["search", "fetch"],
         )
     )
-    err = [f for f in result.findings if f.subject == "fetch"][0]
+    err = next(f for f in result.findings if f.subject == "fetch")
     assert err.verdict == "incorrect"
     assert err.metadata["error_handled"] is False
     assert "error" in err.reason.lower()

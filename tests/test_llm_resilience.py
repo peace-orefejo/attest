@@ -1,5 +1,7 @@
 """call() retries transient empty/blocked provider responses, then fails clearly."""
 
+from typing import ClassVar
+
 import pytest
 
 import attest.llm.structured as llm
@@ -64,7 +66,7 @@ class _BillingError(Exception):
 
 class _GoogleError(Exception):
     code = 403
-    details = {"error": "PERMISSION_DENIED"}
+    details: ClassVar[dict[str, str]] = {"error": "PERMISSION_DENIED"}
 
 
 def _wrapped(inner):

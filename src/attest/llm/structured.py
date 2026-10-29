@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Callable, Hashable
-from typing import Literal, TypeVar
+from typing import Literal, TypeVar, cast
 
 import instructor
+from openai.types.chat import ChatCompletionMessageParam, ChatCompletionUserMessageParam
 from pydantic import BaseModel
 
 from ..prompts.guard import GUARD
@@ -17,7 +18,6 @@ from .response_cache import cache_key, response_cache
 
 T = TypeVar("T", bound=BaseModel)
 Reuse = Literal["prefix", "full"]
-MessageContent = str | list[dict[str, object]]
 
 _EPHEMERAL = {"type": "ephemeral"}
 _EMPTY_RESPONSE_MESSAGE = (
@@ -58,9 +58,9 @@ def call(
 
     resolved = client or resolve_client()
     guarded_system = f"{GUARD}\n\n{system}"
-    messages: list[dict[str, MessageContent]] = [
+    messages: list[ChatCompletionMessageParam] = [
         {"role": "system", "content": guarded_system},
-        {"role": "user", "content": _user_content(resolved, prefix, user, reuse)},
+        _user_message(resolved, prefix, user, reuse),
     ]
     last_error: Exception | None = None
     for _ in range(max(1, attempts)):
@@ -116,11 +116,18 @@ def vote(
     return next(result for result in results if key(result) == winner)
 
 
-def _user_content(
+def _user_message(
     client: instructor.Instructor, prefix: str, user: str, reuse: Reuse | None
-) -> MessageContent:
+) -> ChatCompletionUserMessageParam:
     if getattr(client, "provider", None) != instructor.Provider.ANTHROPIC or reuse is None:
-        return f"{prefix}\n\n{user}" if prefix else user
+        return {"role": "user", "content": f"{prefix}\n\n{user}" if prefix else user}
+    return cast(
+        ChatCompletionUserMessageParam,
+        {"role": "user", "content": _cached_blocks(prefix, user, reuse)},
+    )
+
+
+def _cached_blocks(prefix: str, user: str, reuse: Reuse) -> list[dict[str, object]]:
     blocks: list[dict[str, object]] = []
     if prefix:
         blocks.append({"type": "text", "text": prefix, "cache_control": _EPHEMERAL})
@@ -135,7 +142,7 @@ def _create(
     client: instructor.Instructor,
     output: type[T],
     max_tokens: int,
-    messages: list[dict[str, MessageContent]],
+    messages: list[ChatCompletionMessageParam],
 ) -> T:
     with_completion = getattr(client, "create_with_completion", None)
     if with_completion is None:

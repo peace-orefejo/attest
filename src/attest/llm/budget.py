@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextvars import ContextVar
 
 from pydantic import BaseModel, computed_field
@@ -77,7 +77,7 @@ _meter: ContextVar[_Meter | None] = ContextVar("attest_meter", default=None)
 
 
 @contextlib.contextmanager
-def metering(usage: Usage, budget: Budget | None = None) -> Iterator[None]:
+def metering(usage: Usage, budget: Budget | None = None) -> Generator[None]:
     token = _meter.set(_Meter.model_construct(usage=usage, budget=budget))
     try:
         yield
