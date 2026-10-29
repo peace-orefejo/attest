@@ -105,3 +105,31 @@ def test_response_tool_is_excluded():
     ]
     traj = from_langgraph_messages(messages, response_tool="FinalAnswer")
     assert [tc.name for _, tc in traj.tool_calls()] == ["search"]
+
+
+class _RenamedHuman:
+    type = "human"
+
+    def __init__(self, content):
+        self.content = content
+
+
+class _RenamedAI:
+    type = "ai"
+
+    def __init__(self, content="", tool_calls=None):
+        self.content = content
+        self.tool_calls = tool_calls or []
+
+
+def test_discriminates_by_message_type_not_class_name():
+    messages = [
+        _RenamedHuman("what is the capital of France?"),
+        _RenamedAI(tool_calls=[{"name": "lookup", "args": {}, "id": "1"}]),
+        ToolMessage("Paris is the capital.", "1"),
+        _RenamedAI("The capital of France is Paris."),
+    ]
+    traj = from_langgraph_messages(messages)
+    assert traj.task == "what is the capital of France?"
+    assert traj.final_answer == "The capital of France is Paris."
+    assert [tc.name for _, tc in traj.tool_calls()] == ["lookup"]

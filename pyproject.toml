@@ -80,3 +80,6 @@ exclude = ["/tests", "/.github"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+markers = [
+    "integration: end-to-end tests that make real LLM calls (opt in with ATTEST_INTEGRATION=1)",
+]

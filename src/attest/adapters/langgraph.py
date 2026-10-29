@@ -14,6 +14,28 @@ def _flatten(content) -> str:
     return "" if content is None else str(content)
 
 
+_CLASS_ROLES = {
+    "SystemMessage": "system",
+    "HumanMessage": "human",
+    "AIMessage": "ai",
+    "AIMessageChunk": "ai",
+    "ToolMessage": "tool",
+    "FunctionMessage": "tool",
+}
+
+
+def _role(m) -> str:
+    """LangChain's stable message role (``BaseMessage.type``), class name as a fallback."""
+    role = getattr(m, "type", None)
+    if isinstance(role, str) and role:
+        return role
+    name = type(m).__name__
+    if name == "ChatMessage":
+        chat_role = getattr(m, "role", None)
+        return chat_role if isinstance(chat_role, str) and chat_role else "chat"
+    return _CLASS_ROLES.get(name, name)
+
+
 def from_langgraph_messages(
     messages,
     *,
@@ -41,11 +63,11 @@ def from_langgraph_messages(
     detected_system: str | None = None
     last_ai_text = ""
     for m in messages:
-        kind = type(m).__name__
+        role = _role(m)
         content = _flatten(getattr(m, "content", ""))
-        if kind == "SystemMessage" and detected_system is None:
+        if role == "system" and detected_system is None:
             detected_system = content
-        if kind == "HumanMessage" and first_human is None:
+        if role == "human" and first_human is None:
             first_human = content
         tool_calls = getattr(m, "tool_calls", None) or []
         for tc in tool_calls:
@@ -61,7 +83,7 @@ def from_langgraph_messages(
                     ),
                 )
             )
-        if kind == "AIMessage" and not tool_calls and content:
+        if role == "ai" and not tool_calls and content:
             last_ai_text = content
 
     return Trajectory(
