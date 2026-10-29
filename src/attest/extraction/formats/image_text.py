@@ -11,8 +11,6 @@ def image_parts(
     raw: bytes, limits: ExtractionLimits
 ) -> tuple[list[tuple[str, str]], list[str]]:
     from PIL import Image
-    import pytesseract
-    import zxingcpp
     image = Image.open(io.BytesIO(raw))
     if image.width * image.height > limits.max_image_pixels:
         raise ValueError("Image exceeds pixel limit")
@@ -20,12 +18,14 @@ def image_parts(
     parts: list[tuple[str, str]] = []
     warnings: list[str] = []
     try:
+        import pytesseract
         text = pytesseract.image_to_string(image, timeout=limits.ocr_timeout_seconds)
         if text.strip():
             parts.append(("image.ocr", text))
     except Exception as exc:
         warnings.append(f"OCR unavailable: {type(exc).__name__}: {exc}")
     try:
+        import zxingcpp
         for index, barcode in enumerate(zxingcpp.read_barcodes(image)):
             if barcode.text:
                 parts.append((f"image.qr[{index}]", barcode.text))
