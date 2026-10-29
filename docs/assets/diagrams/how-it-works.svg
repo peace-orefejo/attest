@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" width="960" height="300" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">How attest checks an answer</title>
+  <desc id="d">A recorded run is split into claims, each claim is judged against the tool outputs only, and the verdicts become a scored report.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="959" height="299" rx="16" fill="#f8fafc" stroke="#e2e8f0"/>
+
+  <g>
+    <rect x="24" y="24" width="220" height="252" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="40" y="54" font-size="15" font-weight="700" fill="#0f172a">A recorded run</text>
+    <rect x="40" y="70" width="188" height="36" rx="8" fill="#f1f5f9"/>
+    <text x="54" y="93" font-size="13" fill="#0f172a">Task</text>
+    <rect x="40" y="116" width="188" height="36" rx="8" fill="#dcfce7" stroke="#86efac"/>
+    <text x="54" y="139" font-size="13" fill="#14532d">Tool outputs</text>
+    <text x="214" y="139" font-size="11" font-weight="600" fill="#15803d" text-anchor="end">evidence</text>
+    <rect x="40" y="162" width="188" height="36" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-dasharray="4 3"/>
+    <text x="54" y="185" font-size="13" fill="#94a3b8" text-decoration="line-through">Agent reasoning</text>
+    <text x="214" y="185" font-size="11" font-weight="600" fill="#94a3b8" text-anchor="end">withheld</text>
+    <rect x="40" y="208" width="188" height="36" rx="8" fill="#e0e7ff" stroke="#a5b4fc"/>
+    <text x="54" y="231" font-size="13" fill="#312e81">Final answer</text>
+  </g>
+
+  <line x1="248" y1="150" x2="280" y2="150" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <g>
+    <rect x="284" y="24" width="196" height="252" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="300" y="54" font-size="15" font-weight="700" fill="#0f172a">1. Split into claims</text>
+    <rect x="300" y="70" width="164" height="36" rx="8" fill="#e0e7ff"/>
+    <text x="312" y="93" font-size="12" fill="#312e81">Paris has 2.1M people</text>
+    <rect x="300" y="116" width="164" height="36" rx="8" fill="#e0e7ff"/>
+    <text x="312" y="139" font-size="12" fill="#312e81">Paris is the capital</text>
+    <rect x="300" y="162" width="164" height="36" rx="8" fill="#e0e7ff"/>
+    <text x="312" y="185" font-size="12" fill="#312e81">Paris is larger than Berlin</text>
+    <text x="300" y="232" font-size="12" fill="#64748b">One fact per claim, so each</text>
+    <text x="300" y="250" font-size="12" fill="#64748b">can be checked on its own.</text>
+  </g>
+
+  <line x1="484" y1="150" x2="516" y2="150" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <g>
+    <rect x="520" y="24" width="200" height="252" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="536" y="54" font-size="15" font-weight="700" fill="#0f172a">2. Check each claim</text>
+    <rect x="536" y="70" width="168" height="36" rx="8" fill="#e0e7ff"/>
+    <text x="548" y="93" font-size="12" fill="#312e81">claim</text>
+    <text x="620" y="93" font-size="14" fill="#64748b" text-anchor="middle">+</text>
+    <rect x="636" y="76" width="62" height="24" rx="6" fill="#dcfce7"/>
+    <text x="667" y="92" font-size="11" fill="#14532d" text-anchor="middle">outputs</text>
+    <text x="536" y="136" font-size="12" fill="#334155">The judge sees one claim</text>
+    <text x="536" y="154" font-size="12" fill="#334155">and the real tool outputs.</text>
+    <text x="536" y="186" font-size="12" fill="#334155">It never sees the agent's</text>
+    <text x="536" y="204" font-size="12" fill="#334155">reasoning, so a confident</text>
+    <text x="536" y="222" font-size="12" fill="#334155">story can't talk it into</text>
+    <text x="536" y="240" font-size="12" fill="#334155">a pass.</text>
+  </g>
+
+  <line x1="724" y1="150" x2="752" y2="150" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <g>
+    <rect x="756" y="24" width="180" height="252" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="772" y="54" font-size="15" font-weight="700" fill="#0f172a">3. Report</text>
+    <rect x="772" y="70" width="148" height="36" rx="8" fill="#dcfce7"/>
+    <text x="784" y="93" font-size="12" fill="#14532d">supported</text>
+    <text x="908" y="93" font-size="11" font-weight="700" fill="#15803d" text-anchor="end">PASS</text>
+    <rect x="772" y="116" width="148" height="36" rx="8" fill="#fef9c3"/>
+    <text x="784" y="139" font-size="12" fill="#713f12">unverifiable</text>
+    <text x="908" y="139" font-size="11" font-weight="700" fill="#a16207" text-anchor="end">WARN</text>
+    <rect x="772" y="162" width="148" height="36" rx="8" fill="#fee2e2"/>
+    <text x="784" y="185" font-size="12" fill="#7f1d1d">unsupported</text>
+    <text x="908" y="185" font-size="11" font-weight="700" fill="#b91c1c" text-anchor="end">FAIL</text>
+    <text x="772" y="232" font-size="12" fill="#64748b">Each verdict quotes the</text>
+    <text x="772" y="250" font-size="12" fill="#64748b">line that decided it.</text>
+  </g>
+</svg>

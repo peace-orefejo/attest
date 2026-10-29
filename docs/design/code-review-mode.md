@@ -298,7 +298,7 @@ explicit and testable:
 
 ```python
 gate(report, output_type="issue", mode=None, injection=None, paths=None, output_index=None)
-    -> GateDecision(keep: bool, reasons: list[Finding])
+    -> GateDecision(keep: bool, reasons: list[Finding], notes: list[Finding])
 ```
 
 Defaults per output type, to be confirmed by the labeled set:
@@ -391,7 +391,7 @@ runner reports both kinds side by side.
   `final_answer`.
 - **`ReviewOutput`**, new and adapter-only: `output_type`, `text`, `diffs: dict[path, str]`,
   `files_read`, `changed_files: list[str] | None`, `question: str | None`.
-- **`GateDecision`**, new: `keep: bool`, `mode: str`, `reasons: list[Finding]`.
+- **`GateDecision`**, new: `keep: bool`, `mode: str`, `reasons: list[Finding]` (what dropped it), `notes: list[Finding]` (shown alongside, did not drop it). The split into `reasons` and `notes` came after this design.
 - **Claim verification** keeps the existing algorithm: one extraction call, then batches of up
   to 15 claims per verification call against the full scoped evidence. Cost per output is two
   model calls in the common case.
