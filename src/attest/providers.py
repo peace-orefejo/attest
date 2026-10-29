@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterable
+from typing import Protocol, runtime_checkable
 
 import instructor
 from pydantic import BaseModel, ConfigDict
+
+from .utils.imports import load_callable
 
 DEFAULT_PROVIDER = "anthropic"
 
@@ -119,6 +122,23 @@ def _supports_generation(model: object) -> bool:
     return isinstance(actions, list | tuple | set | frozenset) and "generateContent" in actions
 
 
+@runtime_checkable
+class _GeminiModels(Protocol):
+    def list(self) -> Iterable[object]: ...
+
+
+@runtime_checkable
+class _GeminiClient(Protocol):
+    models: _GeminiModels
+
+
+def _gemini_client(key: str) -> _GeminiClient:
+    client = load_callable("google.genai", "Client")(api_key=key)
+    if not isinstance(client, _GeminiClient):
+        raise TypeError("google.genai.Client did not return a client with a models listing.")
+    return client
+
+
 def fetch_models(provider: str, key: str | None = None) -> list[str]:
     """Fetch the live model list from the provider's SDK (needs a key)."""
     spec = _spec(provider)
@@ -140,9 +160,7 @@ def fetch_models(provider: str, key: str | None = None) -> list[str]:
         return sorted(m.id for m in OpenAI(api_key=resolved).models.list())
 
     if provider == "gemini":
-        from google import genai
-
-        return _gemini_chat_models(genai.Client(api_key=resolved).models.list())
+        return _gemini_chat_models(_gemini_client(resolved).models.list())
 
     raise ValueError(f"Live model listing is not implemented for {provider!r}.")
 
