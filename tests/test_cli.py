@@ -19,7 +19,8 @@ def _flat(output: str) -> str:
     phrase across them. Matching on flattened text keeps these assertions
     about the message rather than about how wide the runner's terminal is.
     """
-    return re.sub(r"\s+", " ", output.replace("│", " "))
+    plain = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output)
+    return re.sub(r"\s+", " ", plain.replace("│", " "))
 
 
 def _trajectory() -> dict:
