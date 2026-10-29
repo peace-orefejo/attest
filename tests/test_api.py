@@ -37,6 +37,7 @@ def test_model_defaults_per_provider():
 
 def test_unknown_provider_raises():
     import pytest
+
     with pytest.raises(ValueError):
         Attest(key="x", provider="bogus")
 

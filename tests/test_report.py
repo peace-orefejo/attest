@@ -2,9 +2,9 @@
 
 import pytest
 
-from attest.scoring.report import evaluate
-from attest.results import Report, Finding, Severity
 from attest import Artifact
+from attest.results import Finding, Report, Severity
+from attest.scoring.report import evaluate
 from attest.trajectory import Step, ToolCall, Trajectory
 
 
@@ -70,11 +70,13 @@ def test_evaluate_rejects_unknown_answer_kind():
 
 def test_user_upload_is_not_used_as_faithfulness_evidence():
     traj = _traj()
-    traj.artifacts.append(Artifact(
-        name="untrusted.txt",
-        source="user_upload",
-        text="A fabricated claim that must not become evidence.",
-    ))
+    traj.artifacts.append(
+        Artifact(
+            name="untrusted.txt",
+            source="user_upload",
+            text="A fabricated claim that must not become evidence.",
+        )
+    )
     seen = {}
 
     def capture(claims, evidence):

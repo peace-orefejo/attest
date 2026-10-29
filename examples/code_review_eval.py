@@ -25,7 +25,9 @@ from pathlib import Path
 from attest import Attest, Severity, Trajectory
 from attest.scoring.stats import wilson_interval
 
-DEFAULT_CASES = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "code_review_cases.json"
+DEFAULT_CASES = (
+    Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "code_review_cases.json"
+)
 KINDS = ("issue", "diff_summary", "group_summary", "canvas_answer")
 
 
@@ -73,13 +75,17 @@ def summarize(rows: list[dict], strict: bool) -> dict:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--cases", type=Path, default=DEFAULT_CASES)
     parser.add_argument("--kind", choices=KINDS)
     parser.add_argument("--provider", default=None)
     parser.add_argument("--model", default=None)
     parser.add_argument("--json", action="store_true")
-    parser.add_argument("--dry-run", action="store_true", help="validate the cases without calling a model")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="validate the cases without calling a model"
+    )
     args = parser.parse_args()
 
     cases = load_cases(args.cases, args.kind)
@@ -103,15 +109,17 @@ def main() -> None:
     for case in cases:
         report = judge.evaluate(case["trajectory"], checks=("faithfulness",))
         call, verdicts = outcome(report)
-        rows.append({
-            "id": case["id"],
-            "kind": case["kind"],
-            "expect": case["expect"],
-            "call": call,
-            "verdicts": verdicts,
-            "lenient_ok": flagged(call, False) == (case["expect"] == "flag"),
-            "strict_ok": flagged(call, True) == (case["expect"] == "flag"),
-        })
+        rows.append(
+            {
+                "id": case["id"],
+                "kind": case["kind"],
+                "expect": case["expect"],
+                "call": call,
+                "verdicts": verdicts,
+                "lenient_ok": flagged(call, False) == (case["expect"] == "flag"),
+                "strict_ok": flagged(call, True) == (case["expect"] == "flag"),
+            }
+        )
 
     summary = {"lenient": summarize(rows, False), "strict": summarize(rows, True)}
     if args.json:
@@ -120,12 +128,16 @@ def main() -> None:
 
     for row in rows:
         marks = f"lenient {'ok ' if row['lenient_ok'] else 'MISS'}  strict {'ok ' if row['strict_ok'] else 'MISS'}"
-        print(f"{row['id']:<38} expect={row['expect']:<4} attest={row['call']:<12} {marks}  {row['verdicts']}")
+        print(
+            f"{row['id']:<38} expect={row['expect']:<4} attest={row['call']:<12} {marks}  {row['verdicts']}"
+        )
     for mode, table in summary.items():
         print(f"\n{mode}")
         for kind, stats in table.items():
-            print(f"  {kind:<14} accuracy {stats['accuracy']}  caught {stats['bad_outputs_caught']}  "
-                  f"blocked {stats['good_outputs_blocked']}")
+            print(
+                f"  {kind:<14} accuracy {stats['accuracy']}  caught {stats['bad_outputs_caught']}  "
+                f"blocked {stats['good_outputs_blocked']}"
+            )
 
 
 if __name__ == "__main__":

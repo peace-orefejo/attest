@@ -3,29 +3,30 @@ from __future__ import annotations
 import base64
 import io
 import zlib
-from typing import Iterable
+from collections.abc import Iterable
 
 from .limits import ExtractionLimits
 
 
-def _pdf_parts(
-    raw: bytes, limits: ExtractionLimits
-) -> tuple[Iterable[tuple[str, str]], bool]:
+def _pdf_parts(raw: bytes, limits: ExtractionLimits) -> tuple[Iterable[tuple[str, str]], bool]:
     from pypdf import PdfReader
+
     reader = PdfReader(io.BytesIO(raw), strict=False)
     if reader.is_encrypted:
         raise ValueError("Encrypted PDF cannot be inspected")
     truncated = len(reader.pages) > limits.max_pdf_pages
+
     def parts() -> Iterable[tuple[str, str]]:
         decoded_used = 0
         seen_streams: set[int] = set()
-        for index, page in enumerate(reader.pages[:limits.max_pdf_pages]):
+        for index, page in enumerate(reader.pages[: limits.max_pdf_pages]):
             decoded_used = _check_pdf_page_budget(
                 page, decoded_used, limits.max_pdf_decoded_bytes, seen_streams
             )
             text = page.extract_text() or ""
             if text.strip():
                 yield (f"pdf.page[{index + 1}]", text)
+
     return parts(), truncated
 
 
@@ -80,8 +81,11 @@ def _bounded_pdf_decode(stream, remaining: int, limit: int) -> bytes:
         names: list[str] = []
     else:
         resolved_filters = filters.get_object()
-        names = ([str(item) for item in resolved_filters]
-                 if isinstance(resolved_filters, list) else [str(resolved_filters)])
+        names = (
+            [str(item) for item in resolved_filters]
+            if isinstance(resolved_filters, list)
+            else [str(resolved_filters)]
+        )
     data = stream._data
     for name in names:
         if name in {"/ASCII85Decode", "/A85"}:
@@ -117,12 +121,12 @@ def _bounded_run_length_decode(data: bytes, remaining: int, limit: int) -> bytes
             break
         if length < 128:
             count = length + 1
-            decoded.extend(data[index:index + count])
+            decoded.extend(data[index : index + count])
             index += count
         else:
             if index >= len(data):
                 raise ValueError("Malformed PDF RunLength stream")
-            decoded.extend(data[index:index + 1] * (257 - length))
+            decoded.extend(data[index : index + 1] * (257 - length))
             index += 1
         if len(decoded) > remaining:
             raise ValueError(f"PDF decoded content exceeds {limit} byte limit")

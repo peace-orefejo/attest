@@ -6,7 +6,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-
 ArtifactSource = Literal["tool_output", "user_upload", "retrieved_file"]
 
 
@@ -29,7 +28,7 @@ class Artifact(BaseModel):
     metadata: dict = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _one_content_source(self) -> "Artifact":
+    def _one_content_source(self) -> Artifact:
         supplied = sum(value is not None for value in (self.text, self.data_base64, self.path))
         if supplied != 1:
             raise ValueError("An artifact requires exactly one of: text, data_base64, or path.")

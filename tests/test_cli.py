@@ -6,7 +6,6 @@ from typer.testing import CliRunner
 
 from attest.cli import app
 
-
 runner = CliRunner()
 
 
@@ -67,18 +66,22 @@ def test_injection_accepts_custom_pattern_file(tmp_path):
     path = tmp_path / "trajectory.json"
     path.write_text(json.dumps(trajectory))
     patterns = tmp_path / "patterns.json"
-    patterns.write_text(json.dumps({
-        "patterns": [{
-            "name": "purple-elephant",
-            "pattern": "purple-elephant",
-            "category": "tool_redirection",
-            "severity": "medium",
-        }]
-    }))
-
-    result = runner.invoke(
-        app, ["injection", str(path), "--patterns", str(patterns), "--json"]
+    patterns.write_text(
+        json.dumps(
+            {
+                "patterns": [
+                    {
+                        "name": "purple-elephant",
+                        "pattern": "purple-elephant",
+                        "category": "tool_redirection",
+                        "severity": "medium",
+                    }
+                ]
+            }
+        )
     )
+
+    result = runner.invoke(app, ["injection", str(path), "--patterns", str(patterns), "--json"])
 
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
@@ -106,13 +109,13 @@ def test_injection_patterns_only_replaces_builtins(tmp_path):
     path = tmp_path / "trajectory.json"
     path.write_text(json.dumps(trajectory))
     patterns = tmp_path / "patterns.json"
-    patterns.write_text(json.dumps({
-        "patterns": [{"name": "purple", "pattern": "purple-elephant"}]
-    }))
+    patterns.write_text(
+        json.dumps({"patterns": [{"name": "purple", "pattern": "purple-elephant"}]})
+    )
 
-    result = runner.invoke(app, [
-        "injection", str(path), "--patterns", str(patterns), "--patterns-only", "--json"
-    ])
+    result = runner.invoke(
+        app, ["injection", str(path), "--patterns", str(patterns), "--patterns-only", "--json"]
+    )
 
     assert result.exit_code == 0
     assert json.loads(result.stdout)[0]["result"]["findings"] == []
@@ -130,9 +133,9 @@ def test_injection_rejects_unknown_pattern_severity(tmp_path):
     path = tmp_path / "trajectory.json"
     path.write_text(json.dumps(_trajectory()))
     patterns = tmp_path / "patterns.json"
-    patterns.write_text(json.dumps({
-        "patterns": [{"name": "custom", "pattern": "custom", "severity": "urgent"}]
-    }))
+    patterns.write_text(
+        json.dumps({"patterns": [{"name": "custom", "pattern": "custom", "severity": "urgent"}]})
+    )
     result = runner.invoke(app, ["injection", str(path), "--patterns", str(patterns)])
     assert result.exit_code == 2
     assert "severity must be low" in result.output

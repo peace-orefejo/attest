@@ -47,18 +47,22 @@ class Trajectory(BaseModel):
         segments: list[TextSegment] = []
         for idx, tc in self.tool_calls():
             if tc.output:
-                segments.append(TextSegment(
-                    text=tc.output,
-                    location=f"steps[{idx}].tool_call.output",
-                    source_kind="tool_output",
-                    subject=tc.name,
-                    step=idx,
-                ))
+                segments.append(
+                    TextSegment(
+                        text=tc.output,
+                        location=f"steps[{idx}].tool_call.output",
+                        source_kind="tool_output",
+                        subject=tc.name,
+                        step=idx,
+                    )
+                )
             for artifact_idx, artifact in enumerate(tc.artifacts):
                 if artifact.text is not None:
-                    segments.append(_artifact_segment(
-                        artifact, f"steps[{idx}].tool_call.artifacts[{artifact_idx}]", idx
-                    ))
+                    segments.append(
+                        _artifact_segment(
+                            artifact, f"steps[{idx}].tool_call.artifacts[{artifact_idx}]", idx
+                        )
+                    )
         for artifact_idx, artifact in enumerate(self.artifacts):
             if artifact.text is not None:
                 segments.append(_artifact_segment(artifact, f"artifacts[{artifact_idx}]", None))

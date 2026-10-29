@@ -28,10 +28,12 @@ def test_user_upload_cannot_become_faithfulness_evidence():
     traj = Trajectory(
         task="Inspect this file",
         final_answer="The balance is one million dollars.",
-        artifacts=[Artifact(
-            name="claim.txt",
-            source="user_upload",
-            text="The balance is one million dollars.",
-        )],
+        artifacts=[
+            Artifact(
+                name="claim.txt",
+                source="user_upload",
+                text="The balance is one million dollars.",
+            )
+        ],
     )
     assert traj.evidence() == ""

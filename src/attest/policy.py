@@ -9,15 +9,20 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
 from ._llm import vote
 from .results import CheckResult, Finding, Severity
 from .trajectory import Trajectory
 
 RuleKind = Literal[
-    "rubric", "evidence", "required_text", "forbidden_text",
-    "required_tools", "required_tool_order", "allowed_tools",
+    "rubric",
+    "evidence",
+    "required_text",
+    "forbidden_text",
+    "required_tools",
+    "required_tool_order",
+    "allowed_tools",
 ]
 RuleSeverity = Literal["warn", "fail"]
 
@@ -40,10 +45,13 @@ class EvaluationRule(BaseModel):
     case_sensitive: bool = False
 
     @model_validator(mode="after")
-    def _validate_values(self) -> "EvaluationRule":
+    def _validate_values(self) -> EvaluationRule:
         deterministic = {
-            "required_text", "forbidden_text", "required_tools",
-            "required_tool_order", "allowed_tools",
+            "required_text",
+            "forbidden_text",
+            "required_tools",
+            "required_tool_order",
+            "allowed_tools",
         }
         if self.kind in deterministic and not self.values:
             raise ValueError(f"Rule {self.id!r} of kind {self.kind!r} requires values.")
@@ -67,7 +75,7 @@ class EvaluationPolicy(BaseModel):
     rules: tuple[EvaluationRule, ...]
 
     @model_validator(mode="after")
-    def _unique_rule_ids(self) -> "EvaluationPolicy":
+    def _unique_rule_ids(self) -> EvaluationPolicy:
         ids = [rule.id for rule in self.rules]
         if len(ids) != len(set(ids)):
             raise ValueError("Policy rule ids must be unique.")
@@ -86,12 +94,11 @@ class EvaluationPolicy(BaseModel):
         return any(rule.needs_llm for rule in self.rules)
 
     @classmethod
-    def from_file(cls, path: str | Path) -> "EvaluationPolicy":
+    def from_file(cls, path: str | Path) -> EvaluationPolicy:
         source = Path(path)
         try:
             raw = source.read_text()
-            data = (_json_load(raw) if source.suffix.lower() == ".json"
-                    else _yaml_load(raw))
+            data = _json_load(raw) if source.suffix.lower() == ".json" else _yaml_load(raw)
         except (OSError, json.JSONDecodeError, yaml.YAMLError, _DuplicateKeyError) as exc:
             raise ValueError(f"Could not load evaluation policy {source}: {exc}") from exc
         return cls.model_validate(data)
@@ -148,8 +155,10 @@ def _construct_unique_mapping(loader, node, deep=False):
         key = loader.construct_object(key_node, deep=deep)
         if key in mapping:
             raise yaml.constructor.ConstructorError(
-                "while constructing a mapping", node.start_mark,
-                f"found duplicate key {key!r}", key_node.start_mark,
+                "while constructing a mapping",
+                node.start_mark,
+                f"found duplicate key {key!r}",
+                key_node.start_mark,
             )
         mapping[key] = loader.construct_object(value_node, deep=deep)
     return mapping
@@ -180,9 +189,7 @@ _POLICY_SYSTEM = (
 )
 
 
-def check_policy(
-    traj: Trajectory, policy: EvaluationPolicy, *, samples: int = 3
-) -> CheckResult:
+def check_policy(traj: Trajectory, policy: EvaluationPolicy, *, samples: int = 3) -> CheckResult:
     findings = [_evaluate_rule(traj, rule, samples=samples) for rule in policy.rules]
     failures = sum(f.severity is Severity.FAIL for f in findings)
     warnings = sum(f.severity is Severity.WARN for f in findings)
@@ -194,11 +201,12 @@ def check_policy(
         check="policy",
         passed=failures == 0,
         score=passed_rules / len(findings) if findings else 1.0,
-        summary=(f"{passed_rules}/{len(findings)} policy rules passed; "
-                 f"{failures} failed; {warnings} warned."),
+        summary=(
+            f"{passed_rules}/{len(findings)} policy rules passed; "
+            f"{failures} failed; {warnings} warned."
+        ),
         findings=findings,
-        metadata={**_policy_identity(policy),
-                  "semantic_context_truncated": context_truncated},
+        metadata={**_policy_identity(policy), "semantic_context_truncated": context_truncated},
     )
 
 
@@ -246,9 +254,7 @@ def _evaluate_deterministic_rule(traj: Trajectory, rule: EvaluationRule) -> Find
     return _finding(rule, compliant, "Rule satisfied." if compliant else detail)
 
 
-def _evaluate_semantic_rule(
-    traj: Trajectory, rule: EvaluationRule, *, samples: int
-) -> Finding:
+def _evaluate_semantic_rule(traj: Trajectory, rule: EvaluationRule, *, samples: int) -> Finding:
     context, context_truncated = _bounded_policy_context(traj)
     rule_json = json.dumps(
         {"id": rule.id, "kind": rule.kind, "description": rule.description},
@@ -262,23 +268,36 @@ def _evaluate_semantic_rule(
         f"{context}\n"
         "</agent_run_data>"
     )
-    out = vote(system=_POLICY_SYSTEM, user=user, output=_PolicyVerdict,
-               key=lambda result: result.compliant, samples=samples)
+    out = vote(
+        system=_POLICY_SYSTEM,
+        user=user,
+        output=_PolicyVerdict,
+        key=lambda result: result.compliant,
+        samples=samples,
+    )
     if context_truncated:
         return Finding(
             severity=Severity.FAIL if rule.severity == "fail" else Severity.WARN,
             verdict="incomplete",
             subject=rule.id,
-            reason=("The agent run exceeded the bounded semantic-policy context, so this rule "
-                    "could not be certified as compliant."),
+            reason=(
+                "The agent run exceeded the bounded semantic-policy context, so this rule "
+                "could not be certified as compliant."
+            ),
             evidence=out.evidence_quote,
-            metadata={"rule_id": rule.id, "rule_kind": rule.kind,
-                      "configured_severity": rule.severity,
-                      "semantic_context_truncated": True,
-                      "partial_judge_reason": out.reason},
+            metadata={
+                "rule_id": rule.id,
+                "rule_kind": rule.kind,
+                "configured_severity": rule.severity,
+                "semantic_context_truncated": True,
+                "partial_judge_reason": out.reason,
+            },
         )
     return _finding(
-        rule, out.compliant, out.reason, out.evidence_quote,
+        rule,
+        out.compliant,
+        out.reason,
+        out.evidence_quote,
         extra_metadata={"semantic_context_truncated": False},
     )
 
@@ -310,8 +329,7 @@ def _bounded_policy_context(traj: Trajectory) -> tuple[str, bool]:
         if output_limit == 0 and tool.output:
             truncated = True
         evidence_used += len(output)
-        tools.append({"step": index, "name": tool.name,
-                      "arguments": arguments, "output": output})
+        tools.append({"step": index, "name": tool.name, "arguments": arguments, "output": output})
 
     payload = {
         "task": clip(traj.task, POLICY_MAX_TASK_CHARS),
@@ -333,8 +351,10 @@ def _finding(
     *,
     extra_metadata: dict | None = None,
 ) -> Finding:
-    severity = Severity.PASS if compliant else (
-        Severity.FAIL if rule.severity == "fail" else Severity.WARN
+    severity = (
+        Severity.PASS
+        if compliant
+        else (Severity.FAIL if rule.severity == "fail" else Severity.WARN)
     )
     return Finding(
         severity=severity,
@@ -342,8 +362,12 @@ def _finding(
         subject=rule.id,
         reason=reason,
         evidence=evidence,
-        metadata={"rule_id": rule.id, "rule_kind": rule.kind,
-                  "configured_severity": rule.severity, **(extra_metadata or {})},
+        metadata={
+            "rule_id": rule.id,
+            "rule_kind": rule.kind,
+            "configured_severity": rule.severity,
+            **(extra_metadata or {}),
+        },
     )
 
 

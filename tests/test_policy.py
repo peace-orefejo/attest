@@ -23,12 +23,16 @@ def _deterministic_policy():
         version="2.1",
         rules=[
             EvaluationRule(
-                id="eligibility-tool", description="Check eligibility first.",
-                kind="required_tools", values=["check_eligibility"],
+                id="eligibility-tool",
+                description="Check eligibility first.",
+                kind="required_tools",
+                values=["check_eligibility"],
             ),
             EvaluationRule(
-                id="no-guarantees", description="Do not guarantee outcomes.",
-                kind="forbidden_text", values=["guaranteed"],
+                id="no-guarantees",
+                description="Do not guarantee outcomes.",
+                kind="forbidden_text",
+                values=["guaranteed"],
             ),
         ],
     )
@@ -46,9 +50,7 @@ def test_instance_policy_is_automatically_enforced_offline():
 
 def test_policy_violation_fails_whole_report():
     judge = Attest(policy=_deterministic_policy())
-    report = judge.evaluate(
-        _traj(answer="Your refund is guaranteed."), checks=["tool_use"]
-    )
+    report = judge.evaluate(_traj(answer="Your refund is guaranteed."), checks=["tool_use"])
     assert report.by("policy").passed is False
     assert report.passed is False
     assert report.by("policy").failures[0].subject == "no-guarantees"
@@ -58,7 +60,8 @@ def test_policy_requires_explicit_opt_out():
     judge = Attest(policy=_deterministic_policy())
     report = judge.evaluate(
         _traj(answer="Your refund is guaranteed."),
-        checks=["tool_use"], enforce_policy=False,
+        checks=["tool_use"],
+        enforce_policy=False,
     )
     assert report.by("policy") is None
     assert "policy" not in report.metadata
@@ -67,9 +70,9 @@ def test_policy_requires_explicit_opt_out():
 def test_instance_can_disable_policy_by_default():
     judge = Attest(policy=_deterministic_policy(), enforce_policy=False)
     assert judge.evaluate(_traj(), checks=["tool_use"]).by("policy") is None
-    assert judge.evaluate(
-        _traj(), checks=["tool_use"], enforce_policy=True
-    ).by("policy") is not None
+    assert (
+        judge.evaluate(_traj(), checks=["tool_use"], enforce_policy=True).by("policy") is not None
+    )
 
 
 def test_policy_check_requires_configured_policy():
@@ -112,15 +115,15 @@ def test_plain_string_becomes_semantic_policy_prompt():
 def test_semantic_policy_uses_active_client(monkeypatch):
     seen = {}
     monkeypatch.setattr(
-        policy_module, "vote",
-        lambda **kwargs: seen.update(kwargs) or policy_module._PolicyVerdict(
-            compliant=True, reason="The answer is concise."
+        policy_module,
+        "vote",
+        lambda **kwargs: (
+            seen.update(kwargs)
+            or policy_module._PolicyVerdict(compliant=True, reason="The answer is concise.")
         ),
     )
     sentinel = object()
-    result = Attest(
-        client=sentinel, policy="The answer must be concise."
-    ).policy_check(_traj())
+    result = Attest(client=sentinel, policy="The answer must be concise.").policy_check(_traj())
     assert result.passed is True
     assert "<evaluation_rule>" in seen["user"]
     assert "<agent_run_data>" in seen["user"]
@@ -154,9 +157,7 @@ def test_policy_is_deeply_immutable_and_copied_on_input():
 @pytest.mark.parametrize("value", ["", "   "])
 def test_deterministic_rule_rejects_blank_values(value):
     with pytest.raises(ValueError, match="empty or whitespace"):
-        EvaluationRule(
-            id="bad", description="bad", kind="required_text", values=[value]
-        )
+        EvaluationRule(id="bad", description="bad", kind="required_text", values=[value])
 
 
 def test_names_and_descriptions_reject_whitespace_only():
@@ -195,23 +196,34 @@ def test_json_duplicate_keys_are_rejected(tmp_path):
 def test_required_tool_order_is_a_subsequence():
     policy = EvaluationPolicy(
         name="refund",
-        rules=[EvaluationRule(
-            id="order", description="Check before issuing.", kind="required_tool_order",
-            values=["check_eligibility", "issue_refund"],
-        )],
+        rules=[
+            EvaluationRule(
+                id="order",
+                description="Check before issuing.",
+                kind="required_tool_order",
+                values=["check_eligibility", "issue_refund"],
+            )
+        ],
     )
-    assert Attest(policy=policy).policy_check(
-        _traj(tools=("check_eligibility", "audit", "issue_refund"))
-    ).passed is True
-    assert Attest(policy=policy).policy_check(
-        _traj(tools=("issue_refund", "check_eligibility"))
-    ).passed is False
+    assert (
+        Attest(policy=policy)
+        .policy_check(_traj(tools=("check_eligibility", "audit", "issue_refund")))
+        .passed
+        is True
+    )
+    assert (
+        Attest(policy=policy)
+        .policy_check(_traj(tools=("issue_refund", "check_eligibility")))
+        .passed
+        is False
+    )
 
 
 def test_semantic_context_is_bounded_escaped_and_reports_truncation(monkeypatch):
     seen = {}
     monkeypatch.setattr(
-        policy_module, "vote",
+        policy_module,
+        "vote",
         lambda **kwargs: seen.update(kwargs) or policy_module._PolicyVerdict(compliant=True),
     )
     payload = (
@@ -220,7 +232,8 @@ def test_semantic_context_is_bounded_escaped_and_reports_truncation(monkeypatch)
         + "x" * 1_000_000
     )
     traj = Trajectory(
-        task="t", final_answer="bad",
+        task="t",
+        final_answer="bad",
         steps=[Step(tool_call=ToolCall(name="fetch", output=payload))],
     )
     result = Attest(policy="The response must be grounded.", client=object()).policy_check(traj)
@@ -237,14 +250,15 @@ def test_semantic_context_is_bounded_escaped_and_reports_truncation(monkeypatch)
 
 def test_truncated_warn_rule_is_incomplete_but_non_blocking(monkeypatch):
     monkeypatch.setattr(
-        policy_module, "vote",
+        policy_module,
+        "vote",
         lambda **kwargs: policy_module._PolicyVerdict(compliant=True),
     )
     policy = EvaluationPolicy(
         name="advisory",
-        rules=[EvaluationRule(
-            id="tone", description="Be concise.", kind="rubric", severity="warn"
-        )],
+        rules=[
+            EvaluationRule(id="tone", description="Be concise.", kind="rubric", severity="warn")
+        ],
     )
     result = Attest(policy=policy, client=object()).policy_check(
         _traj(answer="x" * (policy_module.POLICY_MAX_ANSWER_CHARS + 1))

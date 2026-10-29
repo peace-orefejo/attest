@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import csv
 import json
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def _json_parts(raw: bytes) -> Iterable[tuple[str, str]]:
     value = json.loads(raw)
+
     def walk(item, path: str) -> Iterable[tuple[str, str]]:
         if isinstance(item, dict):
             for key, child in item.items():
@@ -16,12 +17,11 @@ def _json_parts(raw: bytes) -> Iterable[tuple[str, str]]:
                 yield from walk(child, f"{path}[{index}]")
         elif isinstance(item, str):
             yield (f"json{path}", item)
+
     return walk(value, "$")
 
 
-def _csv_parts(
-    raw: bytes, delimiter: str, max_chars: int
-) -> Iterable[tuple[str, str]]:
+def _csv_parts(raw: bytes, delimiter: str, max_chars: int) -> Iterable[tuple[str, str]]:
     """Parse the default CSV dialect without mutating csv.field_size_limit globally."""
     text = raw.decode("utf-8", errors="replace")
 

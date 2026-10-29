@@ -100,6 +100,7 @@ def test_bare_api_error_propagates_unchanged():
 
 def test_wrapped_validation_failure_is_still_retried():
     from pydantic import ValidationError
+
     try:
         VerdictOut.model_validate({"verdict": "nope"})
     except ValidationError as ve:

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from functools import partial
-from typing import Callable, Sequence
 
 from ..checks.injection import check_injection
 from ..checks.role import check_role_adherence
@@ -17,9 +17,7 @@ SUPPORTED_CHECKS = ("faithfulness", "tool_use", "injection", "role")
 SUPPORTED_ANSWER_KINDS = ("factual", "plan")
 
 
-def validate_evaluation_options(
-    checks: Sequence[str], answer_kind: str
-) -> tuple[str, ...]:
+def validate_evaluation_options(checks: Sequence[str], answer_kind: str) -> tuple[str, ...]:
     """Validate public evaluator options before any checks or LLM calls run."""
     selected = tuple(checks)
     if not selected:
@@ -28,8 +26,7 @@ def validate_evaluation_options(
     unknown = sorted(set(selected) - set(SUPPORTED_CHECKS))
     if unknown:
         raise ValueError(
-            f"Unknown check(s): {', '.join(unknown)}. "
-            f"Choose from: {', '.join(SUPPORTED_CHECKS)}."
+            f"Unknown check(s): {', '.join(unknown)}. Choose from: {', '.join(SUPPORTED_CHECKS)}."
         )
     if len(set(selected)) != len(selected):
         raise ValueError("Each check may be selected only once.")

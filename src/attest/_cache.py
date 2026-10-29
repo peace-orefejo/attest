@@ -5,9 +5,8 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections.abc import MutableMapping
+from collections.abc import Iterator, MutableMapping
 from pathlib import Path
-from typing import Iterator
 
 from pydantic import BaseModel
 

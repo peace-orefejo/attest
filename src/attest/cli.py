@@ -13,8 +13,8 @@ from pydantic import ValidationError
 from ._budget import Budget, BudgetExceeded
 from ._llm import using
 from .api import Attest
-from .checks.judge_baseline import naive_judge
 from .checks.injection import DEFAULT_DETECTORS, check_injection, load_regex_detector
+from .checks.judge_baseline import naive_judge
 from .checks.role import check_role_adherence
 from .checks.tool_use import check_tool_use
 from .checks.verify import extract_claims, judge_trajectory, verify_claims
@@ -27,10 +27,15 @@ from .trajectory import Trajectory
 load_dotenv()
 app = typer.Typer(help="Evidence-grounded evaluation for AI agent trajectories.")
 
-_PROVIDER_OPT = typer.Option(DEFAULT_PROVIDER, "--provider", "-p",
-                             help="LLM provider: anthropic (default), openai, or gemini.")
-_MODEL_OPT = typer.Option(None, "--model", "-m",
-                          help="Model id; defaults to a sensible model for the provider.")
+_PROVIDER_OPT = typer.Option(
+    DEFAULT_PROVIDER,
+    "--provider",
+    "-p",
+    help="LLM provider: anthropic (default), openai, or gemini.",
+)
+_MODEL_OPT = typer.Option(
+    None, "--model", "-m", help="Model id; defaults to a sensible model for the provider."
+)
 
 
 def _require_key(provider: str) -> None:
@@ -59,7 +64,9 @@ def _load(path: Path) -> list[Trajectory]:
         try:
             trajectories.append(Trajectory.model_validate_json(line))
         except (ValidationError, ValueError) as exc:
-            location = f"{path}" if path.suffix.lower() == ".json" else f"{path}, line {line_number}"
+            location = (
+                f"{path}" if path.suffix.lower() == ".json" else f"{path}, line {line_number}"
+            )
             detail = exc.errors()[0]["msg"] if isinstance(exc, ValidationError) else str(exc)
             raise typer.BadParameter(f"Invalid trajectory in {location}: {detail}") from exc
     return trajectories
@@ -100,8 +107,9 @@ def stats(successes: int, n: int) -> None:
 @app.command()
 def tools(
     path: Path,
-    appropriate: bool = typer.Option(False, "--appropriate",
-                                      help="Also run the LLM tool-choice check (needs a key)."),
+    appropriate: bool = typer.Option(
+        False, "--appropriate", help="Also run the LLM tool-choice check (needs a key)."
+    ),
     provider: str = _PROVIDER_OPT,
     model: str = _MODEL_OPT,
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
@@ -114,7 +122,12 @@ def tools(
         trajectories = _load(path)
         results = [(traj, check_tool_use(traj, appropriate=appropriate)) for traj in trajectories]
         if json_output:
-            _emit_json([{"task": traj.task, "result": result.model_dump(mode="json")} for traj, result in results])
+            _emit_json(
+                [
+                    {"task": traj.task, "result": result.model_dump(mode="json")}
+                    for traj, result in results
+                ]
+            )
             return
         for traj, result in results:
             typer.echo(f"- {traj.task[:70]!r}")
@@ -125,8 +138,11 @@ def tools(
 @app.command()
 def injection(
     path: Path,
-    deep: bool = typer.Option(False, "--deep",
-                              help="Also LLM-check whether the agent FOLLOWED each payload (needs a key)."),
+    deep: bool = typer.Option(
+        False,
+        "--deep",
+        help="Also LLM-check whether the agent FOLLOWED each payload (needs a key).",
+    ),
     provider: str = _PROVIDER_OPT,
     model: str = _MODEL_OPT,
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
@@ -140,7 +156,8 @@ def injection(
         False, "--allow-paths", help="Allow explicitly referenced local artifact paths."
     ),
     extract_files: bool = typer.Option(
-        True, "--extract-files/--no-extract-files",
+        True,
+        "--extract-files/--no-extract-files",
         help="Extract supported embedded files before scanning.",
     ),
 ) -> None:
@@ -148,7 +165,9 @@ def injection(
     if deep:
         _require_key(provider)
     if patterns_only and patterns is None:
-        raise typer.BadParameter("--patterns-only requires --patterns.", param_hint="--patterns-only")
+        raise typer.BadParameter(
+            "--patterns-only requires --patterns.", param_hint="--patterns-only"
+        )
     detectors = [] if patterns_only else list(DEFAULT_DETECTORS)
     if patterns is not None:
         try:
@@ -159,14 +178,25 @@ def injection(
     with ctx:
         trajectories = _load(path)
         results = [
-            (traj, check_injection(
-                traj, deep=deep, detectors=detectors,
-                extract_files=extract_files, allow_paths=allow_paths,
-            ))
+            (
+                traj,
+                check_injection(
+                    traj,
+                    deep=deep,
+                    detectors=detectors,
+                    extract_files=extract_files,
+                    allow_paths=allow_paths,
+                ),
+            )
             for traj in trajectories
         ]
         if json_output:
-            _emit_json([{"task": traj.task, "result": result.model_dump(mode="json")} for traj, result in results])
+            _emit_json(
+                [
+                    {"task": traj.task, "result": result.model_dump(mode="json")}
+                    for traj, result in results
+                ]
+            )
             return
         for traj, result in results:
             typer.echo(f"- {traj.task[:70]!r}")
@@ -187,7 +217,12 @@ def role(
         trajectories = _load(path)
         results = [(traj, check_role_adherence(traj)) for traj in trajectories]
         if json_output:
-            _emit_json([{"task": traj.task, "result": result.model_dump(mode="json")} for traj, result in results])
+            _emit_json(
+                [
+                    {"task": traj.task, "result": result.model_dump(mode="json")}
+                    for traj, result in results
+                ]
+            )
             return
         for traj, result in results:
             typer.echo(f"- {traj.task[:70]!r}")
@@ -198,21 +233,31 @@ def role(
 @app.command()
 def run(
     path: Path,
-    checks: str = typer.Option(",".join(DEFAULT_CHECKS), "--checks",
-                               help="Comma-separated: faithfulness,tool_use,injection,role."),
-    appropriate: bool = typer.Option(False, "--appropriate",
-                                     help="Also run the LLM tool-choice check (1 call per tool call)."),
-    kind: str = typer.Option("factual", "--kind",
-                             help="Answer type: 'factual' (default) or 'plan' (judge fidelity to the plan)."),
+    checks: str = typer.Option(
+        ",".join(DEFAULT_CHECKS),
+        "--checks",
+        help="Comma-separated: faithfulness,tool_use,injection,role.",
+    ),
+    appropriate: bool = typer.Option(
+        False, "--appropriate", help="Also run the LLM tool-choice check (1 call per tool call)."
+    ),
+    kind: str = typer.Option(
+        "factual",
+        "--kind",
+        help="Answer type: 'factual' (default) or 'plan' (judge fidelity to the plan).",
+    ),
     provider: str = _PROVIDER_OPT,
     model: str = _MODEL_OPT,
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
-    max_calls: int | None = typer.Option(None, "--max-calls",
-                                         help="Stop before exceeding this many judge calls."),
-    max_tokens: int | None = typer.Option(None, "--max-tokens",
-                                          help="Stop before exceeding this many tokens."),
-    cache_dir: Path | None = typer.Option(None, "--cache-dir",
-                                          help="Reuse judge verdicts from this directory across runs."),
+    max_calls: int | None = typer.Option(
+        None, "--max-calls", help="Stop before exceeding this many judge calls."
+    ),
+    max_tokens: int | None = typer.Option(
+        None, "--max-tokens", help="Stop before exceeding this many tokens."
+    ),
+    cache_dir: Path | None = typer.Option(
+        None, "--cache-dir", help="Reuse judge verdicts from this directory across runs."
+    ),
 ) -> None:
     """Full report on a trajectory (or JSONL): runs the chosen checks + an overall score."""
     selected = [c.strip() for c in checks.split(",") if c.strip()]
@@ -232,8 +277,9 @@ def run(
     stopped: str | None = None
     for traj in trajectories:
         try:
-            report = judge.evaluate(traj, checks=selected, appropriate=appropriate,
-                                    answer_kind=kind)
+            report = judge.evaluate(
+                traj, checks=selected, appropriate=appropriate, answer_kind=kind
+            )
         except BudgetExceeded as exc:
             stopped = str(exc)
             break
@@ -244,20 +290,24 @@ def run(
 
     usage = judge.usage.as_dict()
     if json_output:
-        _emit_json({
-            "trajectories": [
-                {"task": traj.task, "report": report.model_dump(mode="json")}
-                for traj, report in reports
-            ],
-            "mean_overall_score": sum(overalls) / len(overalls) if overalls else None,
-            "usage": usage,
-            "budget_exceeded": stopped,
-        })
+        _emit_json(
+            {
+                "trajectories": [
+                    {"task": traj.task, "report": report.model_dump(mode="json")}
+                    for traj, report in reports
+                ],
+                "mean_overall_score": sum(overalls) / len(overalls) if overalls else None,
+                "usage": usage,
+                "budget_exceeded": stopped,
+            }
+        )
     else:
         if overalls:
             typer.echo(f"Mean overall score: {sum(overalls) / len(overalls):.0%}")
-        typer.echo(f"Usage: {usage['calls']} calls, {usage['tokens']} tokens "
-                   f"({usage['cache_hits']} cache hits)")
+        typer.echo(
+            f"Usage: {usage['calls']} calls, {usage['tokens']} tokens "
+            f"({usage['cache_hits']} cache hits)"
+        )
         if stopped:
             typer.echo(f"Stopped after {len(reports)}/{len(trajectories)} trajectories: {stopped}")
     if stopped:

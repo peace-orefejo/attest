@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import os
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
 
 import instructor
 
@@ -12,13 +12,13 @@ from ._budget import Budget, Usage, metering
 from ._cache import DiskCache
 from ._llm import using, using_cache
 from .checks.injection import DEFAULT_DETECTORS, InjectionDetector, check_injection
-from .extraction import ExtractionLimits
-from .checks.role import check_role_adherence
 from .checks.judge_baseline import JudgeVerdict, naive_judge
+from .checks.role import check_role_adherence
 from .checks.tool_use import check_tool_use
 from .checks.verify import MAX_CLAIMS, extract_claims
-from .providers import DEFAULT_PROVIDER, build_client, default_model, list_models, providers
+from .extraction import ExtractionLimits
 from .policy import PolicyInput, check_policy, load_policy
+from .providers import DEFAULT_PROVIDER, build_client, default_model, list_models, providers
 from .results import CheckResult, Report
 from .scoring.report import DEFAULT_CHECKS, evaluate, validate_evaluation_options
 from .scoring.stats import Proportion, wilson_interval
@@ -89,8 +89,8 @@ class Attest:
         enforce_policy: bool | None = None,
     ) -> Report:
         selected = validate_evaluation_options(checks, answer_kind)
-        faithfulness_needs_llm = (
-            "faithfulness" in selected and (extract is extract_claims or verify is None)
+        faithfulness_needs_llm = "faithfulness" in selected and (
+            extract is extract_claims or verify is None
         )
         policy = self.policy
         enforce = self.enforce_policy if enforce_policy is None else enforce_policy
@@ -129,8 +129,13 @@ class Attest:
     def policy_identity(self) -> dict:
         if self.policy is None:
             return {}
-        return {"policy": {"name": self.policy.name, "version": self.policy.version,
-                           "hash": self.policy.hash}}
+        return {
+            "policy": {
+                "name": self.policy.name,
+                "version": self.policy.version,
+                "hash": self.policy.hash,
+            }
+        }
 
     def tool_use(self, traj: Trajectory, *, appropriate: bool = False) -> CheckResult:
         with self._llm_context(appropriate):
@@ -148,8 +153,12 @@ class Attest:
     ) -> CheckResult:
         with self._llm_context(deep):
             return check_injection(
-                traj, deep=deep, detectors=detectors, extract_files=extract_files,
-                allow_paths=allow_paths, extraction_limits=extraction_limits,
+                traj,
+                deep=deep,
+                detectors=detectors,
+                extract_files=extract_files,
+                allow_paths=allow_paths,
+                extraction_limits=extraction_limits,
             )
 
     def role_adherence(self, traj: Trajectory) -> CheckResult:

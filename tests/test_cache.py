@@ -1,7 +1,8 @@
 """Response caching: re-evaluating an identical run is free, without collapsing self-consistency."""
 
-import attest._llm as llm
 from pydantic import BaseModel
+
+import attest._llm as llm
 
 
 class _V(BaseModel):
@@ -49,6 +50,7 @@ def test_without_cache_every_call_hits_the_client(monkeypatch):
 
 def test_attest_cache_flag_wires_a_store():
     from attest import Attest
+
     assert Attest(cache=True)._cache is not None
     assert Attest()._cache is None
     assert Attest(cache=False)._cache is None

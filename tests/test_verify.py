@@ -1,19 +1,25 @@
 """Faithfulness aggregation and the batched verifier, all offline."""
 
 import attest.checks.verify as v
-from attest.trajectory import Trajectory, Step, ToolCall
 from attest.checks.verify import judge_trajectory, verify_claims
 from attest.results import Finding, Severity
+from attest.trajectory import Step, ToolCall, Trajectory
 
 
 def _example() -> Trajectory:
     return Trajectory(
         task="pop compare",
         steps=[
-            Step(tool_call=ToolCall(name="get_population",
-                                    arguments={"city": "Paris"}, output="Paris: 2,103,000")),
-            Step(tool_call=ToolCall(name="get_population",
-                                    arguments={"city": "Berlin"}, output="Berlin: 3,677,000")),
+            Step(
+                tool_call=ToolCall(
+                    name="get_population", arguments={"city": "Paris"}, output="Paris: 2,103,000"
+                )
+            ),
+            Step(
+                tool_call=ToolCall(
+                    name="get_population", arguments={"city": "Berlin"}, output="Berlin: 3,677,000"
+                )
+            ),
         ],
         final_answer="Paris has ~2.1M people. Paris is larger than Berlin.",
     )
@@ -36,8 +42,14 @@ def test_judge_aggregates_verdicts():
         out = []
         for c in claims:
             if "larger than Berlin" in c:
-                out.append(Finding(severity=Severity.FAIL, verdict="unsupported", subject=c,
-                                   reason="Berlin 3.6M > Paris 2.1M"))
+                out.append(
+                    Finding(
+                        severity=Severity.FAIL,
+                        verdict="unsupported",
+                        subject=c,
+                        reason="Berlin 3.6M > Paris 2.1M",
+                    )
+                )
             else:
                 out.append(Finding(severity=Severity.PASS, verdict="supported", subject=c))
         return out
@@ -80,10 +92,16 @@ def test_max_claims_caps_the_work():
 
 
 def test_verify_claims_batches_and_maps(monkeypatch):
-    monkeypatch.setattr(v, "call", lambda **k: v._BatchOut(verdicts=[
-        v._ClaimVerdict(claim=1, verdict="supported", reason="ok"),
-        v._ClaimVerdict(claim=2, verdict="unsupported", reason="no", evidence_quote="x"),
-    ]))
+    monkeypatch.setattr(
+        v,
+        "call",
+        lambda **k: v._BatchOut(
+            verdicts=[
+                v._ClaimVerdict(claim=1, verdict="supported", reason="ok"),
+                v._ClaimVerdict(claim=2, verdict="unsupported", reason="no", evidence_quote="x"),
+            ]
+        ),
+    )
     findings = verify_claims(["a", "b"], "some evidence")
     assert [f.verdict for f in findings] == ["supported", "unsupported"]
     assert findings[0].subject == "a" and findings[1].subject == "b"
@@ -91,9 +109,15 @@ def test_verify_claims_batches_and_maps(monkeypatch):
 
 
 def test_verify_claims_missing_verdict_degrades(monkeypatch):
-    monkeypatch.setattr(v, "call", lambda **k: v._BatchOut(verdicts=[
-        v._ClaimVerdict(claim=1, verdict="supported"),
-    ]))
+    monkeypatch.setattr(
+        v,
+        "call",
+        lambda **k: v._BatchOut(
+            verdicts=[
+                v._ClaimVerdict(claim=1, verdict="supported"),
+            ]
+        ),
+    )
     findings = verify_claims(["a", "b"], "evidence")
     assert findings[0].verdict == "supported"
     assert findings[1].verdict == "unverifiable"
@@ -102,6 +126,7 @@ def test_verify_claims_missing_verdict_degrades(monkeypatch):
 def test_verify_claims_error_degrades_whole_batch(monkeypatch):
     def boom(**k):
         raise RuntimeError("provider died")
+
     monkeypatch.setattr(v, "call", boom)
     findings = verify_claims(["a", "b"], "evidence")
     assert [f.verdict for f in findings] == ["unverifiable", "unverifiable"]
@@ -110,6 +135,7 @@ def test_verify_claims_error_degrades_whole_batch(monkeypatch):
 def test_verify_claims_no_evidence_skips_llm(monkeypatch):
     def boom(**k):
         raise AssertionError("must not call the LLM without evidence")
+
     monkeypatch.setattr(v, "call", boom)
     findings = verify_claims(["a"], "   ")
     assert findings[0].verdict == "unverifiable"

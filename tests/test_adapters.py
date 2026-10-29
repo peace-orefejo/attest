@@ -29,9 +29,15 @@ class SystemMessage:
 def test_adapts_a_codesprint_like_run():
     messages = [
         HumanMessage("Review my binary search implementation"),
-        AIMessage(tool_calls=[{"name": "understand_code_snippet",
-                               "args": {"code_snippet": "def bsearch(...)"},
-                               "id": "c1"}]),
+        AIMessage(
+            tool_calls=[
+                {
+                    "name": "understand_code_snippet",
+                    "args": {"code_snippet": "def bsearch(...)"},
+                    "id": "c1",
+                }
+            ]
+        ),
         ToolMessage("It's an iterative binary search over a sorted list; O(log n).", "c1"),
         AIMessage(tool_calls=[{"name": "reason_through_design", "args": {}, "id": "c2"}]),
         ToolMessage("Sorted-array precondition; consider bounds handling.", "c2"),

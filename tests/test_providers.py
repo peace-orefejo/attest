@@ -49,8 +49,7 @@ def test_list_models_without_key_is_curated(monkeypatch):
 
 
 def test_list_models_with_key_goes_live(monkeypatch):
-    _install_fake_sdk(monkeypatch, "openai", "OpenAI",
-                      [_Model(id="gpt-live")])
+    _install_fake_sdk(monkeypatch, "openai", "OpenAI", [_Model(id="gpt-live")])
     assert list_models("openai", key="k") == ["gpt-live"]
 
 
@@ -89,15 +88,15 @@ def _install_fake_sdk(monkeypatch, module_path, cls_name, items):
 
 
 def test_fetch_anthropic_returns_ids(monkeypatch):
-    captured = _install_fake_sdk(monkeypatch, "anthropic", "Anthropic",
-                                 [_Model(id="claude-x"), _Model(id="claude-y")])
+    captured = _install_fake_sdk(
+        monkeypatch, "anthropic", "Anthropic", [_Model(id="claude-x"), _Model(id="claude-y")]
+    )
     assert fetch_models("anthropic", key="k") == ["claude-x", "claude-y"]
     assert captured["api_key"] == "k"
 
 
 def test_fetch_openai_sorts_ids(monkeypatch):
-    _install_fake_sdk(monkeypatch, "openai", "OpenAI",
-                      [_Model(id="gpt-z"), _Model(id="gpt-a")])
+    _install_fake_sdk(monkeypatch, "openai", "OpenAI", [_Model(id="gpt-z"), _Model(id="gpt-a")])
     assert fetch_models("openai", key="k") == ["gpt-a", "gpt-z"]
 
 

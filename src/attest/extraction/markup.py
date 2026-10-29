@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from html.parser import HTMLParser
-from typing import Iterable
 
 
 class _HTMLText(HTMLParser):
@@ -44,11 +44,14 @@ def _html_parts(raw: bytes, max_chars: int) -> tuple[list[tuple[str, str]], bool
 
 def _xml_parts(raw: bytes) -> Iterable[tuple[str, str]]:
     from defusedxml import ElementTree
+
     root = ElementTree.fromstring(raw)
+
     def parts() -> Iterable[tuple[str, str]]:
         for index, element in enumerate(root.iter()):
             if element.text and element.text.strip():
                 yield (f"xml.element[{index}].text", element.text)
             for name, value in element.attrib.items():
                 yield (f"xml.element[{index}].attribute.{name}", value)
+
     return parts()

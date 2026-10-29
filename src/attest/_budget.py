@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Iterator
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass
-from typing import Any, Iterator
+from typing import Any
 
 _CHARS_PER_TOKEN = 4
 
@@ -129,16 +130,24 @@ def token_counts(completion: Any) -> TokenCounts:
     if usage is not None and hasattr(usage, "input_tokens"):
         cached = _n(usage, "cache_read_input_tokens")
         written = _n(usage, "cache_creation_input_tokens")
-        return TokenCounts(input=_n(usage, "input_tokens") + cached + written,
-                           output=_n(usage, "output_tokens"), cached=cached, written=written)
+        return TokenCounts(
+            input=_n(usage, "input_tokens") + cached + written,
+            output=_n(usage, "output_tokens"),
+            cached=cached,
+            written=written,
+        )
     if usage is not None:
         details = getattr(usage, "prompt_tokens_details", None)
-        return TokenCounts(input=_n(usage, "prompt_tokens"),
-                           output=_n(usage, "completion_tokens"),
-                           cached=_n(details, "cached_tokens"))
+        return TokenCounts(
+            input=_n(usage, "prompt_tokens"),
+            output=_n(usage, "completion_tokens"),
+            cached=_n(details, "cached_tokens"),
+        )
     meta = getattr(completion, "usage_metadata", None)
     if meta is not None:
-        return TokenCounts(input=_n(meta, "prompt_token_count"),
-                           output=_n(meta, "candidates_token_count"),
-                           cached=_n(meta, "cached_content_token_count"))
+        return TokenCounts(
+            input=_n(meta, "prompt_token_count"),
+            output=_n(meta, "candidates_token_count"),
+            cached=_n(meta, "cached_content_token_count"),
+        )
     return TokenCounts()

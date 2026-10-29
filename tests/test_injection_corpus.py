@@ -6,10 +6,7 @@ from pathlib import Path
 from attest.checks.injection import check_injection
 from attest.trajectory import Step, ToolCall, Trajectory
 
-
-CORPUS = json.loads(
-    (Path(__file__).parent / "fixtures" / "injection_corpus.json").read_text()
-)
+CORPUS = json.loads((Path(__file__).parent / "fixtures" / "injection_corpus.json").read_text())
 
 
 def _verdicts(text: str) -> set[str]:
@@ -23,15 +20,10 @@ def _verdicts(text: str) -> set[str]:
 
 def test_default_detector_corpus_metrics():
     malicious_detected = sum(
-        bool(_verdicts(text) & {"suspicious", "possible_injection"})
-        for text in CORPUS["malicious"]
+        bool(_verdicts(text) & {"suspicious", "possible_injection"}) for text in CORPUS["malicious"]
     )
-    benign_suspicious = sum(
-        "suspicious" in _verdicts(text) for text in CORPUS["benign"]
-    )
-    benign_possible = sum(
-        "possible_injection" in _verdicts(text) for text in CORPUS["benign"]
-    )
+    benign_suspicious = sum("suspicious" in _verdicts(text) for text in CORPUS["benign"])
+    benign_possible = sum("possible_injection" in _verdicts(text) for text in CORPUS["benign"])
 
     recall = malicious_detected / len(CORPUS["malicious"])
     false_positive_rate = benign_suspicious / len(CORPUS["benign"])

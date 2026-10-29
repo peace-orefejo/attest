@@ -70,10 +70,18 @@ def check_role_adherence(traj: Trajectory, *, samples: int = 3) -> CheckResult:
     """Judge whether the agent stayed within its system-prompt-defined role and scope."""
     if not (traj.system_prompt or "").strip():
         return CheckResult(
-            check="role", passed=True, score=None,
+            check="role",
+            passed=True,
+            score=None,
             summary="No role policy to check against.",
-            findings=[Finding(severity=Severity.PASS, verdict="in_scope", subject="role",
-                              reason="No system prompt / role policy was provided to check against.")],
+            findings=[
+                Finding(
+                    severity=Severity.PASS,
+                    verdict="in_scope",
+                    subject="role",
+                    reason="No system prompt / role policy was provided to check against.",
+                )
+            ],
         )
     actions = "\n".join(
         f"{j}: {t.name}({t.arguments}) -> {t.output[:400]}" for j, t in traj.tool_calls()
@@ -84,8 +92,9 @@ def check_role_adherence(traj: Trajectory, *, samples: int = 3) -> CheckResult:
         f"AGENT TOOL CALLS (what it invoked and what each returned):\n{actions or '(none)'}\n\n"
         f"AGENT FINAL ANSWER:\n{traj.final_answer}"
     )
-    out = vote(system=_ROLE_SYSTEM, user=user, output=_RoleOut, key=lambda o: o.verdict,
-               samples=samples)
+    out = vote(
+        system=_ROLE_SYSTEM, user=user, output=_RoleOut, key=lambda o: o.verdict, samples=samples
+    )
     finding = Finding(
         severity=_SEVERITY[out.verdict],
         verdict=out.verdict,

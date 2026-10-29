@@ -26,8 +26,11 @@ _REGISTRY: dict[str, _Provider] = {
         env_keys=("ANTHROPIC_API_KEY",),
         default_model="claude-haiku-4-5",
         models=(
-            "claude-opus-5", "claude-sonnet-5",
-            "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5",
+            "claude-opus-5",
+            "claude-sonnet-5",
+            "claude-opus-4-8",
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5",
         ),
     ),
     "openai": _Provider(
@@ -43,7 +46,9 @@ _REGISTRY: dict[str, _Provider] = {
         env_keys=("GEMINI_API_KEY", "GOOGLE_API_KEY"),
         default_model="gemini-3.6-flash",
         models=(
-            "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
             "gemini-2.5-pro",
         ),
     ),
@@ -117,14 +122,17 @@ def fetch_models(provider: str, key: str | None = None) -> list[str]:
 
     if provider == "anthropic":
         from anthropic import Anthropic
+
         return [m.id for m in Anthropic(api_key=resolved).models.list()]
 
     if provider == "openai":
         from openai import OpenAI
+
         return sorted(m.id for m in OpenAI(api_key=resolved).models.list())
 
     if provider == "gemini":
         from google import genai
+
         return _gemini_chat_models(genai.Client(api_key=resolved).models.list())
 
     raise ValueError(f"Live model listing is not implemented for {provider!r}.")

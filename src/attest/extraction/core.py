@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import base64
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from ..content import Artifact, TextSegment
 from .image import _image_parts
@@ -23,31 +23,37 @@ def extract_artifact(
     allow_paths: bool = False,
 ) -> ExtractionOutcome:
     if artifact.text is not None:
-        clipped = artifact.text[:limits.max_chars]
+        clipped = artifact.text[: limits.max_chars]
         return ExtractionOutcome(
             [_segment(clipped, artifact, location, step, "artifact_text")]
-            if clipped.strip() else [],
+            if clipped.strip()
+            else [],
             truncated=len(clipped) < len(artifact.text),
             inspected=True,
         )
     try:
         raw = _read_bytes(artifact, limits, allow_paths)
-        declared_media = (artifact.media_type or _guess_media(artifact.name)).split(";", 1)[0].lower()
+        declared_media = (
+            (artifact.media_type or _guess_media(artifact.name)).split(";", 1)[0].lower()
+        )
         detected_media = _sniff_media(raw)
         media = detected_media or declared_media
         format_truncated = False
         channel_warnings: list[str] = []
         extraction_artifact = artifact
         if detected_media and detected_media != declared_media:
-            extraction_artifact = artifact.model_copy(update={
-                "media_type": detected_media,
-                "metadata": {**artifact.metadata, "declared_media_type": declared_media},
-            })
+            extraction_artifact = artifact.model_copy(
+                update={
+                    "media_type": detected_media,
+                    "metadata": {**artifact.metadata, "declared_media_type": declared_media},
+                }
+            )
         if media in {"application/json"}:
             parts = _json_parts(raw)
         elif media in {"text/csv", "text/tab-separated-values"}:
             parts = _csv_parts(
-                raw, "\t" if media.endswith("tab-separated-values") else ",",
+                raw,
+                "\t" if media.endswith("tab-separated-values") else ",",
                 limits.max_chars,
             )
         elif media in {"application/xml", "text/xml", "application/xhtml+xml"}:
@@ -74,8 +80,10 @@ def extract_artifact(
 
 def _read_bytes(artifact: Artifact, limits: ExtractionLimits, allow_paths: bool) -> bytes:
     if artifact.data_base64 is not None:
-        padding = 2 if artifact.data_base64.endswith("==") else (
-            1 if artifact.data_base64.endswith("=") else 0
+        padding = (
+            2
+            if artifact.data_base64.endswith("==")
+            else (1 if artifact.data_base64.endswith("=") else 0)
         )
         estimated = len(artifact.data_base64) * 3 // 4 - padding
         if estimated > limits.max_bytes:
@@ -98,10 +106,17 @@ def _read_bytes(artifact: Artifact, limits: ExtractionLimits, allow_paths: bool)
 def _guess_media(name: str | None) -> str:
     suffix = Path(name or "").suffix.lower()
     return {
-        ".json": "application/json", ".csv": "text/csv", ".tsv": "text/tab-separated-values",
-        ".xml": "application/xml", ".html": "text/html", ".htm": "text/html",
-        ".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg", ".webp": "image/webp",
+        ".json": "application/json",
+        ".csv": "text/csv",
+        ".tsv": "text/tab-separated-values",
+        ".xml": "application/xml",
+        ".html": "text/html",
+        ".htm": "text/html",
+        ".pdf": "application/pdf",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
     }.get(suffix, "application/octet-stream")
 
 
@@ -123,8 +138,11 @@ def _sniff_media(raw: bytes) -> str | None:
 
 
 def _bounded_segments(
-    parts: Iterable[tuple[str, str]], artifact: Artifact, location: str,
-    step: int | None, max_chars: int,
+    parts: Iterable[tuple[str, str]],
+    artifact: Artifact,
+    location: str,
+    step: int | None,
+    max_chars: int,
 ) -> ExtractionOutcome:
     segments, used, truncated = [], 0, False
     for source_kind, text in parts:
@@ -135,23 +153,41 @@ def _bounded_segments(
         clipped = text[:remaining]
         truncated |= len(clipped) < len(text)
         if clipped.strip():
-            segments.append(_segment(
-                clipped, artifact, f"{location}.{source_kind}", step, source_kind,
-                artifact_location=location,
-            ))
+            segments.append(
+                _segment(
+                    clipped,
+                    artifact,
+                    f"{location}.{source_kind}",
+                    step,
+                    source_kind,
+                    artifact_location=location,
+                )
+            )
             used += len(clipped)
     return ExtractionOutcome(segments, truncated=truncated)
 
 
 def _segment(
-    text: str, artifact: Artifact, location: str, step: int | None, source_kind: str,
-    *, artifact_location: str | None = None,
+    text: str,
+    artifact: Artifact,
+    location: str,
+    step: int | None,
+    source_kind: str,
+    *,
+    artifact_location: str | None = None,
 ) -> TextSegment:
     return TextSegment(
-        text=text, location=location, source_kind=source_kind,
-        subject=artifact.name or artifact.id or "artifact", step=step,
-        metadata={**artifact.metadata,
-                  "artifact_id": artifact.id, "media_type": artifact.media_type,
-                  "source": artifact.source, "sha256": artifact.sha256,
-                  "artifact_location": artifact_location or location},
+        text=text,
+        location=location,
+        source_kind=source_kind,
+        subject=artifact.name or artifact.id or "artifact",
+        step=step,
+        metadata={
+            **artifact.metadata,
+            "artifact_id": artifact.id,
+            "media_type": artifact.media_type,
+            "source": artifact.source,
+            "sha256": artifact.sha256,
+            "artifact_location": artifact_location or location,
+        },
     )

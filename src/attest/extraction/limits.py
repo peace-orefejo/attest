@@ -20,9 +20,15 @@ class ExtractionLimits:
 
     def __post_init__(self) -> None:
         for name in (
-            "max_bytes", "max_chars", "max_scan_chars", "max_scan_segments",
-            "max_artifacts", "max_detections",
-            "max_pdf_pages", "max_pdf_decoded_bytes", "max_image_pixels",
+            "max_bytes",
+            "max_chars",
+            "max_scan_chars",
+            "max_scan_segments",
+            "max_artifacts",
+            "max_detections",
+            "max_pdf_pages",
+            "max_pdf_decoded_bytes",
+            "max_image_pixels",
             "ocr_timeout_seconds",
         ):
             value = getattr(self, name)

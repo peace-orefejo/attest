@@ -96,29 +96,43 @@ def test_budget_exceeded_is_not_swallowed_by_batch_verify(monkeypatch):
 
 def test_vote_stops_once_majority_is_decided():
     client = _MeteredClient(verdicts=["a", "a", "b"])
-    out = llm.vote(system="s", user="u", output=_V, key=lambda o: o.verdict, samples=3,
-                   client=client)
+    out = llm.vote(
+        system="s", user="u", output=_V, key=lambda o: o.verdict, samples=3, client=client
+    )
     assert out.verdict == "a"
     assert client.calls == 2
 
 
 def test_vote_takes_the_tiebreak_sample_on_disagreement():
     client = _MeteredClient(verdicts=["a", "b", "b"])
-    out = llm.vote(system="s", user="u", output=_V, key=lambda o: o.verdict, samples=3,
-                   client=client)
+    out = llm.vote(
+        system="s", user="u", output=_V, key=lambda o: o.verdict, samples=3, client=client
+    )
     assert out.verdict == "b"
     assert client.calls == 3
 
 
 def test_token_counts_normalizes_providers():
-    anthropic = SimpleNamespace(usage=SimpleNamespace(
-        input_tokens=10, output_tokens=4, cache_read_input_tokens=900,
-        cache_creation_input_tokens=0))
-    openai = SimpleNamespace(usage=SimpleNamespace(
-        prompt_tokens=7, completion_tokens=3,
-        prompt_tokens_details=SimpleNamespace(cached_tokens=5)))
-    gemini = SimpleNamespace(usage_metadata=SimpleNamespace(
-        prompt_token_count=5, candidates_token_count=2, cached_content_token_count=None))
+    anthropic = SimpleNamespace(
+        usage=SimpleNamespace(
+            input_tokens=10,
+            output_tokens=4,
+            cache_read_input_tokens=900,
+            cache_creation_input_tokens=0,
+        )
+    )
+    openai = SimpleNamespace(
+        usage=SimpleNamespace(
+            prompt_tokens=7,
+            completion_tokens=3,
+            prompt_tokens_details=SimpleNamespace(cached_tokens=5),
+        )
+    )
+    gemini = SimpleNamespace(
+        usage_metadata=SimpleNamespace(
+            prompt_token_count=5, candidates_token_count=2, cached_content_token_count=None
+        )
+    )
     assert token_counts(anthropic) == TokenCounts(input=910, output=4, cached=900)
     assert token_counts(openai) == TokenCounts(input=7, output=3, cached=5)
     assert token_counts(gemini) == TokenCounts(input=5, output=2)
@@ -189,9 +203,9 @@ class _Capturing(_MeteredClient):
 
 def test_anthropic_gets_a_breakpoint_on_the_shared_prefix():
     import instructor
+
     client = _Capturing(provider=instructor.Provider.ANTHROPIC)
-    llm.call(system="s", prefix="EVIDENCE", user="claims", output=_V, client=client,
-             reuse="prefix")
+    llm.call(system="s", prefix="EVIDENCE", user="claims", output=_V, client=client, reuse="prefix")
     first, tail = client.users[0]
     assert first == {"type": "text", "text": "EVIDENCE", "cache_control": {"type": "ephemeral"}}
     assert tail == {"type": "text", "text": "claims"}
@@ -199,6 +213,7 @@ def test_anthropic_gets_a_breakpoint_on_the_shared_prefix():
 
 def test_anthropic_vote_caches_the_full_prompt():
     import instructor
+
     client = _Capturing(provider=instructor.Provider.ANTHROPIC, verdicts=["a", "a"])
     llm.vote(system="s", user="u", output=_V, key=lambda o: o.verdict, samples=3, client=client)
     assert client.users[0][-1]["cache_control"] == {"type": "ephemeral"}
@@ -206,6 +221,7 @@ def test_anthropic_vote_caches_the_full_prompt():
 
 def test_single_use_prompts_get_no_breakpoint():
     import instructor
+
     client = _Capturing(provider=instructor.Provider.ANTHROPIC)
     llm.call(system="s", prefix="EVIDENCE", user="claims", output=_V, client=client)
     assert client.users[0] == "EVIDENCE\n\nclaims"
@@ -213,9 +229,9 @@ def test_single_use_prompts_get_no_breakpoint():
 
 def test_other_providers_get_the_prefix_first_as_plain_text():
     import instructor
+
     client = _Capturing(provider=instructor.Provider.GENAI)
-    llm.call(system="s", prefix="EVIDENCE", user="claims", output=_V, client=client,
-             reuse="prefix")
+    llm.call(system="s", prefix="EVIDENCE", user="claims", output=_V, client=client, reuse="prefix")
     assert client.users[0] == "EVIDENCE\n\nclaims"
 
 

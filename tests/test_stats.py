@@ -1,4 +1,4 @@
-from attest.scoring.stats import wilson_interval, difference_is_real, two_proportion_z
+from attest.scoring.stats import difference_is_real, two_proportion_z, wilson_interval
 
 
 def test_wilson_basic_bounds():

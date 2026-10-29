@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Callable, Literal
+from collections.abc import Callable
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -54,8 +55,9 @@ ExtractFn = Callable[[str], list[str]]
 VerifyFn = Callable[[list[str], str], list[Finding]]
 
 
-def judge_trajectory(traj: Trajectory, extract: ExtractFn, verify: VerifyFn,
-                     *, max_claims: int = MAX_CLAIMS) -> CheckResult:
+def judge_trajectory(
+    traj: Trajectory, extract: ExtractFn, verify: VerifyFn, *, max_claims: int = MAX_CLAIMS
+) -> CheckResult:
     evidence = traj.evidence()
     claims = extract(traj.final_answer)
     capped = len(claims) > max_claims
@@ -161,8 +163,9 @@ def _batch_system(answer_kind: str) -> str:
     return _BATCH_INSTRUCTION + _VERIFY_SYSTEM.get(answer_kind, _VERIFY_SYSTEM["factual"])
 
 
-def _verify_batch(batch: list[str], evidence: str, answer_kind: str,
-                  *, shared: bool = False) -> list[Finding]:
+def _verify_batch(
+    batch: list[str], evidence: str, answer_kind: str, *, shared: bool = False
+) -> list[Finding]:
     numbered = "\n".join(f"{i}. {c}" for i, c in enumerate(batch, start=1))
     try:
         out = call(
@@ -182,27 +185,47 @@ def _verify_batch(batch: list[str], evidence: str, answer_kind: str,
     for i, claim in enumerate(batch, start=1):
         v = by_num.get(i)
         if v is None:
-            findings.append(Finding(
-                severity=Severity.WARN, verdict="unverifiable", subject=claim,
-                reason="No verdict was returned for this claim."))
+            findings.append(
+                Finding(
+                    severity=Severity.WARN,
+                    verdict="unverifiable",
+                    subject=claim,
+                    reason="No verdict was returned for this claim.",
+                )
+            )
         else:
-            findings.append(Finding(
-                severity=_SEVERITY[v.verdict], verdict=v.verdict, subject=claim,
-                reason=v.reason, evidence=v.evidence_quote or None))
+            findings.append(
+                Finding(
+                    severity=_SEVERITY[v.verdict],
+                    verdict=v.verdict,
+                    subject=claim,
+                    reason=v.reason,
+                    evidence=v.evidence_quote or None,
+                )
+            )
     return findings
 
 
-def verify_claims(claims: list[str], evidence: str, *, answer_kind: str = "factual",
-                  batch_size: int = BATCH_SIZE) -> list[Finding]:
+def verify_claims(
+    claims: list[str], evidence: str, *, answer_kind: str = "factual", batch_size: int = BATCH_SIZE
+) -> list[Finding]:
     """Verify many claims against the evidence in batched calls (one call per batch)."""
     if not claims:
         return []
     if not evidence.strip():
-        return [Finding(severity=Severity.WARN, verdict="unverifiable", subject=c,
-                        reason="No tool-output evidence was recorded.") for c in claims]
+        return [
+            Finding(
+                severity=Severity.WARN,
+                verdict="unverifiable",
+                subject=c,
+                reason="No tool-output evidence was recorded.",
+            )
+            for c in claims
+        ]
     findings: list[Finding] = []
     shared = len(claims) > batch_size
     for start in range(0, len(claims), batch_size):
-        findings.extend(_verify_batch(claims[start:start + batch_size], evidence, answer_kind,
-                                      shared=shared))
+        findings.extend(
+            _verify_batch(claims[start : start + batch_size], evidence, answer_kind, shared=shared)
+        )
     return findings

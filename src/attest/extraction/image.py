@@ -5,12 +5,11 @@ import io
 from .limits import ExtractionLimits
 
 
-def _image_parts(
-    raw: bytes, limits: ExtractionLimits
-) -> tuple[list[tuple[str, str]], list[str]]:
-    from PIL import Image
+def _image_parts(raw: bytes, limits: ExtractionLimits) -> tuple[list[tuple[str, str]], list[str]]:
     import pytesseract
     import zxingcpp
+    from PIL import Image
+
     image = Image.open(io.BytesIO(raw))
     if image.width * image.height > limits.max_image_pixels:
         raise ValueError("Image exceeds pixel limit")
