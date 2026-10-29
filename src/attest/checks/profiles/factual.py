@@ -7,7 +7,14 @@ EXTRACT_PROMPT = (
     "emit every sentence or clause, and merge overlapping points into one claim. Drop "
     "hedges, opinions, filler, questions, and generic advice. Keep only distinct, "
     "verifiable assertions of fact, and prefer a short list of meaningful claims over a "
-    "long list of fragments. Preserve the original meaning; add nothing."
+    "long list of fragments. Always keep the answer's bottom line, its direct answer to the "
+    "task, as its own claim worded as the answer asserts it. Never fold a conclusion into "
+    "the reasoning given for it, and never narrow or reframe a claim to fit that reasoning "
+    "(e.g. do not turn 'A is cheaper than B' into 'A is cheaper than B per unit'); extract "
+    "the reasoning as separate claims. When a task is given, use it only to make claims "
+    "self-contained (e.g. if the task asks which is cheaper to run, write 'A costs less to "
+    "run than B', not 'A is better'); never take claims from the task itself. Preserve "
+    "the original meaning; add nothing."
 )
 
 VERIFY_PROMPT = (

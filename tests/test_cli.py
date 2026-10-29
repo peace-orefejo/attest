@@ -149,3 +149,135 @@ def test_injection_rejects_unknown_pattern_severity(tmp_path):
     result = runner.invoke(app, ["injection", str(path), "--patterns", str(patterns)])
     assert result.exit_code == 2
     assert "severity must be low, medium, or high" in _flat(result.output)
+
+
+def _review_file(tmp_path) -> str:
+    path = tmp_path / "review.json"
+    path.write_text(json.dumps({
+        "pr": {"diffs": {"a.py": "+x = 1\n"}, "changed_files": ["a.py"]},
+        "outputs": [{"output_type": "issue", "text": "x is set to 1."}],
+    }))
+    return str(path)
+
+
+def _fake_review(monkeypatch, seen: dict):
+    from attest import Attest, CheckResult
+    from attest.code_review import OutputDecision, ReviewResult
+
+    def fake(self, pr, outputs, **kwargs):
+        seen.update(kwargs, outputs=outputs)
+        return ReviewResult(
+            injection=CheckResult(check="code_injection", passed=True, summary="clean",
+                                  metadata={"verdict": "clean"}),
+            decisions=[OutputDecision(index=0, output_type="issue", text="x is set to 1.", keep=True,
+                                      mode="lenient", score=1.0)],
+        )
+
+    monkeypatch.setattr(Attest, "review", fake)
+    monkeypatch.setattr("attest.cli.common.resolve_key", lambda provider: "sk-test")
+
+
+def test_review_json_lists_a_decision_per_output(tmp_path, monkeypatch):
+    seen: dict = {}
+    _fake_review(monkeypatch, seen)
+    result = runner.invoke(app, ["review", _review_file(tmp_path), "--json", "--mode", "issue=strict"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["kept"] == [0]
+    assert payload["decisions"][0]["output_type"] == "issue"
+    assert seen["modes"] == {"issue": "strict"}
+    assert seen["outputs"][0].text == "x is set to 1."
+    assert seen["guidelines"].builtin
+    assert seen["follow_guidelines"] is True
+
+
+def test_review_passes_guideline_files_and_writes_when_outputs_are_missing(tmp_path, monkeypatch):
+    seen: dict = {}
+    _fake_review(monkeypatch, seen)
+    rules = tmp_path / "REVIEW.md"
+    rules.write_text("- No raw SQL.\n")
+    path = tmp_path / "pr.json"
+    path.write_text(json.dumps({"pr": {"diffs": {"a.py": "+x = 1\n"}}}))
+    result = runner.invoke(app, ["review", str(path), "-g", str(rules), "--no-follow", "--json"])
+    assert result.exit_code == 0, result.output
+    assert seen["outputs"] is None
+    assert seen["guidelines"].name == "REVIEW.md"
+    assert seen["follow_guidelines"] is False
+
+
+def test_review_rejects_an_unreadable_guidelines_file(tmp_path):
+    result = runner.invoke(app, ["review", _review_file(tmp_path), "-g", str(tmp_path / "missing.md")])
+    assert result.exit_code == 2
+    assert "Could not read guidelines file" in _flat(result.output)
+
+
+def test_review_human_view_is_a_table(tmp_path, monkeypatch):
+    _fake_review(monkeypatch, {})
+    result = runner.invoke(app, ["review", _review_file(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert result.stdout.startswith("KEEP  Code review")
+    assert "x is set to 1." in result.stdout
+
+
+def test_review_rejects_a_bad_mode(tmp_path):
+    result = runner.invoke(app, ["review", _review_file(tmp_path), "--mode", "issue=loose"])
+    assert result.exit_code == 2
+    assert "Expected TYPE=MODE" in _flat(result.output)
+
+
+def test_review_reports_where_the_file_is_invalid(tmp_path):
+    path = tmp_path / "review.json"
+    path.write_text(json.dumps({"pr": {}, "outputs": [{"output_type": "bug", "text": "x"}]}))
+    result = runner.invoke(app, ["review", str(path)])
+    assert result.exit_code == 2
+    assert "outputs.0.output_type" in _flat(result.output)
+
+
+def test_tools_human_view_has_a_status_and_findings(tmp_path):
+    path = tmp_path / "trajectory.json"
+    path.write_text(json.dumps(_trajectory()))
+    result = runner.invoke(app, ["tools", str(path)])
+    assert result.exit_code == 0
+    assert result.stdout.startswith("PASS  search")
+    assert "✓  " in result.stdout
+    assert all(line == line.rstrip() for line in result.stdout.splitlines())
+
+
+def test_stats_json():
+    result = runner.invoke(app, ["stats", "17", "20", "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["rate"] == 0.85
+    assert payload["n"] == 20
+
+
+def test_models_json(monkeypatch):
+    monkeypatch.setattr("attest.cli.commands.info.resolve_key", lambda provider: None)
+    monkeypatch.setattr("attest.cli.commands.info.list_models", lambda provider: ["m1", "m2"])
+    result = runner.invoke(app, ["models", "anthropic", "--json"])
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == {"provider": "anthropic", "source": "curated", "models": ["m1", "m2"]}
+
+
+def test_review_of_a_pr_without_diffs_is_a_usage_error(tmp_path, monkeypatch):
+    from attest import Attest
+
+    def fail(self, pr, outputs, **kwargs):
+        raise ValueError("The pull request has no diffs to review.")
+
+    monkeypatch.setattr(Attest, "review", fail)
+    monkeypatch.setattr("attest.cli.common.resolve_key", lambda provider: "sk-test")
+    path = tmp_path / "pr.json"
+    path.write_text(json.dumps({"pr": {}}))
+    result = runner.invoke(app, ["review", str(path)])
+    assert result.exit_code == 2
+    assert "no diffs to review" in _flat(result.output)
+
+
+def test_python_dash_m_runs_the_cli():
+    import subprocess
+    import sys
+
+    completed = subprocess.run([sys.executable, "-m", "attest.cli", "--help"], capture_output=True, text=True)
+    assert completed.returncode == 0
+    assert "review" in completed.stdout

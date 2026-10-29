@@ -5,7 +5,57 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+- `Attest.review(pr, outputs)` and `attest.code_review.review(...)` check and gate every output of
+  a code review in one call. The result, `ReviewResult`, has one `OutputDecision` per output
+  (`text`, `keep`, `mode`, `score`, `reasons`, `notes`, `omissions`), plus the guidelines used,
+  `kept`, `dropped` and `filter()`. Outputs without their own diffs use the pull request's.
+- Team review rules: pass `guidelines="REVIEW.md"` (or several files, or markdown text) to
+  `review()`. Each list item in the markdown is a rule. The rules are added to every output's
+  evidence, so an issue that cites one can be graded, and a new `guidelines` check drops any output
+  that breaks a rule (`breaks_guideline`). An output that only leaves out something a rule asks
+  for is kept with a `misses_guideline` note. Each finding must quote the output exactly, and each
+  break is confirmed by a second call that asks separately whether the output reports, approves or
+  itself does what the rule forbids; reporting rule-breaking code is never a break.
+  `follow_guidelines=False` turns the check off. Without guidelines, outputs are checked for
+  faithfulness only, and attest's own reviewer follows a built-in general standard.
+- attest can write the review itself: `Attest.write_review(pr, guidelines=...)`, or `review(pr)`
+  with no outputs, produces issues, one summary per changed file and an overview, then checks them
+  like any reviewer's output. It always follows the general standard as a baseline; team rules add
+  to it and win where they conflict.
+- `attest review FILE` reads `{"pr": ..., "outputs": [...]}` and prints one decision per output.
+  Leave out `outputs` to have attest write the review. `--guidelines/-g PATH` (repeatable) passes
+  review rules, `--no-follow` skips the rule check, and `--mode TYPE=MODE` overrides a gate mode.
+- `attest.render(result)` and `attest.show(result)` turn any `Report`, `CheckResult`,
+  `ReviewResult` or `GateDecision` into a structured view: a status line, a summary table, and
+  aligned findings with reasons and evidence.
+- `--json` on `stats`, `models` and `demo`, so every command can emit JSON.
+
 ### Changed
+- **Breaking:** `Report.overall_score` is `None` when no check produced a score, instead of 1.0.
+- **Breaking:** `Trajectory.evidence()` wraps each tool call in a
+  `<tool_output index=... name=... arguments=...>` block and escapes any such tag inside an output.
+  Before, blocks were plain `[i] name(args) -> output` lines, so a tool output (a web page, a file,
+  a diff) could fake another tool's result. Every model call is told how the blocks work.
+  `PROMPT_VERSION` is now `2026.10.29.2`.
+- Every command's terminal output now uses the same structured layout.
+- `GateDecision` splits its findings: `reasons` are what dropped the output, and `notes` are
+  findings shown alongside it that didn't, such as a suspicious hit or a compromised finding
+  that affected a different output.
+- A payload or suspicious hit in the pull request's title, description or commit messages now
+  applies to every output. Before, no output matched its location, so it never dropped or noted
+  anything.
+- `review()` raises `ValueError` for a `diff_summary` with no diffs of its own when the pull
+  request changes several files, since a summary describes one file.
+- `ReviewResult.warnings` flags a pull request that changes the file its review rules were
+  loaded from.
+- `attest run`'s `mean_overall_score` leaves out reports with no overall score.
+- `python -m attest.cli` works again after the CLI became a package.
+- The code injection summary lists only the verdicts found, e.g. "3 hits: 1 payload, 2 suspicious."
+- The `code` answer kind's verifier reads a `read_guidelines` evidence step as the team's rules:
+  authoritative about what the team requires, never about what the code does.
+- The claim extractor keeps an answer's bottom line as its own claim and receives the task as
+  context, so a conclusion can't be reworded to fit the agent's own justification.
 - Anthropic grading now uses native structured outputs (`messages.parse`) instead of instructor's
   forced tool call, so Claude 5.5-generation models such as `claude-sonnet-5-5` work.
 - Sampling parameters are sent only to Anthropic models that accept them (Claude 4.6 and older);
@@ -15,6 +65,8 @@ All notable changes to `agent-attest` are documented here. This project follows
   model list.
 
 ### Fixed
+- An answer whose claims were all unverifiable scored 100% ("0/0 grounded"). It now has no score
+  and says none of its claims could be checked.
 - Fresh installs that resolve `anthropic` 1.x and `instructor` 1.17 no longer fail every LLM call
   with `Messages.create() got an unexpected keyword argument 'temperature'`.
 - A `.env` file in the working directory (or a parent) is now loaded by both the library and the

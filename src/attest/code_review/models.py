@@ -50,3 +50,4 @@ class GateDecision(BaseModel):
     keep: bool
     mode: GateMode
     reasons: list[Finding] = Field(default_factory=list)
+    notes: list[Finding] = Field(default_factory=list)

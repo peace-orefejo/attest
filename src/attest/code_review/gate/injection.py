@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from ...core import CheckResult, Finding
+from ..injection.segments import PR_FILE
 from ..models import INJECTION_VERDICTS
 
 INJECTION_CHECK = "code_injection"
@@ -17,7 +18,7 @@ def _in_paths(finding: Finding, paths: list[str] | None) -> bool:
     if paths is None:
         return True
     file = finding.metadata.get("file")
-    return file is None or file in paths
+    return file is None or file == PR_FILE or file in paths
 
 
 def _action(finding: Finding, paths: list[str] | None, output_index: int | None) -> Action:
@@ -33,22 +34,22 @@ def _action(finding: Finding, paths: list[str] | None, output_index: int | None)
     return "drop" if finding.verdict in BLOCKING_INJECTION else "note"
 
 
-def injection_reasons(
+def injection_findings(
     injection: CheckResult | None,
     paths: list[str] | None,
     output_index: int | None,
-) -> tuple[list[Finding], bool]:
-    """Injection findings that apply to one output, and whether any of them drops it."""
+) -> tuple[list[Finding], list[Finding]]:
+    """Injection findings that drop one output, and those shown beside it as notes."""
     if injection is None:
-        return [], False
+        return [], []
     if injection.check != INJECTION_CHECK:
         raise ValueError(f"Expected a {INJECTION_CHECK!r} result, got {injection.check!r}.")
-    reasons: list[Finding] = []
-    blocked = False
+    drops: list[Finding] = []
+    notes: list[Finding] = []
     for finding in injection.findings:
         action = _action(finding, paths, output_index)
-        if action == "ignore":
-            continue
-        reasons.append(finding)
-        blocked = blocked or action == "drop"
-    return reasons, blocked
+        if action == "drop":
+            drops.append(finding)
+        elif action == "note":
+            notes.append(finding)
+    return drops, notes

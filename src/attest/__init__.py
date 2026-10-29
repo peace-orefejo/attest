@@ -21,10 +21,12 @@ from .adapters.langgraph import from_langgraph_messages
 from .core.stats import wilson_interval, difference_is_real, Proportion
 from .core.llm import providers as list_providers, list_models, default_model
 from .api import Attest
+from .display import render, show
 from . import content, providers, results, trajectory
 
 __all__ = [
     "Attest",
+    "render", "show",
     "list_providers", "list_models", "default_model",
     "Trajectory", "Step", "ToolCall", "Artifact", "Detection", "TextSegment",
     "ExtractionLimits", "ExtractionOutcome", "extract_artifact",

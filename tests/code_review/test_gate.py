@@ -110,32 +110,37 @@ def test_blocking_injection_drops_whatever_the_mode(verdict, mode):
 def test_suspicious_keeps_and_adds_a_note():
     decision = gate(faithfulness("supported"), "issue", injection=injection(("suspicious", "app/a.py")))
     assert decision.keep
-    assert [f.verdict for f in decision.reasons] == ["suspicious"]
+    assert decision.reasons == []
+    assert [f.verdict for f in decision.notes] == ["suspicious"]
 
 
 def test_clean_adds_nothing():
     decision = gate(faithfulness("supported"), "issue", injection=injection(("clean", "app/a.py")))
     assert decision.keep
     assert decision.reasons == []
+    assert decision.notes == []
 
 
 def test_unknown_injection_verdict_is_ignored():
     decision = gate(faithfulness("supported"), "issue", injection=injection(("weird", "app/a.py")))
     assert decision.keep
     assert decision.reasons == []
+    assert decision.notes == []
 
 
 def test_suspicious_does_not_rescue_a_faithfulness_drop():
     decision = gate(faithfulness("unsupported"), "issue", injection=injection(("suspicious", "app/a.py")))
     assert not decision.keep
-    assert [f.verdict for f in decision.reasons] == ["unsupported", "suspicious"]
+    assert [f.verdict for f in decision.reasons] == ["unsupported"]
+    assert [f.verdict for f in decision.notes] == ["suspicious"]
 
 
 def test_reasons_combine_faithfulness_and_injection():
     decision = gate(faithfulness("unverifiable"), "diff_summary",
                     injection=injection(("payload", "app/a.py"), ("suspicious", "app/b.py")))
     assert not decision.keep
-    assert [f.verdict for f in decision.reasons] == ["unverifiable", "payload", "suspicious"]
+    assert [f.verdict for f in decision.reasons] == ["unverifiable", "payload"]
+    assert [f.verdict for f in decision.notes] == ["suspicious"]
 
 
 def test_payload_outside_paths_is_ignored():
@@ -157,6 +162,7 @@ def test_suspicious_outside_paths_adds_no_note():
     decision = gate(faithfulness("supported"), "issue",
                     injection=injection(("suspicious", "app/other.py")), paths=["app/a.py"])
     assert decision.reasons == []
+    assert decision.notes == []
 
 
 def test_no_paths_means_every_file_applies():
@@ -185,7 +191,8 @@ def test_compromised_keeps_an_unaffected_output_on_the_same_file_with_a_note():
     decision = gate(faithfulness("supported"), "issue",
                     injection=injection(("compromised", "app/a.py", [1])), paths=["app/a.py"], output_index=0)
     assert decision.keep
-    assert [f.verdict for f in decision.reasons] == ["compromised"]
+    assert decision.reasons == []
+    assert [f.verdict for f in decision.notes] == ["compromised"]
 
 
 def test_compromised_for_another_file_adds_no_note_to_an_unaffected_output():
@@ -193,6 +200,7 @@ def test_compromised_for_another_file_adds_no_note_to_an_unaffected_output():
                     injection=injection(("compromised", "app/other.py", [1])), paths=["app/a.py"], output_index=0)
     assert decision.keep
     assert decision.reasons == []
+    assert decision.notes == []
 
 
 def test_compromised_drops_an_affected_output_even_outside_paths():
@@ -227,14 +235,16 @@ def test_payload_still_drops_when_a_compromised_finding_spares_this_output():
                     injection=injection(("compromised", "app/a.py", [1]), ("payload", "app/a.py")),
                     paths=["app/a.py"], output_index=0)
     assert not decision.keep
-    assert [f.verdict for f in decision.reasons] == ["compromised", "payload"]
+    assert [f.verdict for f in decision.reasons] == ["payload"]
+    assert [f.verdict for f in decision.notes] == ["compromised"]
 
 
 def test_unaffected_compromised_note_does_not_rescue_a_faithfulness_drop():
     decision = gate(faithfulness("unsupported"), "issue",
                     injection=injection(("compromised", "app/a.py", [1])), paths=["app/a.py"], output_index=0)
     assert not decision.keep
-    assert [f.verdict for f in decision.reasons] == ["unsupported", "compromised"]
+    assert [f.verdict for f in decision.reasons] == ["unsupported"]
+    assert [f.verdict for f in decision.notes] == ["compromised"]
 
 
 def test_output_index_does_not_change_suspicious_or_clean():
@@ -242,7 +252,8 @@ def test_output_index_does_not_change_suspicious_or_clean():
                     injection=injection(("suspicious", "app/a.py"), ("clean", "app/a.py")),
                     paths=["app/a.py"], output_index=0)
     assert decision.keep
-    assert [f.verdict for f in decision.reasons] == ["suspicious"]
+    assert decision.reasons == []
+    assert [f.verdict for f in decision.notes] == ["suspicious"]
 
 
 def test_wrong_injection_check_name_is_rejected():
@@ -271,3 +282,39 @@ def test_gate_does_not_mutate_the_report():
 def test_public_import_path():
     from attest.code_review.gate import GateDecision
     assert isinstance(gate(faithfulness("supported"), "issue"), GateDecision)
+
+
+@pytest.mark.parametrize("mode", ["lenient", "strict"])
+def test_a_broken_guideline_drops_in_every_mode(mode):
+    report = faithfulness("supported")
+    report.results.append(CheckResult(check="guidelines", passed=False, findings=[
+        Finding(severity=Severity.FAIL, verdict="breaks_guideline", subject="G1: rule")]))
+    decision = gate(report, "issue", mode=mode)
+    assert not decision.keep
+    assert [f.verdict for f in decision.reasons] == ["breaks_guideline"]
+
+
+def test_a_followed_guideline_keeps():
+    report = faithfulness("supported")
+    report.results.append(CheckResult(check="guidelines", passed=True))
+    assert gate(report, "issue").keep
+
+
+def test_a_missed_guideline_is_a_note_not_a_drop():
+    report = faithfulness("supported")
+    report.results.append(CheckResult(check="guidelines", passed=True, findings=[
+        Finding(severity=Severity.WARN, verdict="misses_guideline", subject="G3: name the file")]))
+    decision = gate(report, "issue", mode="strict")
+    assert decision.keep
+    assert decision.reasons == []
+    assert [f.verdict for f in decision.notes] == ["misses_guideline"]
+
+
+def test_breaking_the_built_in_standard_is_only_a_note():
+    report = faithfulness("supported")
+    report.results.append(CheckResult(check="guidelines", passed=False, metadata={"builtin": True}, findings=[
+        Finding(severity=Severity.FAIL, verdict="breaks_guideline", subject="G4: rule"),
+        Finding(severity=Severity.WARN, verdict="misses_guideline", subject="G3: rule")]))
+    decision = gate(report, "issue", mode="strict")
+    assert decision.keep
+    assert [f.verdict for f in decision.notes] == ["breaks_guideline", "misses_guideline"]

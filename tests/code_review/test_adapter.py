@@ -116,3 +116,14 @@ def test_canvas_answer_keeps_reads_in_order():
     output = ReviewOutput(output_type="canvas_answer", text="a", question="q", reads=reads)
     run = to_run(output)
     assert [tc.arguments["path"] for _, tc in run.tool_calls()] == ["f0.py", "f1.py", "f2.py"]
+
+
+def test_guidelines_become_a_read_guidelines_step():
+    from attest.code_review import ReviewOutput, to_run
+    from attest.code_review.guidelines import parse_guidelines
+
+    rules = parse_guidelines("- No raw SQL.\n", "REVIEW.md")
+    run = to_run(ReviewOutput(output_type="issue", text="x", diffs={"a.py": "+x\n"}), guidelines=rules)
+    step = run.steps[-1].tool_call
+    assert (step.name, step.arguments, step.output) == ("read_guidelines", {"name": "REVIEW.md"}, "G1: No raw SQL.")
+    assert "read_guidelines" in run.allowed_tools

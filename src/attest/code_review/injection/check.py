@@ -80,9 +80,10 @@ def _summary(findings: list[Finding], verdict: str, incomplete: bool) -> str:
     if not findings:
         text = "No reviewer-steering text found in the added lines or PR text."
     else:
-        text = (f"{counts['compromised']} compromised, {counts['payload']} payload, "
-                f"{counts['suspicious']} suspicious, {counts['clean']} benign look-alike hit(s). "
-                f"Overall: {verdict}.")
+        labels = {"clean": "benign look-alike"}
+        parts = [f"{counts[v]} {labels.get(v, v)}" for v in ("compromised", "payload", "suspicious", "clean")
+                 if counts[v]]
+        text = f"{len(findings)} hit{'s' if len(findings) != 1 else ''}: {', '.join(parts)}. Overall: {verdict}."
     if incomplete:
         text += " Coverage incomplete: the scan or model budget ran out before every hit was checked."
     return text

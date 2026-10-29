@@ -6,7 +6,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field, computed_field
 
-PROMPT_VERSION = "2026.08.12"
+PROMPT_VERSION = "2026.10.29.2"
 
 
 class Severity(str, Enum):
@@ -45,9 +45,9 @@ class Report(BaseModel):
 
     @computed_field
     @property
-    def overall_score(self) -> float:
+    def overall_score(self) -> float | None:
         scored = [r.score for r in self.results if r.score is not None]
-        return sum(scored) / len(scored) if scored else 1.0
+        return sum(scored) / len(scored) if scored else None
 
     @computed_field
     @property

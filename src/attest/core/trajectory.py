@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import html
+import json
+import re
+
 from pydantic import BaseModel, Field
 
 from .content import Artifact, TextSegment
@@ -20,6 +24,20 @@ class Step(BaseModel):
     tool_call: ToolCall | None = None
 
 
+_TAG = re.compile(r"<(/?)(tool_output)", re.IGNORECASE)
+
+
+def _escape(text: str) -> str:
+    return _TAG.sub(r"&lt;\1\2", text)
+
+
+def evidence_block(index: int, call: ToolCall) -> str:
+    """One tool call as a delimited evidence block."""
+    arguments = json.dumps(call.arguments, default=str, ensure_ascii=False)
+    return (f'<tool_output index="{index}" name="{html.escape(call.name)}" '
+            f'arguments="{html.escape(_escape(arguments))}">\n{_escape(call.output)}\n</tool_output>')
+
+
 class Trajectory(BaseModel):
     task: str
     system_prompt: str | None = None
@@ -29,13 +47,14 @@ class Trajectory(BaseModel):
     final_answer: str
 
     def evidence(self) -> str:
-        """The concatenated real tool outputs — the only text attest trusts."""
-        blocks: list[str] = []
-        for i, step in enumerate(self.steps):
-            if step.tool_call is not None:
-                tc = step.tool_call
-                blocks.append(f"[{i}] {tc.name}({tc.arguments}) -> {tc.output}")
-        return "\n".join(blocks)
+        """The real tool outputs, one <tool_output> block each — the only text attest trusts.
+
+        A tag inside an output is escaped, so an output cannot close its block or fake another.
+        """
+        return "\n".join(
+            evidence_block(i, step.tool_call)
+            for i, step in enumerate(self.steps) if step.tool_call is not None
+        )
 
     def has_evidence(self) -> bool:
         return bool(self.artifacts) or any(s.tool_call is not None for s in self.steps)

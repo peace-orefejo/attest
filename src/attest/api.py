@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import contextlib
-from typing import Callable, Sequence
+from typing import Callable, Mapping, Sequence
 
 from .core import CheckResult, Proportion, Report, Trajectory, wilson_interval
 from .core.llm import (
@@ -15,6 +15,11 @@ from .checks.role import check_role_adherence
 from .checks.judge_baseline import JudgeVerdict, naive_judge
 from .checks.tool_use import check_tool_use
 from .checks.verify import MAX_CLAIMS, extract_claims
+from .code_review import EvidenceLimits, PullRequest, ReviewOutput, ReviewResult
+from .code_review import review as review_outputs
+from .code_review import write_review as write_pr_review
+from .code_review.guidelines import GuidelinesInput
+from .code_review.models import GateMode
 from .policy import PolicyInput, check_policy, load_policy
 from .scoring.report import DEFAULT_CHECKS, evaluate, validate_evaluation_options
 
@@ -87,6 +92,41 @@ class Attest:
                 report.results.append(check_policy(traj, policy))
                 report.metadata.update(self.policy_identity())
             return report
+
+    def review(
+        self,
+        pr: PullRequest,
+        outputs: Sequence[ReviewOutput] | None = None,
+        *,
+        guidelines: GuidelinesInput = None,
+        follow_guidelines: bool = True,
+        modes: Mapping[str, GateMode] | None = None,
+        deep: bool = True,
+        limits: EvidenceLimits | None = None,
+        answer_kind: str = "code",
+    ) -> ReviewResult:
+        """Check every output of a code review and decide which to keep, in one call.
+
+        Pass `guidelines` (markdown paths or text) to use the team's review rules; without them the
+        built-in general standard applies. With no `outputs`, attest writes the review itself.
+        """
+        def grade(run: Trajectory) -> Report:
+            return self.evaluate(run, checks=("faithfulness",), answer_kind=answer_kind)
+
+        with self._llm_context():
+            return review_outputs(pr, outputs, evaluate=grade, guidelines=guidelines,
+                                  follow_guidelines=follow_guidelines, modes=modes, deep=deep, limits=limits)
+
+    def write_review(
+        self,
+        pr: PullRequest,
+        *,
+        guidelines: GuidelinesInput = None,
+        limits: EvidenceLimits | None = None,
+    ) -> list[ReviewOutput]:
+        """Write a review of the pull request without checking it: issues, file summaries and an overview."""
+        with self._llm_context():
+            return write_pr_review(pr, guidelines=guidelines, limits=limits)
 
     def policy_check(self, traj: Trajectory) -> CheckResult:
         """Evaluate the instance policy directly without running the standard checks."""

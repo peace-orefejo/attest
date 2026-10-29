@@ -72,7 +72,7 @@ def evaluate(
     kind, metadata = resolve_answer_kind(traj, answer_kind)
 
     if extract is extract_claims:
-        extract = partial(extract_claims, answer_kind=kind)
+        extract = partial(extract_claims, answer_kind=kind, task=traj.task)
     if verify is None:
         verify = partial(verify_claims, answer_kind=kind)
 

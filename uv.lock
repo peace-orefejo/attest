@@ -13,6 +13,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "regex" },
+    { name = "rich" },
     { name = "typer" },
 ]
 
@@ -71,6 +72,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "regex", specifier = ">=2024.11.6" },
+    { name = "rich", specifier = ">=13.7" },
     { name = "typer", specifier = ">=0.12" },
     { name = "zxing-cpp", marker = "extra == 'all'", specifier = ">=2.3" },
     { name = "zxing-cpp", marker = "extra == 'files'", specifier = ">=2.3" },

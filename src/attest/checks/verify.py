@@ -65,8 +65,11 @@ def judge_trajectory(traj: Trajectory, extract: ExtractFn, verify: VerifyFn,
     supported = sum(f.verdict == "supported" for f in findings)
     unsupported = sum(f.verdict == "unsupported" for f in findings)
     checkable = supported + unsupported
-    rate = supported / checkable if checkable else 1.0
+    rate: float | None = supported / checkable if checkable else 1.0
     summary = f"{supported}/{checkable} checkable claims grounded."
+    if findings and not checkable:
+        rate = None
+        summary = f"None of the {len(findings)} claims could be checked against the evidence."
     if capped:
         summary += f" (checked the first {max_claims} claims)"
     return CheckResult(
@@ -82,14 +85,21 @@ _EXTRACT_SYSTEM = get_profile("factual").extract_prompt
 _VERIFY_SYSTEM = {kind: get_profile(kind).verify_prompt for kind in PROFILE_KINDS}
 
 
-def extract_claims(final_answer: str, *, answer_kind: str = "factual") -> list[str]:
-    """Split a final answer into atomic, individually-checkable claims for `answer_kind`."""
+def extract_claims(final_answer: str, *, answer_kind: str = "factual",
+                   task: str | None = None) -> list[str]:
+    """Split a final answer into atomic, individually-checkable claims for `answer_kind`.
+
+    `task` is the request the answer responds to. It is used only to make claims
+    self-contained, never as a source of claims.
+    """
     system = get_profile(answer_kind).extract_prompt
     if not final_answer.strip():
         return []
+    context = (f"Task the answer responds to (context only, do not extract claims from it):\n"
+               f"{task}\n\n") if task and task.strip() else ""
     return call(
         system=system,
-        user=f"Final answer to decompose:\n\n{final_answer}",
+        user=f"{context}Final answer to decompose:\n\n{final_answer}",
         output=ClaimsOut,
     ).claims
 

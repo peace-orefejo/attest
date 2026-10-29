@@ -16,6 +16,7 @@ ABOVE_CORE = (
     "attest.scoring",
     "attest.api",
     "attest.cli",
+    "attest.display",
 )
 
 

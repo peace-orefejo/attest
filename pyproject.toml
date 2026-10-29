@@ -27,6 +27,7 @@ dependencies = [
     "instructor>=1.15.3,<2",
     "regex>=2024.11.6",
     "pyyaml>=6.0",
+    "rich>=13.7",
 ]
 
 [project.optional-dependencies]

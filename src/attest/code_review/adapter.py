@@ -5,8 +5,9 @@ from __future__ import annotations
 from ..core import Step, ToolCall, Trajectory
 from .evidence.large_files import EvidenceLimits, Omission, render_diffs
 from .evidence.scoping import read_label, scope_evidence
+from .guidelines import ReviewGuidelines
 from .models import ReviewOutput
-from .tool_names import EVIDENCE_TOOLS, LIST_CHANGED_FILES, READ_DIFF
+from .tool_names import EVIDENCE_TOOLS, LIST_CHANGED_FILES, READ_DIFF, READ_GUIDELINES
 
 _TASKS = {
     "issue": "Review the diff and report bugs.",
@@ -26,9 +27,15 @@ def task_text(output: ReviewOutput) -> str:
 
 
 def to_run_with_omissions(
-    output: ReviewOutput, *, limits: EvidenceLimits | None = None
+    output: ReviewOutput,
+    *,
+    limits: EvidenceLimits | None = None,
+    guidelines: ReviewGuidelines | None = None,
 ) -> tuple[Trajectory, list[Omission]]:
-    """Build the run for a review output and list which files had content left out and why."""
+    """Build the run for a review output and list which files had content left out and why.
+
+    `guidelines`, when given, are added as a read_guidelines step so claims citing a rule can be checked.
+    """
     scope = scope_evidence(output)
     steps: list[Step] = []
     if scope.changed_files is not None:
@@ -43,6 +50,9 @@ def to_run_with_omissions(
     for read in scope.reads:
         steps.append(Step(tool_call=ToolCall(
             name=read.tool, arguments=dict(read.arguments), output=read.output)))
+    if guidelines is not None:
+        steps.append(Step(tool_call=ToolCall(
+            name=READ_GUIDELINES, arguments={"name": guidelines.name}, output=guidelines.render())))
     omissions.extend(Omission(path, "out_of_scope") for path in scope.dropped_diffs)
     omissions.extend(Omission(read_label(read), "out_of_scope") for read in scope.dropped_reads)
     run = Trajectory(
@@ -54,6 +64,11 @@ def to_run_with_omissions(
     return run, omissions
 
 
-def to_run(output: ReviewOutput, *, limits: EvidenceLimits | None = None) -> Trajectory:
+def to_run(
+    output: ReviewOutput,
+    *,
+    limits: EvidenceLimits | None = None,
+    guidelines: ReviewGuidelines | None = None,
+) -> Trajectory:
     """Build the run for a review output; evidence comes only from tool calls."""
-    return to_run_with_omissions(output, limits=limits)[0]
+    return to_run_with_omissions(output, limits=limits, guidelines=guidelines)[0]

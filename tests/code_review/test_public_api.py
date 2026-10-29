@@ -79,5 +79,7 @@ def test_gate_drops_only_the_output_that_repeats_a_planted_claim():
         for index, output in enumerate(outputs)
     ]
     assert [d.keep for d in decisions] == [True, False]
-    assert [f.verdict for f in decisions[0].reasons] == ["compromised"]
+    assert decisions[0].reasons == []
+    assert [f.verdict for f in decisions[0].notes] == ["compromised"]
+    assert [f.verdict for f in decisions[1].reasons] == ["compromised"]
     assert gate(report, "issue", injection=injection, paths=outputs[0].paths()).keep is False
