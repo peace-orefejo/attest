@@ -486,7 +486,7 @@ def test_artifact_metadata_cannot_spoof_canonical_provenance():
 
 
 def test_segment_budget_stops_expensive_extraction_incrementally(monkeypatch):
-    import attest.checks.injection as injection_module
+    import attest.checks.injection.coverage as injection_module
     from attest import TextSegment
     from attest.extraction import ExtractionOutcome
 
@@ -521,7 +521,7 @@ def test_segment_budget_stops_expensive_extraction_incrementally(monkeypatch):
 
 
 def test_artifact_attempt_limit_bounds_empty_extractions(monkeypatch):
-    import attest.checks.injection as injection_module
+    import attest.checks.injection.coverage as injection_module
     from attest.extraction import ExtractionOutcome
 
     calls = []
