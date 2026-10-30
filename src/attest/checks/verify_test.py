@@ -143,3 +143,65 @@ def test_verify_claims_no_evidence_skips_llm(monkeypatch):
     monkeypatch.setattr(v, "call", boom)
     findings = verify_claims(["a"], "   ")
     assert findings[0].verdict == "unverifiable"
+
+
+def _unverifiable(claims, _evidence):
+    return [Finding(severity=Severity.WARN, verdict="unverifiable", subject=c) for c in claims]
+
+
+def test_all_unverifiable_claims_have_no_score():
+    result = judge_trajectory(_example(), lambda a: ["c1", "c2"], _unverifiable)
+    assert result.score is None
+    assert result.passed is True
+    assert result.summary == "None of the 2 claims could be checked against the evidence."
+
+
+def test_all_unverifiable_and_capped_keeps_the_cap_note():
+    result = judge_trajectory(_example(), lambda a: ["c1", "c2", "c3"], _unverifiable, max_claims=2)
+    assert result.score is None
+    assert result.summary.startswith("None of the 2 claims could be checked")
+    assert "first 2 claims" in result.summary
+
+
+def test_no_claims_still_scores_full():
+    result = judge_trajectory(_example(), lambda a: [], _unverifiable)
+    assert result.score == 1.0
+
+
+def test_extract_claims_sends_the_task_as_context(monkeypatch):
+    seen = {}
+
+    def fake_call(**kwargs):
+        seen.update(kwargs)
+        return v.ClaimsOut(claims=["Paris has a larger population than Berlin"])
+
+    monkeypatch.setattr(v, "call", fake_call)
+    v.extract_claims("Paris is larger.", task="Which has a larger population?")
+    user = seen["user"]
+    assert "Which has a larger population?" in user
+    assert user.index("Which has a larger population?") < user.index("Paris is larger.")
+    assert "do not extract claims from it" in user
+
+
+def test_extract_claims_without_a_task_sends_only_the_answer(monkeypatch):
+    seen = {}
+
+    def fake_call(**kwargs):
+        seen.update(kwargs)
+        return v.ClaimsOut(claims=[])
+
+    monkeypatch.setattr(v, "call", fake_call)
+    v.extract_claims("Paris is larger.")
+    assert seen["user"] == "Final answer to decompose:\n\nParis is larger."
+
+
+def test_extract_claims_ignores_a_blank_task(monkeypatch):
+    seen = {}
+
+    def fake_call(**kwargs):
+        seen.update(kwargs)
+        return v.ClaimsOut(claims=[])
+
+    monkeypatch.setattr(v, "call", fake_call)
+    v.extract_claims("Paris is larger.", task="   ")
+    assert seen["user"] == "Final answer to decompose:\n\nParis is larger."

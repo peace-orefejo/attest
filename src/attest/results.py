@@ -46,9 +46,9 @@ class Report(BaseModel):
 
     @computed_field
     @property
-    def overall_score(self) -> float:
+    def overall_score(self) -> float | None:
         scored = [r.score for r in self.results if r.score is not None]
-        return sum(scored) / len(scored) if scored else 1.0
+        return sum(scored) / len(scored) if scored else None
 
     @computed_field
     @property
