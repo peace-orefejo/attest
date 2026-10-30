@@ -6,16 +6,22 @@ from typing import TypeAlias
 
 from rich.console import Console, Group
 
+from ..code_review import GateDecision, ReviewResult
 from ..results import CheckResult, Report
 from .checks import check_view, report_view
+from .review import gate_view, review_view
 
-Result: TypeAlias = Report | CheckResult
+Result: TypeAlias = Report | CheckResult | ReviewResult | GateDecision
 
 _TRAILING = re.compile(r"[ \t]+((?:\x1b\[[0-9;]*m)*)$", re.MULTILINE)
 
 
 def view(result: object, *, title: str | None = None) -> Group:
     """Build the rich renderable for a result."""
+    if isinstance(result, ReviewResult):
+        return review_view(result, title)
+    if isinstance(result, GateDecision):
+        return gate_view(result, title)
     if isinstance(result, Report):
         return report_view(result, title)
     if isinstance(result, CheckResult):

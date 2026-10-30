@@ -14,6 +14,8 @@ STYLES = {
     "pass": "bold green",
     "fail": "bold red",
     "warn": "bold yellow",
+    "keep": "bold green",
+    "drop": "bold red",
     "muted": "dim",
     "label": "bold",
     "head": "bold dim",
@@ -34,6 +36,10 @@ def safe(text: str, style: str = "") -> Text:
 
 def badge(passed: bool) -> Text:
     return Text("PASS", style=STYLES["pass"]) if passed else Text("FAIL", style=STYLES["fail"])
+
+
+def decision_badge(keep: bool) -> Text:
+    return Text("KEEP", style=STYLES["keep"]) if keep else Text("DROP", style=STYLES["drop"])
 
 
 def percent(score: float | None) -> str:
