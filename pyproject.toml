@@ -78,7 +78,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/attest"]
-exclude = ["**/*_test.py", "**/fixtures"]
+exclude = ["**/*_test.py", "**/conftest.py", "**/fixtures"]
 
 [tool.hatch.build.targets.sdist]
 exclude = ["/.github"]
@@ -108,7 +108,7 @@ extend-immutable-calls = ["typer.Option", "typer.Argument", "attest.extraction.l
 
 [tool.pyright]
 include = ["src"]
-exclude = ["**/*_test.py", "**/__pycache__"]
+exclude = ["**/*_test.py", "**/conftest.py", "**/__pycache__"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 venvPath = "."

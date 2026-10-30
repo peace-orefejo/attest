@@ -33,7 +33,7 @@ def test_high_confidence_directive_is_payload_without_model(make_diff, no_model)
 
 
 def test_bidi_is_payload_without_model(make_diff, no_model):
-    result = check_code_injection(_pr(make_diff, 'x = "a‮b"', path="a.js"))
+    result = check_code_injection(_pr(make_diff, 'x = "a\u202eb"', path="a.js"))
     assert [f.verdict for f in result.findings] == ["payload"]
 
 

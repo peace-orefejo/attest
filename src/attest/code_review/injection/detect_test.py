@@ -45,26 +45,26 @@ def test_hit_line_follows_offset_in_multiline_segment():
 
 
 def test_bidi_in_any_segment_is_certain():
-    [hit] = _detect(Segment("code", "if x‮:", "a.c", 1))
+    [hit] = _detect(Segment("code", "if x\u202e:", "a.c", 1))
     assert (hit.detector, hit.pattern, hit.confidence) == ("unicode", "bidi_control", 1.0)
     assert hit.evidence == "U+202E"
 
 
 def test_invisible_and_mixed_script_depend_on_kind():
-    [code_hit] = _detect(Segment("code", "is_admin​ = 1", "a.py", 1))
+    [code_hit] = _detect(Segment("code", "is_admin\u200b = 1", "a.py", 1))
     [comment_hit] = _detect(Segment("comment", "# p\u0430ss", "a.py", 1))
     assert (code_hit.pattern, code_hit.confidence) == ("invisible", 0.9)
     assert (comment_hit.pattern, comment_hit.confidence) == ("mixed_script", 0.6)
 
 
 def test_unicode_hits_are_grouped_per_kind():
-    hits = _detect(Segment("string", '"a​b​c"', "a.py", 1))
+    hits = _detect(Segment("string", '"a\u200bb\u200bc"', "a.py", 1))
     assert len(hits) == 1
 
 
 def test_benign_unicode_is_skipped():
-    emoji = Segment("string", '"\U0001f468‍\U0001f469"', "a.py", 1)
-    bom = Segment("code", "﻿import os", "a.py", 1)
+    emoji = Segment("string", '"\U0001f468\u200d\U0001f469"', "a.py", 1)
+    bom = Segment("code", "\ufeffimport os", "a.py", 1)
     assert _detect(emoji, bom) == []
 
 
@@ -76,7 +76,7 @@ def test_encoded_payload_is_decoded_and_rescanned():
 
 
 def test_encoded_bidi_is_found():
-    blob = base64.b64encode("access level ‮ user admin text".encode()).decode()
+    blob = base64.b64encode("access level \u202e user admin text".encode()).decode()
     [hit] = _detect(Segment("string", f'"{blob}"', "a.js", 1))
     assert hit.pattern == "base64:bidi_control"
 

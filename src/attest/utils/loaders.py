@@ -56,7 +56,8 @@ _MERGE_TAG = "tag:yaml.org,2002:merge"
 
 
 def _resolved_key(node: ScalarNode, loader: yaml.SafeLoader) -> Hashable:
-    value: object = loader.construct_object(node)
+    constructor = loader.yaml_constructors.get(node.tag)
+    value: object = node.value if constructor is None else constructor(loader, node)
     if isinstance(value, Hashable):
         return value
     return (node.tag, str(node.value))
