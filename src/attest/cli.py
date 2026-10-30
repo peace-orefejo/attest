@@ -10,7 +10,9 @@ import typer
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
+from ._budget import Budget, BudgetExceeded
 from ._llm import using
+from .api import Attest
 from .checks.judge_baseline import naive_judge
 from .checks.injection import DEFAULT_DETECTORS, check_injection, load_regex_detector
 from .checks.role import check_role_adherence
@@ -18,7 +20,7 @@ from .checks.tool_use import check_tool_use
 from .checks.verify import extract_claims, judge_trajectory, verify_claims
 from .providers import DEFAULT_PROVIDER, build_client, list_models, providers, resolve_key
 from .results import CheckResult, Report, Severity
-from .scoring.report import DEFAULT_CHECKS, evaluate, validate_evaluation_options
+from .scoring.report import DEFAULT_CHECKS, validate_evaluation_options
 from .scoring.stats import wilson_interval
 from .trajectory import Trajectory
 
@@ -205,6 +207,12 @@ def run(
     provider: str = _PROVIDER_OPT,
     model: str = _MODEL_OPT,
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    max_calls: int | None = typer.Option(None, "--max-calls",
+                                         help="Stop before exceeding this many judge calls."),
+    max_tokens: int | None = typer.Option(None, "--max-tokens",
+                                          help="Stop before exceeding this many tokens."),
+    cache_dir: Path | None = typer.Option(None, "--cache-dir",
+                                          help="Reuse judge verdicts from this directory across runs."),
 ) -> None:
     """Full report on a trajectory (or JSONL): runs the chosen checks + an overall score."""
     selected = [c.strip() for c in checks.split(",") if c.strip()]
@@ -217,16 +225,24 @@ def run(
     if not json_output:
         typer.echo(f"Loaded {len(trajectories)} trajectory(ies) from {path}\n")
 
+    budget = Budget(max_calls=max_calls, max_tokens=max_tokens) if max_calls or max_tokens else None
+    judge = Attest(provider=provider, model=model, budget=budget, cache=cache_dir or False)
     overalls: list[float] = []
     reports: list[tuple[Trajectory, Report]] = []
-    with _llm_ctx(provider, model):
-        for traj in trajectories:
-            report = evaluate(traj, checks=selected, appropriate=appropriate, answer_kind=kind)
-            reports.append((traj, report))
-            if not json_output:
-                _render_report(traj, report)
-            overalls.append(report.overall_score)
+    stopped: str | None = None
+    for traj in trajectories:
+        try:
+            report = judge.evaluate(traj, checks=selected, appropriate=appropriate,
+                                    answer_kind=kind)
+        except BudgetExceeded as exc:
+            stopped = str(exc)
+            break
+        reports.append((traj, report))
+        if not json_output:
+            _render_report(traj, report)
+        overalls.append(report.overall_score)
 
+    usage = judge.usage.as_dict()
     if json_output:
         _emit_json({
             "trajectories": [
@@ -234,10 +250,18 @@ def run(
                 for traj, report in reports
             ],
             "mean_overall_score": sum(overalls) / len(overalls) if overalls else None,
+            "usage": usage,
+            "budget_exceeded": stopped,
         })
-        return
-    if overalls:
-        typer.echo(f"Mean overall score: {sum(overalls) / len(overalls):.0%}")
+    else:
+        if overalls:
+            typer.echo(f"Mean overall score: {sum(overalls) / len(overalls):.0%}")
+        typer.echo(f"Usage: {usage['calls']} calls, {usage['tokens']} tokens "
+                   f"({usage['cache_hits']} cache hits)")
+        if stopped:
+            typer.echo(f"Stopped after {len(reports)}/{len(trajectories)} trajectories: {stopped}")
+    if stopped:
+        raise typer.Exit(code=2)
 
 
 @app.command()

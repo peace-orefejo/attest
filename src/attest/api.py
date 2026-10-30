@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import contextlib
+import os
 from typing import Callable, Sequence
 
 import instructor
 
-from ._llm import using
+from ._budget import Budget, Usage, metering
+from ._cache import DiskCache
+from ._llm import using, using_cache
 from .checks.injection import DEFAULT_DETECTORS, InjectionDetector, check_injection
 from .extraction import ExtractionLimits
 from .checks.role import check_role_adherence
@@ -22,6 +25,14 @@ from .scoring.stats import Proportion, wilson_interval
 from .trajectory import Trajectory
 
 
+@contextlib.contextmanager
+def _combine(*managers):
+    with contextlib.ExitStack() as stack:
+        for manager in managers:
+            stack.enter_context(manager)
+        yield
+
+
 class Attest:
     """A configured evaluator. Pick a provider + model once; evaluate many trajectories."""
 
@@ -34,6 +45,8 @@ class Attest:
         client: instructor.Instructor | None = None,
         policy: PolicyInput = None,
         enforce_policy: bool = True,
+        cache: bool | dict | str | os.PathLike = False,
+        budget: Budget | None = None,
     ) -> None:
         self.provider = provider
         self.model = model or default_model(provider)
@@ -41,13 +54,26 @@ class Attest:
         self._client = client
         self.policy = load_policy(policy)
         self.enforce_policy = enforce_policy
+        if cache is True:
+            self._cache: dict | None = {}
+        elif cache is False:
+            self._cache = None
+        elif isinstance(cache, (str, os.PathLike)):
+            self._cache = DiskCache(cache, provider=provider, model=self.model)
+        else:
+            self._cache = cache
+        self.budget = budget
+        self.usage = Usage()
 
     def _llm_context(self, required: bool = True):
         if not required:
             return contextlib.nullcontext()
         if self._client is None:
             self._client = build_client(self.provider, self.model, self._key)
-        return using(self._client)
+        managers = [using(self._client), metering(self.usage, self.budget)]
+        if self._cache is not None:
+            managers.append(using_cache(self._cache))
+        return _combine(*managers)
 
     def evaluate(
         self,
@@ -75,6 +101,7 @@ class Attest:
             or ("tool_use" in selected and appropriate)
             or (policy is not None and enforce and policy.needs_llm)
         )
+        before = self.usage.copy()
         with self._llm_context(needs_llm):
             report = evaluate(
                 traj,
@@ -89,7 +116,8 @@ class Attest:
             if policy is not None and enforce:
                 report.results.append(check_policy(traj, policy))
                 report.metadata.update(self.policy_identity())
-            return report
+        report.metadata["usage"] = self.usage.since(before).as_dict()
+        return report
 
     def policy_check(self, traj: Trajectory) -> CheckResult:
         """Evaluate the instance policy directly without running the standard checks."""

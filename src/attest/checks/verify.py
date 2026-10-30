@@ -6,6 +6,7 @@ from typing import Callable, Literal
 
 from pydantic import BaseModel
 
+from .._budget import BudgetExceeded
 from .._llm import call
 from ..results import CheckResult, Finding, Severity
 from ..trajectory import Trajectory
@@ -160,16 +161,21 @@ def _batch_system(answer_kind: str) -> str:
     return _BATCH_INSTRUCTION + _VERIFY_SYSTEM.get(answer_kind, _VERIFY_SYSTEM["factual"])
 
 
-def _verify_batch(batch: list[str], evidence: str, answer_kind: str) -> list[Finding]:
+def _verify_batch(batch: list[str], evidence: str, answer_kind: str,
+                  *, shared: bool = False) -> list[Finding]:
     numbered = "\n".join(f"{i}. {c}" for i, c in enumerate(batch, start=1))
     try:
         out = call(
             system=_batch_system(answer_kind),
-            user=f"CLAIMS:\n{numbered}\n\nEVIDENCE (the agent's real tool outputs):\n{evidence}",
+            prefix=f"EVIDENCE (the agent's real tool outputs):\n{evidence}",
+            user=f"CLAIMS:\n{numbered}",
             output=_BatchOut,
             max_tokens=8192,
+            reuse="prefix" if shared else None,
         )
         by_num = {v.claim: v for v in out.verdicts}
+    except BudgetExceeded:
+        raise
     except Exception:
         by_num = {}
     findings: list[Finding] = []
@@ -195,6 +201,8 @@ def verify_claims(claims: list[str], evidence: str, *, answer_kind: str = "factu
         return [Finding(severity=Severity.WARN, verdict="unverifiable", subject=c,
                         reason="No tool-output evidence was recorded.") for c in claims]
     findings: list[Finding] = []
+    shared = len(claims) > batch_size
     for start in range(0, len(claims), batch_size):
-        findings.extend(_verify_batch(claims[start:start + batch_size], evidence, answer_kind))
+        findings.extend(_verify_batch(claims[start:start + batch_size], evidence, answer_kind,
+                                      shared=shared))
     return findings
