@@ -1,0 +1,46 @@
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -9,8 +9,8 @@ importers:
+     dependencies:
+       axios:
+-        specifier: ^1.6.2
+-        version: 1.6.2
++        specifier: ^1.7.4
++        version: 1.7.4
+       react:
+         specifier: ^18.2.0
+         version: 18.2.0
+@@ -40,8 +40,8 @@ packages:
+     resolution: {integrity: sha512-vxM8v9bUAEDxVLBFGPmNCTz8WJm8ZxOTmVa3d55JR6CqYYIjb8QB1F6ZtHnDHnwj5hDdSiKKpR02qAjTKGNMAQ==}
+     engines: {node: '>=6.9.0'}
+ 
+-  axios@1.6.2:
+-    resolution: {integrity: sha512-7i24Ri4pmDRfJTR7LDBhsOTtcm+9kjX5WiY1X3wIisx6G9So3pfMkEiU7emUBe46oceVImccTEM3k6C5dbVW8A==}
++  axios@1.7.4:
++    resolution: {integrity: sha512-DukmaFRnY6AzAALSH4J2M3k6PkaC+MfaAGdEERRWcC9q3/TWQwLpHR8ZRLKTdQ3aBDL64EdluRDjJqKw+BPZEw==}
+ 
+   '@types/react@18.2.48':
+     resolution: {integrity: sha512-qboRCl6Ie70DQQG9hhNREz81jqC1cs9EVNcjQ1AU+jH6NFfSAhVVbrrY/+nSF+Bsk4AOwm9Qa61InvMCyV+H3w==}
+@@ -71,8 +71,11 @@ packages:
+     resolution: {integrity: sha512-cbqHunsQWnJNE6KhVSMsMeH5H/L9EpymbzqTQ3uLwNCLZ1Q481oWaofqH7nO6V07xlXwY6PhQdQ2IedWx/ZK4Q==}
+     engines: {node: '>=0.10.0'}
+ 
+-  '@tanstack/query-core@5.17.9':
+-    resolution: {integrity: sha512-8xcvpWIPaRMDNLMvG9ugcUJMgFK316ZsqkPPbsI+TMZsb10N9jk0B1XgPk+aHdrDqVYKRMf0RqMzxA0Dvvo2Mw==}
++  '@tanstack/query-core@5.28.4':
++    resolution: {integrity: sha512-uQZqOFqLWUvXNIQZ63XdKzg22NtHzgCBUfDmjDHi3BoF+nUYeBNvMi/xFPtFrMhqRzG2Ir4mYaGsWZzmiEjXpA==}
++
++  zod@3.23.8:
++    resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
+ 
+ snapshots:
+ 
+@@ -102,7 +105,7 @@ snapshots:
+ 
+   '@types/react@18.2.48': {}
+ 
+-  axios@1.6.2:
++  axios@1.7.4:
+     dependencies:
+       follow-redirects: 1.15.6
+       form-data: 4.0.0
