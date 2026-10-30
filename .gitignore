@@ -21,3 +21,6 @@ build/
 .idea/
 .vscode/
 .DS_Store
+
+# Docs build output
+site/

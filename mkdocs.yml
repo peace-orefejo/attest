@@ -1,0 +1,123 @@
+site_name: attest
+site_description: Evidence-grounded evaluation for AI agents. Check every claim against what the tools actually returned.
+site_url: https://peace-orefejo.github.io/attest/
+repo_url: https://github.com/peace-orefejo/attest
+repo_name: peace-orefejo/attest
+edit_uri: edit/main/docs/
+copyright: MIT License
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - content.action.edit
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - assets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_root_full_path: false
+            show_if_no_docstring: true
+            show_symbol_type_heading: true
+            extensions:
+              - griffe_pydantic:
+                  schema: false
+            show_source: false
+            show_signature_annotations: true
+            separate_signature: true
+            members_order: source
+            merge_init_into_class: true
+            filters: ["!^_"]
+
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: info
+    unrecognized_links: warn
+
+exclude_docs: |
+  scripts/
+  assets/terminal/*.txt
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - How it works: concepts.md
+  - Checks:
+      - Faithfulness: checks/faithfulness.md
+      - Tool use: checks/tool-use.md
+      - Prompt injection: checks/injection.md
+      - Role adherence: checks/role.md
+      - Policies: checks/policies.md
+  - Code review mode:
+      - Overview: code-review/index.md
+      - Review guidelines: code-review/guidelines.md
+      - Writing the review: code-review/writing.md
+      - Outputs and decisions: code-review/outputs.md
+      - Injection in diffs: code-review/injection.md
+  - Command line: cli.md
+  - Models and providers: providers.md
+  - Integrations: integrations.md
+  - Architecture: architecture.md
+  - API reference:
+      - attest: reference/attest.md
+      - attest.code_review: reference/code-review.md
+  - Contributing: contributing.md
+  - Changelog: changelog.md
+  - Design notes:
+      - Code review mode: design/code-review-mode.md
+      - Injection roadmap: design/injection-roadmap.md
+      - Async batches and cost: design/async-cost.md

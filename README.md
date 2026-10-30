@@ -9,6 +9,10 @@ pip install agent-attest          # the command and the import are both `attest`
 attest run your-run.json
 ```
 
+![attest flags a false claim and quotes the tool output that contradicts it](https://raw.githubusercontent.com/peace-orefejo/attest/main/docs/assets/terminal/attest-run.svg)
+
+**[Read the docs](https://peace-orefejo.github.io/attest/)**
+
 ## The problem
 
 The more common ways grading an AI agent ask *another* AI: "is this answer good?" That's easy
@@ -226,11 +230,42 @@ report = judge.evaluate(run)
 You can also build a run by hand — see [`examples/quickstart.py`](examples/quickstart.py)
 for a tiny, complete example.
 
-## Develop
+## Check an AI code reviewer
+
+attest can also check the outputs of an AI code review pipeline: flagged issues, diff summaries,
+group summaries and answers about a change. Each one is checked against the diff and your
+team's review rules, and kept or dropped with the reason.
+
+```python
+from attest import Attest, show
+
+result = Attest().review(pr, outputs, guidelines="REVIEW.md")
+show(result)
+post = result.filter(outputs)
+```
+
+`REVIEW.md` is a markdown list of your review rules. Without it, attest uses a built-in general
+standard. Leave out `outputs` and attest writes the review itself, then checks it. From the
+shell:
 
 ```bash
+attest review examples/code_review.json -g REVIEW.md
+```
+
+![Code review gate keeping a real issue and dropping a false one](https://raw.githubusercontent.com/peace-orefejo/attest/main/docs/assets/terminal/code-review-gate.svg)
+
+See [Code review mode](https://peace-orefejo.github.io/attest/code-review/) and
+[`examples/code_review_gate.py`](examples/code_review_gate.py).
+
+## Contributing
+
+```bash
+uv sync
 uv run pytest        # all tests run offline; no API key needed
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the codebase rules, the docs build and how to send a
+change.
 
 ## Status
 
