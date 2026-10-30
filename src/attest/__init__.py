@@ -1,13 +1,7 @@
 """attest — evidence-grounded evaluation for AI agent trajectories."""
 
-from .trajectory import Trajectory, Step, ToolCall
-from .content import Artifact, Detection, TextSegment
-from .extraction import ExtractionLimits, ExtractionOutcome, extract_artifact
-from .policy import EvaluationPolicy, EvaluationRule, check_policy, load_policy
-from .results import Report, CheckResult, Finding, Severity, PROMPT_VERSION
-from .checks.verify import judge_trajectory, extract_claims, grounded_verifier, verify_claims
-from .checks.judge_baseline import naive_judge, JudgeVerdict
-from .checks.tool_use import check_tool_use
+from .adapters.langgraph import from_langgraph_messages
+from .api import Attest
 from .checks.injection import (
     POSSIBLE_INJECTION_THRESHOLD,
     RegexDetector,
@@ -15,30 +9,66 @@ from .checks.injection import (
     check_injection,
     load_regex_detector,
 )
+from .checks.judge_baseline import JudgeVerdict, naive_judge
 from .checks.role import check_role_adherence
+from .checks.tool_use import check_tool_use
+from .checks.verify import extract_claims, grounded_verifier, judge_trajectory, verify_claims
+from .content import Artifact, Detection, TextSegment
+from .extraction import ExtractionLimits, ExtractionOutcome, extract_artifact
+from .llm import Budget, BudgetExceeded, DiskCache, Usage
+from .policy import EvaluationPolicy, EvaluationRule, check_policy, load_policy
+from .providers import default_model, list_models
+from .providers import providers as list_providers
+from .results import PROMPT_VERSION, CheckResult, Finding, Report, Severity
 from .scoring.report import evaluate
-from .adapters.langgraph import from_langgraph_messages
-from .scoring.stats import wilson_interval, difference_is_real, Proportion
-from .providers import providers as list_providers, list_models, default_model
-from .api import Attest
-from ._budget import Budget, BudgetExceeded, Usage
-from ._cache import DiskCache
+from .scoring.stats import Proportion, difference_is_real, wilson_interval
+from .trajectory import Step, ToolCall, Trajectory
 
 __all__ = [
-    "Attest", "Budget", "BudgetExceeded", "Usage", "DiskCache",
-    "list_providers", "list_models", "default_model",
-    "Trajectory", "Step", "ToolCall", "Artifact", "Detection", "TextSegment",
-    "ExtractionLimits", "ExtractionOutcome", "extract_artifact",
-    "EvaluationPolicy", "EvaluationRule", "check_policy", "load_policy",
-    "Report", "CheckResult", "Finding", "Severity", "PROMPT_VERSION",
-    "judge_trajectory", "extract_claims", "grounded_verifier", "verify_claims",
-    "naive_judge", "JudgeVerdict",
-    "check_tool_use", "check_injection", "RegexDetector", "RegexPattern", "load_regex_detector",
     "POSSIBLE_INJECTION_THRESHOLD",
+    "PROMPT_VERSION",
+    "Artifact",
+    "Attest",
+    "Budget",
+    "BudgetExceeded",
+    "CheckResult",
+    "Detection",
+    "DiskCache",
+    "EvaluationPolicy",
+    "EvaluationRule",
+    "ExtractionLimits",
+    "ExtractionOutcome",
+    "Finding",
+    "JudgeVerdict",
+    "Proportion",
+    "RegexDetector",
+    "RegexPattern",
+    "Report",
+    "Severity",
+    "Step",
+    "TextSegment",
+    "ToolCall",
+    "Trajectory",
+    "Usage",
+    "check_injection",
+    "check_policy",
     "check_role_adherence",
+    "check_tool_use",
+    "default_model",
+    "difference_is_real",
     "evaluate",
+    "extract_artifact",
+    "extract_claims",
     "from_langgraph_messages",
-    "wilson_interval", "difference_is_real", "Proportion",
+    "grounded_verifier",
+    "judge_trajectory",
+    "list_models",
+    "list_providers",
+    "load_policy",
+    "load_regex_detector",
+    "naive_judge",
+    "verify_claims",
+    "wilson_interval",
 ]
 
 __version__ = "0.7.0"

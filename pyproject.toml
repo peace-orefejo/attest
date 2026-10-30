@@ -66,6 +66,9 @@ dev = [
     "pypdf>=5.0",
     "pytesseract>=0.3.13",
     "zxing-cpp>=2.3",
+    "types-pyyaml>=6.0.12.20260906",
+    "pyright>=1.1.414",
+    "ruff>=0.17.3",
 ]
 
 [build-system]
@@ -74,9 +77,38 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/attest"]
+exclude = ["**/*_test.py", "**/fixtures"]
 
 [tool.hatch.build.targets.sdist]
-exclude = ["/tests", "/.github"]
+exclude = ["/.github"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+testpaths = ["src"]
+python_files = ["*_test.py"]
+markers = [
+    "integration: end-to-end tests that make real LLM calls (opt in with ATTEST_INTEGRATION=1)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+allowed-confusables = ["–"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Option", "typer.Argument", "attest.extraction.limits.ExtractionLimits", "attest.extraction.ExtractionLimits", "attest.ExtractionLimits"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/attest/prompts/*" = ["E501"]
+
+[tool.pyright]
+include = ["src"]
+exclude = ["**/*_test.py", "**/__pycache__"]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"

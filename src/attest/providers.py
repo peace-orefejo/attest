@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from collections.abc import Iterable
+from typing import Protocol, runtime_checkable
 
 import instructor
+from pydantic import BaseModel, ConfigDict
+
+from .utils.imports import load_callable
 
 DEFAULT_PROVIDER = "anthropic"
 
 
-@dataclass(frozen=True)
-class _Provider:
+class _Provider(BaseModel):
+    model_config = ConfigDict(frozen=True, strict=True)
+
     name: str
     prefix: str
     env_keys: tuple[str, ...]
@@ -26,8 +31,11 @@ _REGISTRY: dict[str, _Provider] = {
         env_keys=("ANTHROPIC_API_KEY",),
         default_model="claude-haiku-4-5",
         models=(
-            "claude-opus-5", "claude-sonnet-5",
-            "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5",
+            "claude-opus-5",
+            "claude-sonnet-5",
+            "claude-opus-4-8",
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5",
         ),
     ),
     "openai": _Provider(
@@ -43,7 +51,9 @@ _REGISTRY: dict[str, _Provider] = {
         env_keys=("GEMINI_API_KEY", "GOOGLE_API_KEY"),
         default_model="gemini-3.6-flash",
         models=(
-            "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
             "gemini-2.5-pro",
         ),
     ),
@@ -96,13 +106,37 @@ def build_client(
     return instructor.from_provider(target)
 
 
-def _gemini_chat_models(models) -> list[str]:
-    names = []
-    for m in models:
-        actions = getattr(m, "supported_actions", None)
-        if actions is None or "generateContent" in actions:
-            names.append(m.name.removeprefix("models/"))
+def _gemini_chat_models(models: Iterable[object]) -> list[str]:
+    names: list[str] = []
+    for model in models:
+        name = getattr(model, "name", None)
+        if isinstance(name, str) and _supports_generation(model):
+            names.append(name.removeprefix("models/"))
     return names
+
+
+def _supports_generation(model: object) -> bool:
+    actions: object = getattr(model, "supported_actions", None)
+    if actions is None:
+        return True
+    return isinstance(actions, list | tuple | set | frozenset) and "generateContent" in actions
+
+
+@runtime_checkable
+class _GeminiModels(Protocol):
+    def list(self) -> Iterable[object]: ...
+
+
+@runtime_checkable
+class _GeminiClient(Protocol):
+    models: _GeminiModels
+
+
+def _gemini_client(key: str) -> _GeminiClient:
+    client = load_callable("google.genai", "Client")(api_key=key)
+    if not isinstance(client, _GeminiClient):
+        raise TypeError("google.genai.Client did not return a client with a models listing.")
+    return client
 
 
 def fetch_models(provider: str, key: str | None = None) -> list[str]:
@@ -117,15 +151,16 @@ def fetch_models(provider: str, key: str | None = None) -> list[str]:
 
     if provider == "anthropic":
         from anthropic import Anthropic
+
         return [m.id for m in Anthropic(api_key=resolved).models.list()]
 
     if provider == "openai":
         from openai import OpenAI
+
         return sorted(m.id for m in OpenAI(api_key=resolved).models.list())
 
     if provider == "gemini":
-        from google import genai
-        return _gemini_chat_models(genai.Client(api_key=resolved).models.list())
+        return _gemini_chat_models(_gemini_client(resolved).models.list())
 
     raise ValueError(f"Live model listing is not implemented for {provider!r}.")
 

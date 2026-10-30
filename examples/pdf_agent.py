@@ -48,14 +48,17 @@ def _pdf_with_text(text: str) -> bytes:
     for offset in offsets:
         pdf += b"%010d 00000 n \n" % offset
     pdf += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF" % (
-        len(objs) + 1, xref_pos
+        len(objs) + 1,
+        xref_pos,
     )
     return bytes(pdf)
 
 
 def _pdf_artifact() -> Artifact:
     return Artifact(
-        id="report.pdf", name="report.pdf", media_type="application/pdf",
+        id="report.pdf",
+        name="report.pdf",
+        media_type="application/pdf",
         source="retrieved_file",
         data_base64=base64.b64encode(_pdf_with_text(PAYLOAD)).decode(),
     )
@@ -65,7 +68,8 @@ def _read_step() -> Step:
     return Step(
         thought="Read the attached report.",
         tool_call=ToolCall(
-            name="read_pdf", arguments={"path": "report.pdf"},
+            name="read_pdf",
+            arguments={"path": "report.pdf"},
             output="(binary PDF returned as an artifact)",
             artifacts=[_pdf_artifact()],
         ),
@@ -113,8 +117,10 @@ def main() -> None:
         for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY")
     )
     if not deep:
-        print("No API key set — running layer 1 only (payload detection, not the held/"
-              "compromised verdict). Set ANTHROPIC_API_KEY for the deep judgment.\n")
+        print(
+            "No API key set — running layer 1 only (payload detection, not the held/"
+            "compromised verdict). Set ANTHROPIC_API_KEY for the deep judgment.\n"
+        )
     _report("held", held, deep)
     _report("compromised", compromised, deep)
 

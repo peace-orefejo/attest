@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from .utils.json_types import JsonObject
 
 ArtifactSource = Literal["tool_output", "user_upload", "retrieved_file"]
 
@@ -26,10 +27,10 @@ class Artifact(BaseModel):
     data_base64: str | None = None
     path: str | None = None
     sha256: str | None = None
-    metadata: dict = Field(default_factory=dict)
+    metadata: JsonObject = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _one_content_source(self) -> "Artifact":
+    def _one_content_source(self) -> Artifact:
         supplied = sum(value is not None for value in (self.text, self.data_base64, self.path))
         if supplied != 1:
             raise ValueError("An artifact requires exactly one of: text, data_base64, or path.")
@@ -45,7 +46,7 @@ class TextSegment(BaseModel):
     subject: str
     step: int | None = None
     extraction_confidence: float = Field(default=1.0, ge=0.0, le=1.0)
-    metadata: dict = Field(default_factory=dict)
+    metadata: JsonObject = Field(default_factory=dict)
 
 
 class Detection(BaseModel):
@@ -57,4 +58,4 @@ class Detection(BaseModel):
     subject: str
     step: int | None = None
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
-    metadata: dict = Field(default_factory=dict)
+    metadata: JsonObject = Field(default_factory=dict)

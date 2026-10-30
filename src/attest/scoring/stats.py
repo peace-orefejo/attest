@@ -27,8 +27,7 @@ def wilson_interval(successes: int, n: int, z: float = Z_95) -> Proportion:
     denom = 1 + z * z / n
     center = (p + z * z / (2 * n)) / denom
     margin = (z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / denom
-    return Proportion(rate=p, low=max(0.0, center - margin),
-                      high=min(1.0, center + margin), n=n)
+    return Proportion(rate=p, low=max(0.0, center - margin), high=min(1.0, center + margin), n=n)
 
 
 def two_proportion_z(s_a: int, n_a: int, s_b: int, n_b: int) -> float:
@@ -43,7 +42,6 @@ def two_proportion_z(s_a: int, n_a: int, s_b: int, n_b: int) -> float:
     return (p_a - p_b) / se
 
 
-def difference_is_real(s_a: int, n_a: int, s_b: int, n_b: int,
-                       z_threshold: float = Z_95) -> bool:
+def difference_is_real(s_a: int, n_a: int, s_b: int, n_b: int, z_threshold: float = Z_95) -> bool:
     """True only if A and B differ beyond noise at ~95%."""
     return abs(two_proportion_z(s_a, n_a, s_b, n_b)) >= z_threshold

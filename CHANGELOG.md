@@ -20,14 +20,28 @@ All notable changes to `agent-attest` are documented here. This project follows
   `cached_input_tokens` and `cache_write_tokens`.
 - `attest run --max-calls/--max-tokens/--cache-dir`, with a usage line (or `usage` in `--json`);
   exits with code 2 when the budget stops a run.
+- Opt-in real-LLM integration tests behind the `integration` marker and `ATTEST_INTEGRATION=1`.
 
 ### Changed
 - Faithfulness and tool-choice prompts put the shared evidence before the per-call text;
   `PROMPT_VERSION` is now `2026.10.29`.
 - `vote` stops sampling once a verdict holds a strict majority (2 of 3 agreeing skips the third
   call), cutting self-consistency spend by up to a third with identical verdicts.
+- The LangGraph adapter discriminates messages by their stable `BaseMessage.type` role instead of
+  the class name, so a LangChain class rename no longer breaks it silently.
+- Split the monolithic `extraction` module into an `extraction/` package
+  (`limits`, `pdf`, `image`, `markup`, `tabular`, `core`) behind an unchanged public API.
+- Codebase reorganized for readability behind an unchanged public API: prompts live in a shared
+  `prompts/` package, LLM plumbing in `llm/`, shared helpers in `utils/`, and `policy`,
+  `checks.injection` and `cli` are now packages of small modules.
+- `ExtractionLimits`, `ExtractionOutcome`, `RegexPattern`, `Budget` and `Usage` are Pydantic models.
+  Invalid values raise pydantic `ValidationError` (a `ValueError`).
+- `Severity` is a `StrEnum`, so `str(Severity.PASS)` is `"pass"`.
+- `Trajectory.tool_calls()` returns `IndexedToolCall(step, call)` named tuples; unpacking still works.
+- Tests live next to their modules as `<module>_test.py`; ruff and strict pyright are configured.
 
 ### Fixed
+- `attest demo` no longer crashes when the grounding score is unavailable.
 - Hard provider errors (auth, billing, bad request) are no longer retried as "empty responses":
   `call` raises the provider's own error after one attempt instead of three retries ending in a
   misleading "no parseable content" message. Empty candidates and unparseable output still retry.

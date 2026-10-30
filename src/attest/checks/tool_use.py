@@ -4,26 +4,13 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from .._llm import call
+from ..llm import call
+from ..prompts.tool_use import APPROPRIATE_SYSTEM, appropriate_prefix, appropriate_user
 from ..results import CheckResult, Finding, Severity
 from ..trajectory import ToolCall, Trajectory
 
-
-def _looks_like_error(output: str) -> bool:
-    o = output.strip()
-    if not o:
-        return True
-    low = o.lower()
-    return (
-        low.startswith(("error", "exception", "traceback"))
-        or "traceback (most recent call last)" in low
-        or "error:" in low
-        or "exception:" in low
-    )
-
-
-def _handled_later(traj: Trajectory, error_step: int) -> bool:
-    return any(i > error_step for i, _ in traj.tool_calls())
+_ERROR_PREFIXES = ("error", "exception", "traceback")
+_ERROR_MARKERS = ("traceback (most recent call last)", "error:", "exception:")
 
 
 class _AppropriatenessOut(BaseModel):
@@ -33,86 +20,139 @@ class _AppropriatenessOut(BaseModel):
     reason: str = ""
 
 
-_APPROPRIATE_SYSTEM = (
-    "You judge whether an AI agent chose an APPROPRIATE TOOL for a step — not "
-    "whether the final answer is good. Given the task, the tools available to the "
-    "agent (with descriptions), and the specific call it made, decide whether "
-    "calling that tool with those arguments was a reasonable step toward the task. "
-    "Judge tool CHOICE only."
-)
+class ToolCallReview(BaseModel):
+    allowed: bool
+    error_handled: bool | None
+    appropriate: bool | None
+    appropriate_reason: str = ""
 
 
-def _check_appropriate(traj: Trajectory, tc: ToolCall,
-                       *, shared: bool = False) -> _AppropriatenessOut:
-    prefix = (
-        f"TASK:\n{traj.task}\n\n"
-        f"TOOLS AVAILABLE (from the agent's system prompt):\n"
-        f"{traj.system_prompt or '(no tool descriptions provided)'}"
+def check_tool_use(traj: Trajectory, *, appropriate: bool = False) -> CheckResult:
+    """Review each tool call. `appropriate=True` adds the LLM tool-choice check."""
+    allowed_tools = set(traj.allowed_tools or [])
+    calls = traj.tool_calls()
+    shared = len(calls) > 1
+    findings = [
+        _review_finding(
+            traj, step, tool_call, allowed_tools, appropriate=appropriate, shared=shared
+        )
+        for step, tool_call in calls
+    ]
+    correct = sum(finding.verdict == "correct" for finding in findings)
+    return CheckResult(
+        check="tool_use",
+        passed=all(finding.severity is not Severity.FAIL for finding in findings),
+        score=correct / len(findings) if findings else 1.0,
+        summary=_summarize(findings),
+        findings=findings,
     )
-    return call(system=_APPROPRIATE_SYSTEM, prefix=prefix,
-                user=f"TOOL CALL:\n{tc.name}({tc.arguments})", output=_AppropriatenessOut,
-                reuse="prefix" if shared else None)
 
 
-def _review_call(traj: Trajectory, idx: int, tc: ToolCall,
-                 allowed_set: set[str], appropriate: bool, shared: bool = False) -> Finding:
-    allowed = (not allowed_set) or (tc.name in allowed_set)
-    is_error = _looks_like_error(tc.output)
-    error_handled = _handled_later(traj, idx) if is_error else None
+def _review_finding(
+    traj: Trajectory,
+    step: int,
+    tool_call: ToolCall,
+    allowed_tools: set[str],
+    *,
+    appropriate: bool,
+    shared: bool,
+) -> Finding:
+    review = _review(traj, step, tool_call, allowed_tools, appropriate=appropriate, shared=shared)
+    is_error = review.error_handled is not None
 
-    appropriate_flag: bool | None = None
-    appr_reason = ""
-    if appropriate:
-        out = _check_appropriate(traj, tc, shared=shared)
-        appropriate_flag, appr_reason = out.appropriate, out.reason
+    def finding(
+        verdict: str, severity: Severity, reason: str, evidence: str | None = None
+    ) -> Finding:
+        return Finding(
+            severity=severity,
+            verdict=verdict,
+            subject=tool_call.name,
+            step=step,
+            reason=reason,
+            evidence=evidence,
+            metadata={
+                "allowed": review.allowed,
+                "error_handled": review.error_handled,
+                "appropriate": review.appropriate,
+            },
+        )
 
-    meta = {"allowed": allowed, "error_handled": error_handled, "appropriate": appropriate_flag}
+    if not review.allowed:
+        return finding(
+            "incorrect",
+            Severity.FAIL,
+            f"'{tool_call.name}' is not in the agent's allowed tools {sorted(allowed_tools)}.",
+        )
+    if is_error and not review.error_handled:
+        return finding(
+            "incorrect",
+            Severity.FAIL,
+            "The tool returned an error that no later step addressed.",
+            tool_call.output.strip()[:160] or None,
+        )
+    if review.appropriate is False:
+        return finding(
+            "incorrect",
+            Severity.FAIL,
+            review.appropriate_reason or "Not an appropriate tool choice for this step.",
+        )
+    return finding(
+        "correct", Severity.PASS, review.appropriate_reason or "Allowed tool; no unhandled error."
+    )
 
-    def finding(verdict: str, severity: Severity, reason: str, evidence: str | None = None) -> Finding:
-        return Finding(severity=severity, verdict=verdict, subject=tc.name, step=idx,
-                       reason=reason, evidence=evidence, metadata=meta)
 
-    if not allowed:
-        return finding("incorrect", Severity.FAIL,
-                       f"'{tc.name}' is not in the agent's allowed tools {sorted(allowed_set)}.")
-    if is_error and not error_handled:
-        return finding("incorrect", Severity.FAIL,
-                       "The tool returned an error that no later step addressed.",
-                       tc.output.strip()[:160] or None)
-    if appropriate_flag is False:
-        return finding("incorrect", Severity.FAIL,
-                       appr_reason or "Not an appropriate tool choice for this step.")
-    return finding("correct", Severity.PASS, appr_reason or "Allowed tool; no unhandled error.")
+def _review(
+    traj: Trajectory,
+    step: int,
+    tool_call: ToolCall,
+    allowed_tools: set[str],
+    *,
+    appropriate: bool,
+    shared: bool,
+) -> ToolCallReview:
+    is_error = _looks_like_error(tool_call.output)
+    judged = _check_appropriate(traj, tool_call, shared=shared) if appropriate else None
+    return ToolCallReview(
+        allowed=not allowed_tools or tool_call.name in allowed_tools,
+        error_handled=_handled_later(traj, step) if is_error else None,
+        appropriate=judged.appropriate if judged else None,
+        appropriate_reason=judged.reason if judged else "",
+    )
+
+
+def _check_appropriate(
+    traj: Trajectory, tool_call: ToolCall, *, shared: bool = False
+) -> _AppropriatenessOut:
+    return call(
+        system=APPROPRIATE_SYSTEM,
+        prefix=appropriate_prefix(traj),
+        user=appropriate_user(tool_call),
+        output=_AppropriatenessOut,
+        reuse="prefix" if shared else None,
+    )
+
+
+def _looks_like_error(output: str) -> bool:
+    text = output.strip().lower()
+    if not text:
+        return True
+    return text.startswith(_ERROR_PREFIXES) or any(marker in text for marker in _ERROR_MARKERS)
+
+
+def _handled_later(traj: Trajectory, error_step: int) -> bool:
+    return any(step > error_step for step, _ in traj.tool_calls())
 
 
 def _summarize(findings: list[Finding]) -> str:
     if not findings:
         return "No tool calls were made."
-    total = len(findings)
-    correct = sum(f.verdict == "correct" for f in findings)
-    seq = " -> ".join(f.subject for f in findings)
-    parts = [f"{correct}/{total} tool calls correct.", f"Sequence: {seq}."]
-    issues = [f for f in findings if f.verdict != "correct"]
-    if issues:
-        parts.append("Issues: " + "; ".join(f"step {f.step} ({f.subject}) — {f.reason}" for f in issues))
-    else:
+    correct = sum(finding.verdict == "correct" for finding in findings)
+    sequence = " -> ".join(finding.subject for finding in findings)
+    parts = [f"{correct}/{len(findings)} tool calls correct.", f"Sequence: {sequence}."]
+    issues = [finding for finding in findings if finding.verdict != "correct"]
+    if not issues:
         parts.append("All tools allowed; no unhandled errors.")
+        return " ".join(parts)
+    details = "; ".join(f"step {f.step} ({f.subject}) — {f.reason}" for f in issues)
+    parts.append(f"Issues: {details}")
     return " ".join(parts)
-
-
-def check_tool_use(traj: Trajectory, *, appropriate: bool = False) -> CheckResult:
-    """Review each tool call. `appropriate=True` adds the LLM tool-choice check."""
-    allowed_set = set(traj.allowed_tools or [])
-    calls = traj.tool_calls()
-    findings = [_review_call(traj, idx, tc, allowed_set, appropriate, shared=len(calls) > 1)
-                for idx, tc in calls]
-    total = len(findings)
-    correct = sum(f.verdict == "correct" for f in findings)
-    rate = correct / total if total else 1.0
-    return CheckResult(
-        check="tool_use",
-        passed=all(f.severity is not Severity.FAIL for f in findings),
-        score=rate,
-        summary=_summarize(findings),
-        findings=findings,
-    )
