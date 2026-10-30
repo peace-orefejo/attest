@@ -7,6 +7,7 @@ from typing import NamedTuple
 from pydantic import BaseModel, Field
 
 from .content import Artifact, TextSegment
+from .prompts.evidence import evidence_block
 from .utils.json_types import JsonObject
 
 
@@ -36,13 +37,15 @@ class Trajectory(BaseModel):
     final_answer: str
 
     def evidence(self) -> str:
-        """The concatenated real tool outputs — the only text attest trusts."""
-        blocks: list[str] = []
-        for i, step in enumerate(self.steps):
-            if step.tool_call is not None:
-                tc = step.tool_call
-                blocks.append(f"[{i}] {tc.name}({tc.arguments}) -> {tc.output}")
-        return "\n".join(blocks)
+        """The real tool outputs, one <tool_output> block each — the only text attest trusts.
+
+        Block tags inside an output are escaped, so an output cannot close its block or
+        fake another tool's block.
+        """
+        return "\n".join(
+            evidence_block(step, call.name, call.arguments, call.output)
+            for step, call in self.tool_calls()
+        )
 
     def has_evidence(self) -> bool:
         return bool(self.artifacts) or any(s.tool_call is not None for s in self.steps)

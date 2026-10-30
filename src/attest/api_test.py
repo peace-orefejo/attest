@@ -1,7 +1,8 @@
 """The Attest facade — all offline."""
 
 import attest.checks.injection.deep as inj
-from attest import Attest
+from attest import Attest, CheckResult, Finding, Report, Severity
+from attest.code_review import PullRequest, ReviewOutput
 from attest.llm import using
 from attest.llm.client import resolve_client as _resolve_client
 from attest.trajectory import Step, ToolCall, Trajectory
@@ -93,3 +94,39 @@ def test_evaluate_routes_active_client(monkeypatch):
         deep=True,
     )
     assert seen["client"] is sentinel
+
+
+_CLEAN_DIFF = (
+    "--- a/billing/cart.py\n+++ b/billing/cart.py\n"
+    "@@ -21,3 +21,4 @@ def cart_total(items):\n"
+    "     total = 0\n"
+    "+    total = 0\n"
+    "     for i in range(len(items)):\n"
+    "         total += items[i].price\n"
+)
+
+
+def test_attest_review_grades_with_faithfulness_in_code_mode(monkeypatch):
+    calls = []
+
+    def fake_evaluate(self, run, **kwargs):
+        calls.append(kwargs)
+        finding = Finding(severity=Severity.PASS, verdict="supported", subject="claim 0")
+        return Report(
+            results=[
+                CheckResult(
+                    check="faithfulness",
+                    passed=True,
+                    score=0.5,
+                    summary="graded",
+                    findings=[finding],
+                )
+            ]
+        )
+
+    monkeypatch.setattr(Attest, "evaluate", fake_evaluate)
+    judge = Attest(key="sk-ant-test-key")
+    pr = PullRequest(diffs={"billing/cart.py": _CLEAN_DIFF}, changed_files=["billing/cart.py"])
+    result = judge.review(pr, [ReviewOutput(output_type="issue", text="a")], deep=False)
+    assert calls == [{"checks": ("faithfulness",), "answer_kind": "code"}]
+    assert result.kept == [0]

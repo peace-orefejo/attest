@@ -13,6 +13,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "regex" },
+    { name = "rich" },
     { name = "typer" },
 ]
 
@@ -56,10 +57,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", specifier = ">=0.40" },
+    { name = "anthropic", specifier = ">=0.77,<2" },
     { name = "defusedxml", marker = "extra == 'all'", specifier = ">=0.7.1" },
     { name = "defusedxml", marker = "extra == 'files'", specifier = ">=0.7.1" },
-    { name = "instructor", specifier = ">=1.15.3" },
+    { name = "instructor", specifier = ">=1.15.3,<2" },
     { name = "instructor", extras = ["google-genai"], marker = "extra == 'all'", specifier = ">=1.15.3" },
     { name = "instructor", extras = ["google-genai"], marker = "extra == 'gemini'", specifier = ">=1.15.3" },
     { name = "openai", marker = "extra == 'all'", specifier = ">=1.40" },
@@ -74,6 +75,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "regex", specifier = ">=2024.11.6" },
+    { name = "rich", specifier = ">=13.7" },
     { name = "typer", specifier = ">=0.12" },
     { name = "zxing-cpp", marker = "extra == 'all'", specifier = ">=2.3" },
     { name = "zxing-cpp", marker = "extra == 'files'", specifier = ">=2.3" },

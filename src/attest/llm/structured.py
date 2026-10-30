@@ -1,4 +1,4 @@
-"""Provider-agnostic structured output via instructor. The single LLM chokepoint."""
+"""Structured LLM output (native Anthropic, instructor elsewhere). The single LLM chokepoint."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from ..prompts.guard import GUARD
 from .budget import before_call, record_cache_hit, record_completion
 from .client import resolve_client
 from .errors import api_error, is_empty_response
+from .protocol import LLMClient
 from .response_cache import cache_key, response_cache
 
 if TYPE_CHECKING:
@@ -35,7 +36,7 @@ def call(
     user: str,
     output: type[T],
     max_tokens: int = 4096,
-    client: instructor.Instructor | None = None,
+    client: LLMClient | None = None,
     attempts: int = 3,
     sample: int = 0,
     prefix: str = "",
@@ -90,7 +91,7 @@ def vote(
     output: type[T],
     key: Callable[[T], Hashable],
     samples: int = 3,
-    client: instructor.Instructor | None = None,
+    client: LLMClient | None = None,
 ) -> T:
     """Self-consistency: sample the judge `samples` times and return the majority `key(...)`.
 
@@ -119,7 +120,7 @@ def vote(
 
 
 def _user_message(
-    client: instructor.Instructor, prefix: str, user: str, reuse: Reuse | None
+    client: LLMClient, prefix: str, user: str, reuse: Reuse | None
 ) -> ChatCompletionUserMessageParam:
     if getattr(client, "provider", None) != instructor.Provider.ANTHROPIC or reuse is None:
         return {"role": "user", "content": f"{prefix}\n\n{user}" if prefix else user}
@@ -141,7 +142,7 @@ def _cached_blocks(prefix: str, user: str, reuse: Reuse) -> list[dict[str, objec
 
 
 def _create(
-    client: instructor.Instructor,
+    client: LLMClient,
     output: type[T],
     max_tokens: int,
     messages: list[ChatCompletionMessageParam],

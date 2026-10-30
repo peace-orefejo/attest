@@ -1,11 +1,15 @@
 """Provider registry — all offline (live fetch tested with faked SDK clients)."""
 
+import os
 import sys
 import types
 from typing import ClassVar
 
 import pytest
 
+from attest.checks.verify import VerdictOut
+from attest.llm import Usage, call, metering
+from attest.llm.anthropic_client import AnthropicClient, accepts_temperature
 from attest.providers import (
     _gemini_chat_models,
     build_client,
@@ -13,6 +17,7 @@ from attest.providers import (
     default_model,
     fetch_models,
     list_models,
+    load_env,
     providers,
     resolve_key,
 )
@@ -114,3 +119,138 @@ def test_fetch_requires_key(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(ValueError):
         fetch_models("openai")
+
+
+@pytest.fixture
+def real_dotenv(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text(
+        "ANTHROPIC_API_KEY=from-dotenv\nANTHROPIC_BASE_URL=https://evil.test\n"
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "placeholder")
+    monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+    monkeypatch.setattr("attest.providers.load_env", load_env)
+    load_env.cache_clear()
+    yield
+    load_env.cache_clear()
+
+
+def test_resolve_key_reads_dotenv_from_working_directory(real_dotenv, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert resolve_key("anthropic") == "from-dotenv"
+
+
+def test_dotenv_does_not_override_real_env(real_dotenv, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "from-env")
+    assert resolve_key("anthropic") == "from-env"
+
+
+def test_dotenv_only_loads_provider_keys(real_dotenv, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    resolve_key("anthropic")
+    assert "ANTHROPIC_BASE_URL" not in os.environ
+
+
+class _Parsed:
+    def __init__(self, parsed_output, stop_reason="end_turn"):
+        self.parsed_output = parsed_output
+        self.stop_reason = stop_reason
+
+
+class _FakeMessages:
+    def __init__(self, result):
+        self.result = result
+        self.kwargs = None
+
+    def parse(self, **kwargs):
+        self.kwargs = kwargs
+        return self.result
+
+
+def _anthropic_client(model, result):
+    client = AnthropicClient(model, api_key="sk-ant-fake")
+    fake = _FakeMessages(result)
+    client.client = types.SimpleNamespace(messages=fake)
+    return client, fake
+
+
+def _messages():
+    return [{"role": "system", "content": "judge"}, {"role": "user", "content": "claim"}]
+
+
+def test_build_client_anthropic_is_native():
+    assert isinstance(build_client("anthropic", "claude-opus-5-5", key="k"), AnthropicClient)
+
+
+def test_anthropic_client_uses_structured_outputs_without_tool_choice():
+    out = VerdictOut(verdict="supported")
+    client, fake = _anthropic_client("claude-sonnet-5-5", _Parsed(out))
+    got = client.create(
+        response_model=VerdictOut, messages=_messages(), max_tokens=64, temperature=0
+    )
+    assert got is out
+    assert fake.kwargs["output_format"] is VerdictOut
+    assert fake.kwargs["system"] == "judge"
+    assert fake.kwargs["messages"] == [{"role": "user", "content": "claim"}]
+    assert "tool_choice" not in fake.kwargs and "tools" not in fake.kwargs
+    assert "temperature" not in fake.kwargs and fake.kwargs.get("extra_body") is None
+
+
+def test_anthropic_client_keeps_temperature_for_models_that_accept_it():
+    client, fake = _anthropic_client("claude-haiku-4-5", _Parsed(VerdictOut(verdict="supported")))
+    client.create(response_model=VerdictOut, messages=_messages(), max_tokens=64, temperature=0)
+    assert "temperature" not in fake.kwargs
+    assert fake.kwargs["extra_body"] == {"temperature": 0}
+
+
+@pytest.mark.parametrize("model", ["claude-opus-4-8", "claude-opus-5", "claude-haiku-5-5"])
+def test_anthropic_client_drops_temperature_for_newer_models(model):
+    client, fake = _anthropic_client(model, _Parsed(VerdictOut(verdict="supported")))
+    client.create(response_model=VerdictOut, messages=_messages(), max_tokens=64, temperature=0)
+    assert fake.kwargs.get("extra_body") is None
+
+
+@pytest.mark.parametrize(
+    ("model", "expected"),
+    [
+        ("claude-3-5-sonnet-latest", True),
+        ("claude-sonnet-4-6", True),
+        ("claude-opus-4-1-20250805", True),
+        ("claude-sonnet-4-20250514", True),
+        ("claude-opus-4-7", False),
+        ("claude-sonnet-5-5", False),
+    ],
+)
+def test_accepts_temperature(model, expected):
+    assert accepts_temperature(model) is expected
+
+
+def test_anthropic_client_raises_when_no_structured_output():
+    client, _ = _anthropic_client("claude-opus-5-5", _Parsed(None, stop_reason="max_tokens"))
+    with pytest.raises(RuntimeError, match="max_tokens"):
+        client.create(response_model=VerdictOut, messages=_messages(), max_tokens=64)
+
+
+def test_anthropic_client_keeps_cache_breakpoints():
+    client, fake = _anthropic_client("claude-opus-5-5", _Parsed(VerdictOut(verdict="supported")))
+    blocks = [
+        {"type": "text", "text": "EVIDENCE", "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": "claims"},
+    ]
+    messages = [{"role": "system", "content": "judge"}, {"role": "user", "content": blocks}]
+    client.create(response_model=VerdictOut, messages=messages, max_tokens=64)
+    assert fake.kwargs["messages"] == [{"role": "user", "content": blocks}]
+
+
+def test_anthropic_client_reports_usage_through_call():
+    response = _Parsed(VerdictOut(verdict="supported"))
+    response.usage = types.SimpleNamespace(
+        input_tokens=10, output_tokens=3, cache_read_input_tokens=0, cache_creation_input_tokens=0
+    )
+    client, _ = _anthropic_client("claude-opus-5-5", response)
+    usage = Usage()
+    with metering(usage):
+        call(system="s", user="u", output=VerdictOut, client=client)
+    assert usage.calls == 1
+    assert usage.input_tokens == 10
+    assert usage.output_tokens == 3

@@ -21,7 +21,34 @@ All notable changes to `agent-attest` are documented here. This project follows
 - `attest run --max-calls/--max-tokens/--cache-dir`, with a usage line (or `usage` in `--json`);
   exits with code 2 when the budget stops a run.
 - Opt-in real-LLM integration tests behind the `integration` marker and `ATTEST_INTEGRATION=1`.
-
+- `Attest.review(pr, outputs)` and `attest.code_review.review(...)` check and gate every output of
+  a code review in one call. The result, `ReviewResult`, has one `OutputDecision` per output
+  (`text`, `keep`, `mode`, `score`, `reasons`, `notes`, `omissions`), plus the guidelines used,
+  `kept`, `dropped` and `filter()`. Outputs without their own diffs use the pull request's.
+- Team review rules: pass `guidelines="REVIEW.md"` (or several files, or markdown text) to
+  `review()`. Each list item in the markdown is a rule. The rules are added to every output's
+  evidence, so an issue that cites one can be graded, and a new `guidelines` check drops any output
+  that breaks a rule (`breaks_guideline`). An output that only leaves out something a rule asks
+  for is kept with a `misses_guideline` note. Each finding must quote the output exactly, and each
+  break is confirmed by a second call that asks separately whether the output reports, approves or
+  itself does what the rule forbids; reporting rule-breaking code is never a break.
+  `follow_guidelines=False` turns the check off. Without guidelines, outputs are checked for
+  faithfulness only, and attest's own reviewer follows a built-in general standard.
+- attest can write the review itself: `Attest.write_review(pr, guidelines=...)`, or `review(pr)`
+  with no outputs, produces issues, one summary per changed file and an overview, then checks them
+  like any reviewer's output. It always follows the general standard as a baseline; team rules add
+  to it and win where they conflict.
+- `attest review FILE` reads `{"pr": ..., "outputs": [...]}` and prints one decision per output.
+  Leave out `outputs` to have attest write the review. `--guidelines/-g PATH` (repeatable) passes
+  review rules, `--no-follow` skips the rule check, and `--mode TYPE=MODE` overrides a gate mode.
+- `attest.render(result)` and `attest.show(result)` turn any `Report`, `CheckResult`,
+  `ReviewResult` or `GateDecision` into a structured view: a status line, a summary table, and
+  aligned findings with reasons and evidence.
+- `--json` on `stats`, `models` and `demo`, so every command can emit JSON.
+- `answer_kind` accepts `"code"` and `"auto"`. `"auto"` picks the grading standard from the run
+  and records the choice in the report metadata.
+- Two new default injection detectors: hidden Unicode (bidi controls, zero-width and tag
+  characters) and encoded payloads (base64 and hex that decode to instructions).
 ### Changed
 - Faithfulness and tool-choice prompts put the shared evidence before the per-call text;
   `PROMPT_VERSION` is now `2026.10.29`.
@@ -39,12 +66,62 @@ All notable changes to `agent-attest` are documented here. This project follows
 - `Severity` is a `StrEnum`, so `str(Severity.PASS)` is `"pass"`.
 - `Trajectory.tool_calls()` returns `IndexedToolCall(step, call)` named tuples; unpacking still works.
 - Tests live next to their modules as `<module>_test.py`; ruff and strict pyright are configured.
-
+- **Breaking:** `Report.overall_score` is `None` when no check produced a score, instead of 1.0.
+- **Breaking:** `Trajectory.evidence()` wraps each tool call in a
+  `<tool_output index=... name=... arguments=...>` block and escapes any such tag inside an output.
+  Before, blocks were plain `[i] name(args) -> output` lines, so a tool output (a web page, a file,
+  a diff) could fake another tool's result. Every model call is told how the blocks work.
+  `PROMPT_VERSION` is now `2026.10.30`.
+- Every command's terminal output now uses the same structured layout.
+- `GateDecision` splits its findings: `reasons` are what dropped the output, and `notes` are
+  findings shown alongside it that didn't, such as a suspicious hit or a compromised finding
+  that affected a different output.
+- A payload or suspicious hit in the pull request's title, description or commit messages now
+  applies to every output. Before, no output matched its location, so it never dropped or noted
+  anything.
+- `review()` raises `ValueError` for a `diff_summary` with no diffs of its own when the pull
+  request changes several files, since a summary describes one file.
+- `ReviewResult.warnings` flags a pull request that changes the file its review rules were
+  loaded from.
+- `attest run`'s `mean_overall_score` leaves out reports with no overall score.
+- `python -m attest.cli` works again after the CLI became a package.
+- The code injection summary lists only the verdicts found, e.g. "3 hits: 1 payload, 2 suspicious."
+- The `code` answer kind's verifier reads a `read_guidelines` evidence step as the team's rules:
+  authoritative about what the team requires, never about what the code does.
+- The claim extractor keeps an answer's bottom line as its own claim and receives the task as
+  context, so a conclusion can't be reworded to fit the agent's own justification.
+- Anthropic grading now uses native structured outputs (`messages.parse`) instead of instructor's
+  forced tool call, so Claude 5.5-generation models such as `claude-sonnet-5-5` work.
+- Sampling parameters are sent only to Anthropic models that accept them (Claude 4.6 and older);
+  Claude Opus 4.7+ and the Claude 5 family run without `temperature`.
+- Dependency bounds: `anthropic>=0.77,<2` and `instructor>=1.15.3,<2`.
+- Added `claude-opus-5-5`, `claude-sonnet-5-5`, and `claude-haiku-5-5` to the curated Anthropic
+  model list.
 ### Fixed
 - `attest demo` no longer crashes when the grounding score is unavailable.
 - Hard provider errors (auth, billing, bad request) are no longer retried as "empty responses":
   `call` raises the provider's own error after one attempt instead of three retries ending in a
   misleading "no parseable content" message. Empty candidates and unparseable output still retry.
+- An answer whose claims were all unverifiable scored 100% ("0/0 grounded"). It now has no score
+  and says none of its claims could be checked.
+- Fresh installs that resolve `anthropic` 1.x and `instructor` 1.17 no longer fail every LLM call
+  with `Messages.create() got an unexpected keyword argument 'temperature'`.
+- A `.env` file in the working directory (or a parent) is now read by both the library and the
+  CLI, but only for provider API keys that aren't already set. Other variables in it, such as a
+  base URL that would redirect your key, are ignored.
+- Terminal output shows control and bidi characters from tool outputs as visible escapes, so
+  untrusted text can't clear the screen, hide lines, change colors or write to the clipboard.
+- Duplicate keys in policy YAML are caught after YAML resolves them, so `true:` and `True:` no
+  longer overwrite each other silently.
+- Diff parsing keeps every line inside a hunk as content, so an added line shaped like a file
+  header can't start a fake file and hide later lines from the injection scan.
+- A `@generated` marker or a very long line added by the pull request no longer hides that file
+  from the grader and the reviewer.
+- Code injection scanning: a quoted "example" no longer discounts a high-confidence payload
+  outside test and doc files; hitting a match or decode cap marks coverage incomplete; and the
+  shell, Ruby, PHP, Java and Rust lexers recognise comment and string forms they used to miss.
+- Scans that could take quadratic time on crafted input (hex runs, Python docstrings, unclosed
+  HTML comments in review rules) are now linear.
 
 ## [0.7.0] - 2026-08-13
 

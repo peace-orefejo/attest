@@ -6,6 +6,7 @@ from collections.abc import Callable, Sequence
 from functools import partial
 
 from ..checks.injection import check_injection
+from ..checks.profiles import SUPPORTED_ANSWER_KINDS, resolve_answer_kind
 from ..checks.role import check_role_adherence
 from ..checks.tool_use import check_tool_use
 from ..checks.verify import (
@@ -21,7 +22,6 @@ from ..trajectory import Trajectory
 
 DEFAULT_CHECKS = ("faithfulness", "tool_use")
 SUPPORTED_CHECKS = ("faithfulness", "tool_use", "injection", "role")
-SUPPORTED_ANSWER_KINDS = ("factual", "plan")
 
 
 def validate_evaluation_options(checks: Sequence[str], answer_kind: str) -> tuple[str, ...]:
@@ -59,18 +59,26 @@ def evaluate(
     """
     Run the chosen checks and return one Report. `checks` picks any of
     "faithfulness", "tool_use", "injection", "role" (default: faithfulness + tool_use).
+    `answer_kind` is "factual", "plan", "code" or "auto"; "auto" picks factual or code
+    from the tool evidence and records the choice in the report metadata.
     Faithfulness/role and injection's `deep` pass need an API key; the tool-use and
     shallow-injection paths do not. `max_claims` caps how many claims faithfulness checks.
     """
     selected = validate_evaluation_options(checks, answer_kind)
+    resolved = resolve_answer_kind(traj, answer_kind)
 
-    verifier: VerifyFn = verify or partial(verify_claims, answer_kind=answer_kind)
+    extractor: ExtractFn = (
+        partial(extract_claims, answer_kind=resolved.kind, task=traj.task)
+        if extract is extract_claims
+        else extract
+    )
+    verifier: VerifyFn = verify or partial(verify_claims, answer_kind=resolved.kind)
 
     runners: dict[str, Callable[[], CheckResult]] = {
-        "faithfulness": lambda: judge_trajectory(traj, extract, verifier, max_claims=max_claims),
+        "faithfulness": lambda: judge_trajectory(traj, extractor, verifier, max_claims=max_claims),
         "tool_use": lambda: check_tool_use(traj, appropriate=appropriate),
         "injection": lambda: check_injection(traj, deep=deep),
         "role": lambda: check_role_adherence(traj),
     }
     results: list[CheckResult] = [runners[c]() for c in selected]
-    return Report(results=results)
+    return Report(results=results, metadata=resolved.metadata)

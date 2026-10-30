@@ -9,16 +9,15 @@ from pydantic import BaseModel
 
 from ..llm import BudgetExceeded, call
 from ..prompts.faithfulness import (
-    EXTRACT_SYSTEM,
     batch_system,
     claims_user,
     evidence_prefix,
     extract_user,
-    verify_system,
     verify_user,
 )
 from ..results import CheckResult, Finding, Severity
 from ..trajectory import Trajectory
+from .profiles import get_profile
 
 ClaimVerdict = Literal["supported", "unsupported", "unverifiable"]
 
@@ -75,31 +74,46 @@ def judge_trajectory(
     supported = sum(finding.verdict == "supported" for finding in findings)
     unsupported = sum(finding.verdict == "unsupported" for finding in findings)
     checkable = supported + unsupported
-    summary = f"{supported}/{checkable} checkable claims grounded."
+    unscorable = bool(findings) and not checkable
+    summary = _faithfulness_summary(supported, checkable, len(findings))
     if capped:
         summary += f" (checked the first {max_claims} claims)"
     return CheckResult(
         check="faithfulness",
         passed=unsupported == 0,
-        score=supported / checkable if checkable else 1.0,
+        score=None if unscorable else (supported / checkable if checkable else 1.0),
         summary=summary,
         findings=findings,
     )
 
 
-def extract_claims(final_answer: str) -> list[str]:
-    """Split a final answer into atomic, individually-checkable factual claims."""
+def _faithfulness_summary(supported: int, checkable: int, total: int) -> str:
+    if total and not checkable:
+        return f"None of the {total} claims could be checked against the evidence."
+    return f"{supported}/{checkable} checkable claims grounded."
+
+
+def extract_claims(
+    final_answer: str, *, answer_kind: str = "factual", task: str | None = None
+) -> list[str]:
+    """Split a final answer into atomic, individually-checkable claims for `answer_kind`.
+
+    `task` is the request the answer responds to. It is used only to make claims
+    self-contained, never as a source of claims.
+    """
+    system = get_profile(answer_kind).extract_prompt
     if not final_answer.strip():
         return []
-    return call(system=EXTRACT_SYSTEM, user=extract_user(final_answer), output=ClaimsOut).claims
+    return call(system=system, user=extract_user(final_answer, task), output=ClaimsOut).claims
 
 
 def grounded_verifier(claim: str, evidence: str, *, answer_kind: str = "factual") -> Finding:
     """Decide whether `evidence` entails one `claim`. Sees no agent reasoning."""
+    system = get_profile(answer_kind).verify_prompt
     if not evidence.strip():
         return _unverifiable(claim, _NO_EVIDENCE_REASON)
     out = call(
-        system=verify_system(answer_kind),
+        system=system,
         user=verify_user(claim, evidence),
         output=VerdictOut,
     )
@@ -114,6 +128,7 @@ def verify_claims(
     batch_size: int = BATCH_SIZE,
 ) -> list[Finding]:
     """Verify many claims against the evidence in batched calls (one call per batch)."""
+    system = batch_system(get_profile(answer_kind).verify_prompt)
     if not claims:
         return []
     if not evidence.strip():
@@ -122,14 +137,14 @@ def verify_claims(
     findings: list[Finding] = []
     for start in range(0, len(claims), batch_size):
         batch = claims[start : start + batch_size]
-        findings.extend(_verify_batch(batch, evidence, answer_kind, shared=shared))
+        findings.extend(_verify_batch(batch, evidence, system, shared=shared))
     return findings
 
 
 def _verify_batch(
-    batch: list[str], evidence: str, answer_kind: str, *, shared: bool = False
+    batch: list[str], evidence: str, system: str, *, shared: bool = False
 ) -> list[Finding]:
-    verdicts = _batch_verdicts(batch, evidence, answer_kind, shared=shared)
+    verdicts = _batch_verdicts(batch, evidence, system, shared=shared)
     findings: list[Finding] = []
     for number, claim in enumerate(batch, start=1):
         verdict = verdicts.get(number)
@@ -143,11 +158,11 @@ def _verify_batch(
 
 
 def _batch_verdicts(
-    batch: list[str], evidence: str, answer_kind: str, *, shared: bool
+    batch: list[str], evidence: str, system: str, *, shared: bool
 ) -> dict[int, _ClaimVerdict]:
     try:
         out = call(
-            system=batch_system(answer_kind),
+            system=system,
             prefix=evidence_prefix(evidence),
             user=claims_user(batch),
             output=_BatchOut,

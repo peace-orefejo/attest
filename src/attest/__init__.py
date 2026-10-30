@@ -14,8 +14,9 @@ from .checks.role import check_role_adherence
 from .checks.tool_use import check_tool_use
 from .checks.verify import extract_claims, grounded_verifier, judge_trajectory, verify_claims
 from .content import Artifact, Detection, TextSegment
+from .display import render, show
 from .extraction import ExtractionLimits, ExtractionOutcome, extract_artifact
-from .llm import Budget, BudgetExceeded, DiskCache, Usage
+from .llm import Budget, BudgetExceeded, DiskCache, LLMClient, Usage
 from .policy import EvaluationPolicy, EvaluationRule, check_policy, load_policy
 from .providers import default_model, list_models
 from .providers import providers as list_providers
@@ -40,6 +41,7 @@ __all__ = [
     "ExtractionOutcome",
     "Finding",
     "JudgeVerdict",
+    "LLMClient",
     "Proportion",
     "RegexDetector",
     "RegexPattern",
@@ -67,6 +69,8 @@ __all__ = [
     "load_policy",
     "load_regex_detector",
     "naive_judge",
+    "render",
+    "show",
     "verify_claims",
     "wilson_interval",
 ]

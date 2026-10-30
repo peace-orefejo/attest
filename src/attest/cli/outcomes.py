@@ -31,9 +31,9 @@ class RunOutcome(BaseModel):
 
     @property
     def mean_overall_score(self) -> float | None:
-        if not self.reports:
-            return None
-        return sum(r.report.overall_score for r in self.reports) / len(self.reports)
+        scores = [r.report.overall_score for r in self.reports]
+        scored = [score for score in scores if score is not None]
+        return sum(scored) / len(scored) if scored else None
 
     def to_json(self) -> JsonObject:
         return {

@@ -4,18 +4,21 @@ from __future__ import annotations
 
 import contextlib
 import os
-from collections.abc import Generator, Sequence
+from collections.abc import Generator, Mapping, Sequence
 from contextlib import AbstractContextManager
-
-import instructor
 
 from .checks.injection import DEFAULT_DETECTORS, InjectionDetector, check_injection
 from .checks.judge_baseline import JudgeVerdict, naive_judge
 from .checks.role import check_role_adherence
 from .checks.tool_use import check_tool_use
 from .checks.verify import MAX_CLAIMS, ExtractFn, VerifyFn, extract_claims
+from .code_review import EvidenceLimits, PullRequest, ReviewOutput, ReviewResult
+from .code_review import review as review_outputs
+from .code_review import write_review as write_pr_review
+from .code_review.guidelines import GuidelinesInput
+from .code_review.models import GateMode
 from .extraction import ExtractionLimits
-from .llm import Budget, DiskCache, Usage, metering, using, using_cache
+from .llm import Budget, DiskCache, LLMClient, Usage, metering, using, using_cache
 from .llm.response_cache import ResponseStore
 from .policy import EvaluationPolicy, PolicyInput, check_policy, load_policy
 from .providers import DEFAULT_PROVIDER, build_client, default_model, list_models, providers
@@ -37,7 +40,7 @@ class Attest:
         *,
         provider: str = DEFAULT_PROVIDER,
         model: str | None = None,
-        client: instructor.Instructor | None = None,
+        client: LLMClient | None = None,
         policy: PolicyInput = None,
         enforce_policy: bool = True,
         cache: CacheOption = False,
@@ -88,6 +91,50 @@ class Attest:
                 report.metadata.update(self.policy_identity())
         report.metadata["usage"] = self.usage.since(before).as_dict()
         return report
+
+    def review(
+        self,
+        pr: PullRequest,
+        outputs: Sequence[ReviewOutput] | None = None,
+        *,
+        guidelines: GuidelinesInput = None,
+        follow_guidelines: bool = True,
+        modes: Mapping[str, GateMode] | None = None,
+        deep: bool = True,
+        limits: EvidenceLimits | None = None,
+        answer_kind: str = "code",
+    ) -> ReviewResult:
+        """Check every output of a code review and decide which to keep, in one call.
+
+        Pass `guidelines` (markdown paths or text) to use the team's review rules; without them
+        the built-in general standard applies. With no `outputs`, attest writes the review itself.
+        """
+
+        def grade(run: Trajectory) -> Report:
+            return self.evaluate(run, checks=("faithfulness",), answer_kind=answer_kind)
+
+        with self._llm_context():
+            return review_outputs(
+                pr,
+                outputs,
+                evaluate=grade,
+                guidelines=guidelines,
+                follow_guidelines=follow_guidelines,
+                modes=modes,
+                deep=deep,
+                limits=limits,
+            )
+
+    def write_review(
+        self,
+        pr: PullRequest,
+        *,
+        guidelines: GuidelinesInput = None,
+        limits: EvidenceLimits | None = None,
+    ) -> list[ReviewOutput]:
+        """Write a review of the pull request without checking it: issues, summaries, overview."""
+        with self._llm_context():
+            return write_pr_review(pr, guidelines=guidelines, limits=limits)
 
     def policy_check(self, traj: Trajectory) -> CheckResult:
         """Evaluate the instance policy directly without running the standard checks."""
@@ -160,13 +207,13 @@ class Attest:
             return contextlib.nullcontext()
         return self._scoped_llm(self._resolved_client())
 
-    def _resolved_client(self) -> instructor.Instructor:
+    def _resolved_client(self) -> LLMClient:
         if self._client is None:
             self._client = build_client(self.provider, self.model, self._key)
         return self._client
 
     @contextlib.contextmanager
-    def _scoped_llm(self, client: instructor.Instructor) -> Generator[None, None, None]:
+    def _scoped_llm(self, client: LLMClient) -> Generator[None, None, None]:
         with contextlib.ExitStack() as stack:
             stack.enter_context(using(client))
             stack.enter_context(metering(self.usage, self.budget))

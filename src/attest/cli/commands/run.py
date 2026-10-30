@@ -10,8 +10,8 @@ from ...scoring.report import DEFAULT_CHECKS, validate_evaluation_options
 from ..context import require_key
 from ..evaluation import EvaluationSettings, evaluate_all
 from ..loading import load_trajectories
-from ..options import JSON_OPTION, MODEL_OPTION, PROVIDER_OPTION
-from ..rendering import emit_json, render_run_summary, render_task_report
+from ..options import JSON_OPTION, KIND_OPTION, MODEL_OPTION, PROVIDER_OPTION
+from ..rendering import ReportPrinter, emit_json, render_run_summary
 
 
 def run(
@@ -24,11 +24,7 @@ def run(
     appropriate: bool = typer.Option(
         False, "--appropriate", help="Also run the LLM tool-choice check (1 call per tool call)."
     ),
-    kind: str = typer.Option(
-        "factual",
-        "--kind",
-        help="Answer type: 'factual' (default) or 'plan' (judge fidelity to the plan).",
-    ),
+    kind: str = KIND_OPTION,
     provider: str = PROVIDER_OPTION,
     model: str | None = MODEL_OPTION,
     json_output: bool = JSON_OPTION,
@@ -46,8 +42,6 @@ def run(
     selected = _selected_checks(checks, kind)
     require_key(provider)
     trajectories = load_trajectories(path)
-    if not json_output:
-        typer.echo(f"Loaded {len(trajectories)} trajectory(ies) from {path}\n")
 
     judge = Attest(
         provider=provider,
@@ -56,7 +50,7 @@ def run(
         cache=cache_dir or False,
     )
     settings = EvaluationSettings(checks=selected, appropriate=appropriate, kind=kind)
-    on_report = None if json_output else render_task_report
+    on_report = None if json_output else ReportPrinter()
     outcome = evaluate_all(judge, trajectories, settings, on_report=on_report)
 
     if json_output:

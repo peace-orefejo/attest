@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterable
-from typing import Protocol, runtime_checkable
+from functools import lru_cache
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import instructor
+from dotenv import dotenv_values, find_dotenv
 from pydantic import BaseModel, ConfigDict
 
 from .utils.imports import load_callable
+
+if TYPE_CHECKING:
+    from .llm.protocol import LLMClient
 
 DEFAULT_PROVIDER = "anthropic"
 
@@ -31,6 +36,9 @@ _REGISTRY: dict[str, _Provider] = {
         env_keys=("ANTHROPIC_API_KEY",),
         default_model="claude-haiku-4-5",
         models=(
+            "claude-opus-5-5",
+            "claude-sonnet-5-5",
+            "claude-haiku-5-5",
             "claude-opus-5",
             "claude-sonnet-5",
             "claude-opus-4-8",
@@ -81,9 +89,26 @@ def curated_models(provider: str) -> list[str]:
     return list(_spec(provider).models)
 
 
+@lru_cache(maxsize=1)
+def load_env() -> None:
+    """Load provider API keys from a `.env` in the working directory (or a parent).
+
+    Only the provider key variables are read, and real environment variables always win, so an
+    untrusted repository's `.env` cannot redirect API traffic (e.g. via a base-URL variable).
+    """
+    path = find_dotenv(usecwd=True)
+    if not path:
+        return
+    wanted = {name for spec in _REGISTRY.values() for name in spec.env_keys}
+    for name, value in dotenv_values(path).items():
+        if name in wanted and value and not os.getenv(name):
+            os.environ[name] = value
+
+
 def resolve_key(provider: str, key: str | None = None) -> str | None:
     if key:
         return key
+    load_env()
     for env in _spec(provider).env_keys:
         value = os.getenv(env)
         if value:
@@ -95,11 +120,18 @@ def build_client(
     provider: str = DEFAULT_PROVIDER,
     model: str | None = None,
     key: str | None = None,
-) -> instructor.Instructor:
-    """Build an instructor client for `provider`/`model`, key from arg or env."""
+) -> LLMClient:
+    """Build a structured-output client for `provider`/`model`, key from arg or env.
+
+    Anthropic uses its native structured outputs; the other providers go through instructor.
+    """
     spec = _spec(provider)
     model = model or spec.default_model
     resolved = resolve_key(provider, key)
+    if provider == "anthropic":
+        from .llm.anthropic_client import AnthropicClient
+
+        return AnthropicClient(model, resolved)
     target = f"{spec.prefix}/{model}"
     if resolved:
         return instructor.from_provider(target, api_key=resolved)
@@ -123,20 +155,24 @@ def _supports_generation(model: object) -> bool:
 
 
 @runtime_checkable
-class _GeminiModels(Protocol):
+class _ModelListing(Protocol):
     def list(self) -> Iterable[object]: ...
 
 
 @runtime_checkable
-class _GeminiClient(Protocol):
-    models: _GeminiModels
+class _ModelsClient(Protocol):
+    models: _ModelListing
 
 
-def _gemini_client(key: str) -> _GeminiClient:
-    client = load_callable("google.genai", "Client")(api_key=key)
-    if not isinstance(client, _GeminiClient):
-        raise TypeError("google.genai.Client did not return a client with a models listing.")
+def _sdk_client(module: str, attribute: str, key: str) -> _ModelsClient:
+    client = load_callable(module, attribute)(api_key=key)
+    if not isinstance(client, _ModelsClient):
+        raise TypeError(f"{module}.{attribute} did not return a client with a models listing.")
     return client
+
+
+def _model_ids(models: Iterable[object]) -> list[str]:
+    return [model_id for model in models if isinstance(model_id := getattr(model, "id", None), str)]
 
 
 def fetch_models(provider: str, key: str | None = None) -> list[str]:
@@ -155,12 +191,10 @@ def fetch_models(provider: str, key: str | None = None) -> list[str]:
         return [m.id for m in Anthropic(api_key=resolved).models.list()]
 
     if provider == "openai":
-        from openai import OpenAI
-
-        return sorted(m.id for m in OpenAI(api_key=resolved).models.list())
+        return sorted(_model_ids(_sdk_client("openai", "OpenAI", resolved).models.list()))
 
     if provider == "gemini":
-        return _gemini_chat_models(_gemini_client(resolved).models.list())
+        return _gemini_chat_models(_sdk_client("google.genai", "Client", resolved).models.list())
 
     raise ValueError(f"Live model listing is not implemented for {provider!r}.")
 
