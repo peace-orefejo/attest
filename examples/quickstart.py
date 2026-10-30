@@ -48,7 +48,8 @@ def main() -> None:
     judge = Attest()
     report = judge.evaluate(trajectory)
 
-    print(f"overall score : {report.overall_score:.0%}")
+    overall = report.overall_score
+    print(f"overall score : {'—' if overall is None else f'{overall:.0%}'}")
     print(f"passed        : {report.passed}")
     print()
 
