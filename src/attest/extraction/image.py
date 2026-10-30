@@ -51,9 +51,9 @@ def _ocr_text(image: Image, timeout_seconds: int) -> str:
 
 
 def _barcode_parts(image: Image) -> ParsedParts:
-    import zxingcpp
-
     try:
+        import zxingcpp
+
         parts = [
             ExtractedPart(source_kind=f"image.qr[{index}]", text=barcode.text)
             for index, barcode in enumerate(zxingcpp.read_barcodes(image))

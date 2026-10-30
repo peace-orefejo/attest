@@ -10,7 +10,6 @@ from .image import image_parts
 from .limits import ExtractionLimits, ExtractionOutcome
 from .markup import html_parts, xml_parts
 from .parts import ExtractedPart, ParsedParts
-from .pdf import pdf_parts
 from .reading import read_artifact_bytes
 from .segments import bounded_segments, build_segment
 from .tabular import csv_parts, json_parts
@@ -105,6 +104,8 @@ def _parse_parts(raw: bytes, media: str, limits: ExtractionLimits) -> ParsedPart
     if media == "text/html":
         return html_parts(raw, limits.max_chars)
     if media == "application/pdf":
+        from .pdf import pdf_parts
+
         return pdf_parts(raw, limits)
     if media.startswith("image/"):
         return image_parts(raw, limits)

@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Callable, Hashable
-from typing import Literal, TypeVar, cast
+from typing import TYPE_CHECKING, Literal, TypeVar, cast
 
 import instructor
-from openai.types.chat import ChatCompletionMessageParam, ChatCompletionUserMessageParam
 from pydantic import BaseModel
 
 from ..prompts.guard import GUARD
@@ -15,6 +14,9 @@ from .budget import before_call, record_cache_hit, record_completion
 from .client import resolve_client
 from .errors import api_error, is_empty_response
 from .response_cache import cache_key, response_cache
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessageParam, ChatCompletionUserMessageParam
 
 T = TypeVar("T", bound=BaseModel)
 Reuse = Literal["prefix", "full"]
@@ -122,7 +124,7 @@ def _user_message(
     if getattr(client, "provider", None) != instructor.Provider.ANTHROPIC or reuse is None:
         return {"role": "user", "content": f"{prefix}\n\n{user}" if prefix else user}
     return cast(
-        ChatCompletionUserMessageParam,
+        "ChatCompletionUserMessageParam",
         {"role": "user", "content": _cached_blocks(prefix, user, reuse)},
     )
 
