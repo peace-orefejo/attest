@@ -1,5 +1,7 @@
 # Code review mode: architecture
 
+> **Layout note.** This design was written before the codebase cleanup. The shipped code keeps the same behaviour but uses the layout on the [architecture page](../architecture.md): there is no `core/` package (models stay in `trajectory.py`, `results.py` and `content.py`, model calls are in `llm/`), all prompts are in `prompts/`, and tests sit next to the code as `<module>_test.py`.
+
 Status: proposal. Branch: `feat/code-review-mode`.
 
 ## Summary

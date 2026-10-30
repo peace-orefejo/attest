@@ -3,8 +3,9 @@
 ![attest package layers](assets/diagrams/architecture.svg){ .diagram }
 
 attest is split into layers. Imports only point down: entry points use `display` and the
-features, features use `core` and `utils`, and `core` never imports anything above it. `tests/core/test_core_boundary.py`
-enforces this, so a feature can't quietly become a dependency of the foundation.
+features, and features use the shared foundation (the data models, `llm/`, `prompts/`) and
+`utils/`. The foundation never imports a feature, so a feature can't quietly become a
+dependency of everything else.
 
 ## Layers
 
@@ -19,7 +20,7 @@ the readable view used by `attest.show`, `attest.render` and the CLI.
 
 | Package | Job |
 |---|---|
-| `checks/` | Faithfulness (`verify.py`), tool use, role adherence and prompt injection. `profiles/` holds the prompts for each answer kind. |
+| `checks/` | Faithfulness (`verify.py`), tool use, role adherence and prompt injection. `profiles/` picks the grading standard for each answer kind. |
 | `code_review/` | Code review mode: the adapter from reviewer outputs to runs, evidence budgeting, the gate, injection checks for diffs, review guidelines (`guidelines/`), the one-call `review()` (`review/`), and attest's own reviewer (`writer/`). |
 | `policy/` | Project rules: models, loading from YAML or JSON, deterministic and semantic evaluation. |
 | `extraction/` | Bounded text extraction from PDFs, images, XML, CSV, HTML and JSON for the injection scan. |
@@ -30,8 +31,11 @@ the readable view used by `attest.show`, `attest.render` and the CLI.
 
 | Package | Job |
 |---|---|
-| `core/` | The data model (`Trajectory`, `Report`, `CheckResult`, `Finding`, `Artifact`), Wilson intervals, and `core/llm/`: providers, model catalog, clients and the structured `call()`. |
-| `utils/` | Pure helpers that know nothing about attest's types: unified-diff parsing, hidden-Unicode and encoded-payload scanning. |
+| Data models | `trajectory.py`, `results.py` and `content.py`: `Trajectory`, `Report`, `CheckResult`, `Finding`, `Artifact`. |
+| `providers.py` | The supported providers, their model lists and API keys, and building a client. |
+| `llm/` | The structured `call()` and `vote()`, the provider clients, response caching, and spend budgets. |
+| `prompts/` | Every prompt attest sends, one module per feature, with `PROMPT_VERSION` in `prompts/version.py`. |
+| `utils/` | Small stateless helpers shared across features: unified-diff parsing, hidden-Unicode and encoded-payload scanning, strict JSON and YAML loading. |
 
 ## Design rules
 
@@ -39,25 +43,30 @@ the readable view used by `attest.show`, `attest.render` and the CLI.
   deciding whether a claim is true.
 - **Untrusted text is data.** Anything an attacker could write reaches a judge only inside a
   bounded, escaped, clearly delimited block, framed as content to judge.
-- **Prompts are isolated per answer kind.** Each kind owns its prompts in `checks/profiles/`,
-  and tests pin the `factual` and `plan` prompts by SHA-256, so work on `code` can't change how
-  plain text is graded.
+- **Prompts live in one place.** All prompt text is in `prompts/`. Each answer kind has its own
+  module in `prompts/profiles/`, and tests pin the `factual` and `plan` prompts by SHA-256, so
+  work on `code` can't change how plain text is graded.
 - **Incomplete is not clean.** Content that couldn't be scanned or extracted, or a budget that
   ran out, is reported as incomplete coverage, never as a pass.
 - **Clients are lazy.** Deterministic checks never create an API client, so they run with no key.
 - **Small files.** Modules stay short and focused, grouped into feature folders. A file that
-  grows past a few hundred lines gets split.
+  grows past a couple of hundred lines gets split.
+- **Typed, structured values.** Data passed between steps is a Pydantic model, not a tuple or a
+  loose dict. The code passes strict pyright.
+- **Tests sit next to the code.** Each module's tests are in `<module>_test.py` beside it.
 
 ## Where things live
 
 | To change | Look in |
 |---|---|
-| How claims are extracted or verified | `checks/verify.py`, `checks/profiles/` |
+| How claims are extracted or verified | `checks/verify.py`, `checks/profiles/`, `prompts/profiles/` |
+| Any prompt text | `prompts/` |
 | The code review gate | `code_review/gate/` |
 | How review guidelines are parsed and checked | `code_review/guidelines/` |
 | How large diffs are cut | `code_review/evidence/` |
-| Injection patterns | `checks/injection/detectors/`, `checks/injection/packs/` |
-| Supported models | `core/llm/catalog.py` |
+| Injection patterns and detectors | `checks/injection/` |
+| Supported models | `providers.py` |
+| Model calls, caching and budgets | `llm/` |
 | CLI commands | `cli/commands/` |
 | How results are printed | `display/` |
 

@@ -28,5 +28,5 @@ catches subtler errors. Compare models on your own labeled runs before you switc
 
 ## Your own client
 
-Pass any object that implements the `LLMClient` protocol in `attest.core.llm` as `client=`, to
+Pass any object that implements the `LLMClient` protocol in `attest.llm` as `client=`, to
 route grading through your own gateway, cache or rate limiter.

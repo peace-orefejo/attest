@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 476" width="960" height="476" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" role="img" aria-labelledby="t d">
   <title id="t">attest package layers</title>
-  <desc id="d">Entry points at the top, then display, then feature packages, with core and utils at the bottom. Imports only point downward.</desc>
+  <desc id="d">Entry points at the top, then display, then feature packages, with the shared foundation (data models, llm, prompts) and utils at the bottom. Imports only point downward.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
@@ -48,8 +48,8 @@
 
     <text x="24" y="384" font-size="12" font-weight="700" fill="#64748b" font-family="ui-sans-serif, system-ui, sans-serif" letter-spacing="1">FOUNDATION</text>
     <rect x="24" y="396" width="676" height="68" rx="10" fill="#dcfce7" stroke="#86efac"/>
-    <text x="40" y="420" font-size="14" font-weight="700" fill="#14532d">core/</text>
-    <text x="40" y="442" font-size="12" fill="#166534">trajectory  results  content  stats  artifacts  llm/ (providers, clients, calls)</text>
+    <text x="40" y="420" font-size="14" font-weight="700" fill="#14532d">models · llm/ · prompts/</text>
+    <text x="40" y="442" font-size="12" fill="#166534">trajectory  results  content  providers  ·  llm/ (clients, calls, budget)  ·  prompts/</text>
     <rect x="712" y="396" width="224" height="68" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
     <text x="728" y="420" font-size="14" font-weight="700" fill="#0f172a">utils/</text>
     <text x="728" y="439" font-size="12" fill="#475569">diff  unicode_scan</text>

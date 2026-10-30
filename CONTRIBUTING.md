@@ -32,6 +32,8 @@ CI tests Python 3.11, 3.12 and 3.13 with only the core dependencies, and Python 
 ```bash
 uv run pytest -q
 GITHUB_ACTIONS=true uv run pytest -q        # the CLI forces color under Actions
+uvx ruff check src examples && uvx ruff format --check src examples
+uv run pyright                              # strict; can take a few minutes
 uv build && uvx twine check dist/*
 uv run --group docs mkdocs build --strict
 ```
@@ -51,27 +53,30 @@ The package is layered. Imports only point down:
 - **Entry points:** `api.py` and `cli/`.
 - **Display:** `display/`, which turns results into the readable view.
 - **Features:** `checks/`, `code_review/`, `policy/`, `extraction/`, `scoring/` and `adapters/`.
-- **Foundation:** `core/`, which holds the data model, stats and LLM plumbing, and `utils/`,
-  which holds pure helpers.
+- **Foundation:** the data models (`trajectory.py`, `results.py`, `content.py`),
+  `providers.py`, `llm/` for model calls, caching and budgets, and `prompts/` for every prompt.
+- **Helpers:** `utils/`, small stateless helpers shared by several features.
 
-`core` never imports from a feature package, and `tests/core/test_core_boundary.py` fails if it
-does. `utils` knows nothing about attest's types.
+The foundation never imports from a feature package.
 
 The [architecture page](https://peace-orefejo.github.io/attest/architecture/) says where each
 kind of change belongs.
 
 ## Rules for code
 
-- **Keep files small.** Aim for under 300 lines per module. Split a growing module into a
+- **Keep files small.** Aim for well under 200 lines per module. Split a growing module into a
   feature folder with focused files, and move generic helpers into `utils/`.
 - **Name things clearly instead of commenting.** Comments are rare in this codebase. Add one
   only when the code can't explain itself, such as a non-obvious constraint. Docstrings on
   public functions are welcome, since they appear in the API reference.
-- **Match the surrounding style.** Use `from __future__ import annotations`, Pydantic models for
-  data that crosses a boundary, and dataclasses for internal values.
+- **Read top-down.** Entry functions tell the story in a few calls and return early on guard
+  cases. Helpers are small, stateless and do one thing.
+- **Use typed, structured values.** Use `from __future__ import annotations` and Pydantic models
+  rather than dataclasses, tuples or loose dicts. Use built-in generics and `X | None`. Avoid
+  `Any` and `# type: ignore`; the code must pass strict pyright.
+- **Put prompts in `prompts/`.** Never write prompt text inline in a feature module.
 - **Keep the public API stable.** Anything exported from `attest` or `attest.code_review` is
-  public. Old import paths such as `attest.trajectory` still work through shims, and
-  `tests/core/test_legacy_module_attributes.py` keeps them working.
+  public, as are module paths such as `attest.trajectory` and `attest.checks.injection`.
 - **Never trust what the agent says.** A check must judge against tool outputs, never the
   agent's reasoning.
 - **Treat untrusted text as data.** Text from tool outputs, artifacts or diffs reaches a judge
@@ -79,18 +84,19 @@ kind of change belongs.
 - **Don't report incomplete coverage as clean.** If content couldn't be scanned or a budget
   ran out, say so in the result.
 - **Guard optional dependencies.** Import `pypdf`, `PIL`, `pytesseract`, `zxingcpp`,
-  `defusedxml`, `openai` and `google-genai` inside a `try` and degrade gracefully.
+  `defusedxml` and `google-genai` only inside the function that needs them, and degrade
+  gracefully when they're missing. `import attest` must work with only the core dependencies.
 
 ## Changing prompts
 
-Grading prompts live in `src/attest/checks/profiles/`, one module per answer kind. Tests in
-`tests/checks/test_profiles.py` pin the `factual` and `plan` prompts by SHA-256, so editing one
-kind can't silently change another.
+All prompts live in `src/attest/prompts/`. Grading prompts are in `prompts/profiles/`, one module
+per answer kind. `prompts/profiles/profiles_test.py` pins the `factual` and `plan` prompts by
+SHA-256, so editing one kind can't silently change another.
 
 If you change a prompt on purpose:
 
 1. Update its pinned hash in the test, and say why in your pull request.
-2. Bump `PROMPT_VERSION` in `src/attest/core/results.py`.
+2. Bump `PROMPT_VERSION` in `src/attest/prompts/version.py`.
 3. Rerun the relevant eval and include the before and after numbers. For code review prompts:
 
    ```bash
@@ -100,11 +106,13 @@ If you change a prompt on purpose:
 ## Tests
 
 - Every change needs tests, and they must run offline. Stub model calls by passing fake
-  `extract` or `verify` functions, or by monkeypatching `call`. See `tests/test_verify.py`.
-- Mirror the source layout. Tests for `src/attest/code_review/` go in `tests/code_review/`,
-  and tests for `src/attest/checks/injection/` go in `tests/checks/injection/`.
-- Labeled cases live in `tests/fixtures/`. Add a case when you fix a grading mistake, so it
-  stays fixed.
+  `extract` or `verify` functions, or by monkeypatching `call`. See
+  `src/attest/checks/verify_test.py`.
+- Put tests next to the code. Tests for `src/attest/foo/bar.py` go in
+  `src/attest/foo/bar_test.py`. The built package leaves test files out.
+- Labeled cases live in a `fixtures/` folder next to the tests that use them, such as
+  `src/attest/code_review/fixtures/`. Add a case when you fix a grading mistake, so it stays
+  fixed.
 
 ## Docs
 

@@ -120,3 +120,4 @@ nav:
   - Design notes:
       - Code review mode: design/code-review-mode.md
       - Injection roadmap: design/injection-roadmap.md
+      - Async batches and cost: design/async-cost.md
