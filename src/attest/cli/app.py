@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import typer
-from dotenv import load_dotenv
 
-from .commands import demo, injection, models, role, run, stats, tools
+from .. import providers
+from .commands import COMMANDS
 
-load_dotenv()
 app = typer.Typer(help="Evidence-grounded evaluation for AI agent trajectories.")
 
-for command in (stats, tools, injection, role, run, demo, models):
+
+@app.callback()
+def _load_workspace_env() -> None:
+    providers.load_env()
+
+
+for command in COMMANDS:
     app.command()(command)

@@ -14,3 +14,12 @@ MODEL_OPTION = typer.Option(
     None, "--model", "-m", help="Model id; defaults to a sensible model for the provider."
 )
 JSON_OPTION = typer.Option(False, "--json", help="Emit machine-readable JSON.")
+KIND_OPTION = typer.Option(
+    "factual",
+    "--kind",
+    help=(
+        "Answer type: 'factual' (default), 'plan' (judge fidelity to the plan), "
+        "'code' (judge against diffs and source), or 'auto' (pick factual or code "
+        "from the evidence)."
+    ),
+)

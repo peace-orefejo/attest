@@ -7,15 +7,13 @@ import os
 from collections.abc import Generator, Sequence
 from contextlib import AbstractContextManager
 
-import instructor
-
 from .checks.injection import DEFAULT_DETECTORS, InjectionDetector, check_injection
 from .checks.judge_baseline import JudgeVerdict, naive_judge
 from .checks.role import check_role_adherence
 from .checks.tool_use import check_tool_use
 from .checks.verify import MAX_CLAIMS, ExtractFn, VerifyFn, extract_claims
 from .extraction import ExtractionLimits
-from .llm import Budget, DiskCache, Usage, metering, using, using_cache
+from .llm import Budget, DiskCache, LLMClient, Usage, metering, using, using_cache
 from .llm.response_cache import ResponseStore
 from .policy import EvaluationPolicy, PolicyInput, check_policy, load_policy
 from .providers import DEFAULT_PROVIDER, build_client, default_model, list_models, providers
@@ -37,7 +35,7 @@ class Attest:
         *,
         provider: str = DEFAULT_PROVIDER,
         model: str | None = None,
-        client: instructor.Instructor | None = None,
+        client: LLMClient | None = None,
         policy: PolicyInput = None,
         enforce_policy: bool = True,
         cache: CacheOption = False,
@@ -160,13 +158,13 @@ class Attest:
             return contextlib.nullcontext()
         return self._scoped_llm(self._resolved_client())
 
-    def _resolved_client(self) -> instructor.Instructor:
+    def _resolved_client(self) -> LLMClient:
         if self._client is None:
             self._client = build_client(self.provider, self.model, self._key)
         return self._client
 
     @contextlib.contextmanager
-    def _scoped_llm(self, client: instructor.Instructor) -> Generator[None, None, None]:
+    def _scoped_llm(self, client: LLMClient) -> Generator[None, None, None]:
         with contextlib.ExitStack() as stack:
             stack.enter_context(using(client))
             stack.enter_context(metering(self.usage, self.budget))
