@@ -32,6 +32,8 @@ theme:
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
+  logo: assets/brand/attest-mark.svg
+  favicon: assets/brand/attest-mark.svg
   icon:
     repo: fontawesome/brands/github
 
