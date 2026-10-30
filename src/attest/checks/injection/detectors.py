@@ -125,6 +125,3 @@ def _compile(pattern: RegexPattern) -> _CompiledPattern:
     except regex.error as exc:
         raise ValueError(f"Invalid regex pattern {pattern.name!r}: {exc}") from exc
     return _CompiledPattern(spec=pattern, compiled=compiled)
-
-
-DEFAULT_DETECTORS: tuple[InjectionDetector, ...] = (RegexDetector(),)

@@ -3,6 +3,12 @@ from __future__ import annotations
 from ...content import Detection, TextSegment
 from ...results import Finding, Severity
 
+DEFAULT_REASON = "Untrusted content contains instruction-like text."
+DETECTOR_REASONS = {
+    "unicode": "Untrusted content contains hidden or look-alike Unicode characters.",
+    "encoded": "Untrusted content contains encoded text that decodes to instruction-like text.",
+}
+
 
 def detection_finding(detection: Detection) -> Finding:
     return Finding(
@@ -11,7 +17,7 @@ def detection_finding(detection: Detection) -> Finding:
         subject=detection.subject,
         step=detection.step,
         evidence=detection.matched_text,
-        reason="Untrusted content contains instruction-like text.",
+        reason=DETECTOR_REASONS.get(detection.detector, DEFAULT_REASON),
         metadata={
             **detection.metadata,
             "detector": detection.detector,

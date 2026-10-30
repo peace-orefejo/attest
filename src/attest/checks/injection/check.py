@@ -8,7 +8,8 @@ from ...trajectory import Trajectory
 from .coverage import ArtifactEntry, artifact_entries, bound_scan_segments, collect_segments
 from .coverage_findings import extraction_findings, scan_limit_findings
 from .deep import DeepOutcome, run_deep_check
-from .detectors import DEFAULT_DETECTORS, InjectionDetector
+from .defaults import DEFAULT_DETECTORS
+from .detectors import InjectionDetector
 from .scanning import run_detectors
 from .summary import result_metadata, summarize
 
