@@ -42,7 +42,8 @@ an execution) is outside what attest does today.
   whether attest graded each run correctly.
 - An inconclusive faithfulness result (claims that couldn't be checked) is `review`, not `pass`,
   by default. A `pass` means attest found nothing wrong in what it could check, not that
-  everything was checked; `metadata["claims_checked"]` and `claims_total` say how much was.
+  everything was checked; `metadata["claims_checked"]` and `claims_total` say how much was, and
+  `VerdictPolicy(min_claim_coverage=...)` sends low-coverage runs to review.
 
 ## Using results safely
 

@@ -38,7 +38,7 @@ def disposition_for(check: str, finding: Finding, policy: VerdictPolicy) -> Disp
 
 
 def _dispose_result(result: CheckResult, policy: VerdictPolicy) -> CheckResult:
-    below_floor = _below_min_score(result, policy)
+    below_floor = _below_min_score(result, policy) or _below_min_coverage(result, policy)
     inconclusive = _inconclusive_faithfulness(result)
     findings: list[Finding] = []
     for finding in result.findings:
@@ -56,6 +56,22 @@ def _inconclusive_faithfulness(result: CheckResult) -> bool:
     if result.check != "faithfulness" or not result.findings:
         return False
     return all(finding.verdict == "unverifiable" for finding in result.findings)
+
+
+def _below_min_coverage(result: CheckResult, policy: VerdictPolicy) -> bool:
+    floor = policy.min_claim_coverage
+    if floor is None or result.check != "faithfulness":
+        return False
+    coverage = claim_coverage(result)
+    return coverage is not None and coverage < floor
+
+
+def claim_coverage(result: CheckResult) -> float | None:
+    """Share of the answer's claims checked against the evidence, or None if it made none."""
+    checked, total = result.metadata.get("claims_checked"), result.metadata.get("claims_total")
+    if not isinstance(checked, int) or not isinstance(total, int) or total == 0:
+        return None
+    return checked / total
 
 
 def _below_min_score(result: CheckResult, policy: VerdictPolicy) -> bool:

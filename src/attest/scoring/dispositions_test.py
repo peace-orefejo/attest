@@ -263,3 +263,48 @@ def test_an_empty_custom_verifier_gives_a_review_verdict():
     )
     assert report.verdict == "review"
     assert report.results[0].score is None
+
+
+def _faithfulness(checked: int, total: int) -> Report:
+    findings = [_finding("supported", PASS)] * checked + [_finding("unverifiable", WARN)] * (
+        total - checked
+    )
+    result = CheckResult(
+        check="faithfulness",
+        passed=True,
+        score=1.0 if checked else None,
+        findings=findings,
+        metadata={"claims_checked": checked, "claims_total": total},
+    )
+    return Report(results=[result])
+
+
+def test_min_claim_coverage_is_off_by_default():
+    assert apply_verdict_policy(_faithfulness(1, 40)).verdict == "pass"
+
+
+def test_low_claim_coverage_goes_to_review():
+    policy = VerdictPolicy(min_claim_coverage=0.8)
+    assert apply_verdict_policy(_faithfulness(1, 40), policy).verdict == "review"
+
+
+def test_enough_claim_coverage_passes():
+    policy = VerdictPolicy(min_claim_coverage=0.8)
+    assert apply_verdict_policy(_faithfulness(8, 10), policy).verdict == "pass"
+
+
+def test_claim_coverage_doesnt_soften_a_block():
+    report = _faithfulness(1, 10)
+    report.results[0].findings.append(_finding("unsupported", FAIL))
+    policy = VerdictPolicy(min_claim_coverage=0.8)
+    assert apply_verdict_policy(report, policy).verdict == "block"
+
+
+def test_claim_coverage_ignores_an_answer_with_no_claims():
+    policy = VerdictPolicy(min_claim_coverage=0.8)
+    assert apply_verdict_policy(_faithfulness(0, 0), policy).verdict == "pass"
+
+
+def test_min_claim_coverage_must_be_a_share():
+    with pytest.raises(ValidationError):
+        VerdictPolicy(min_claim_coverage=1.5)
