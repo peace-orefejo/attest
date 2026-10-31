@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import NamedTuple
 
 from pydantic import BaseModel, Field
 
-from .content import Artifact, TextSegment
-from .prompts.evidence import evidence_block
+from .content import Artifact, ArtifactText, TextSegment
+from .prompts.evidence import artifact_block, evidence_block
 from .utils.json_types import JsonObject
 
 
@@ -29,6 +30,14 @@ class IndexedToolCall(NamedTuple):
     call: ToolCall
 
 
+class EvidenceBlock(BaseModel):
+    """One rendered evidence block, with where it came from and its unescaped text."""
+
+    location: str
+    text: str
+    rendered: str
+
+
 class Trajectory(BaseModel):
     task: str
     system_prompt: str | None = None
@@ -38,16 +47,37 @@ class Trajectory(BaseModel):
     artifacts: list[Artifact] = Field(default_factory=list[Artifact])
     final_answer: str
 
-    def evidence(self) -> str:
-        """The real tool outputs, one <tool_output> block each — the only text attest trusts.
+    def evidence(self, extracted: Mapping[str, ArtifactText] | None = None) -> str:
+        """The real tool outputs and artifacts — the only text attest trusts.
 
-        Block tags inside an output are escaped, so an output cannot close its block or
-        fake another tool's block.
+        Each tool output is one <tool_output> block, followed by an <artifact> block for each
+        of its artifacts; run-level artifacts come last. User uploads are never evidence.
+        Artifact text is used directly; binary and path artifacts appear only when `extracted`
+        holds their text, keyed by location. Block tags inside content are escaped, so content
+        cannot close its block or fake another block.
         """
-        return "\n".join(
-            evidence_block(step, call.name, call.arguments, call.output)
-            for step, call in self.tool_calls()
-        )
+        return "\n".join(block.rendered for block in self.evidence_blocks(extracted))
+
+    def evidence_blocks(
+        self, extracted: Mapping[str, ArtifactText] | None = None
+    ) -> list[EvidenceBlock]:
+        """The blocks `evidence()` joins, in order, each with its location."""
+        texts = extracted or {}
+        blocks: list[EvidenceBlock] = []
+        for step, call in self.tool_calls():
+            blocks.append(
+                EvidenceBlock(
+                    location=f"steps[{step}].tool_call.output",
+                    text=call.output,
+                    rendered=evidence_block(step, call.name, call.arguments, call.output),
+                )
+            )
+            for index, artifact in enumerate(call.artifacts):
+                location = f"steps[{step}].tool_call.artifacts[{index}]"
+                blocks.extend(_artifact_blocks(artifact, location, call.name, texts))
+        for index, artifact in enumerate(self.artifacts):
+            blocks.extend(_artifact_blocks(artifact, f"artifacts[{index}]", None, texts))
+        return blocks
 
     def has_evidence(self) -> bool:
         return bool(self.artifacts) or any(s.tool_call is not None for s in self.steps)
@@ -85,6 +115,27 @@ class Trajectory(BaseModel):
             if artifact.text is not None:
                 segments.append(_artifact_segment(artifact, f"artifacts[{artifact_idx}]", None))
         return segments
+
+
+def _artifact_blocks(
+    artifact: Artifact, location: str, tool: str | None, extracted: Mapping[str, ArtifactText]
+) -> list[EvidenceBlock]:
+    if artifact.source == "user_upload":
+        return []
+    content = (
+        ArtifactText(text=artifact.text) if artifact.text is not None else extracted.get(location)
+    )
+    if content is None:
+        return []
+    rendered = artifact_block(
+        location,
+        content.text,
+        name=artifact.name,
+        source=artifact.source,
+        from_tool=tool,
+        complete=content.complete,
+    )
+    return [EvidenceBlock(location=location, text=content.text, rendered=rendered)]
 
 
 def _artifact_segment(artifact: Artifact, location: str, step: int | None) -> TextSegment:

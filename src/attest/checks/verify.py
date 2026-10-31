@@ -17,7 +17,9 @@ from ..prompts.faithfulness import (
 )
 from ..results import CheckResult, Finding, Severity
 from ..trajectory import Trajectory
+from .artifact_evidence import ArtifactExtraction, current_extraction, gather_evidence
 from .profiles import get_profile
+from .provenance import with_locations
 
 ClaimVerdict = Literal["supported", "unsupported", "unverifiable"]
 
@@ -66,11 +68,18 @@ VerifyFn = Callable[[list[str], str], list[Finding]]
 
 
 def judge_trajectory(
-    traj: Trajectory, extract: ExtractFn, verify: VerifyFn, *, max_claims: int = MAX_CLAIMS
+    traj: Trajectory,
+    extract: ExtractFn,
+    verify: VerifyFn,
+    *,
+    max_claims: int = MAX_CLAIMS,
+    artifacts: ArtifactExtraction | None = None,
 ) -> CheckResult:
+    """Grade the answer's claims; `artifacts` overrides the active artifact extraction."""
     claims = extract(traj.final_answer)
     capped = len(claims) > max_claims
-    findings = verify(claims[:max_claims], traj.evidence())
+    evidence = gather_evidence(traj, artifacts or current_extraction())
+    findings = with_locations(verify(claims[:max_claims], evidence.text), evidence.blocks)
     supported = sum(finding.verdict == "supported" for finding in findings)
     unsupported = sum(finding.verdict == "unsupported" for finding in findings)
     checkable = supported + unsupported
@@ -84,6 +93,7 @@ def judge_trajectory(
         score=None if unscorable else (supported / checkable if checkable else 1.0),
         summary=summary,
         findings=findings,
+        metadata=evidence.metadata(),
     )
 
 

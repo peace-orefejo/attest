@@ -1,5 +1,5 @@
 ---
-description: "Use attest with LangChain, LangGraph or any agent framework, and gate CI on pass rates with confidence intervals."
+description: "Use attest with LangChain, LangGraph, Haystack or any agent framework, and gate CI on pass rates with confidence intervals."
 ---
 
 # Integrations
@@ -21,6 +21,22 @@ report = Attest().evaluate(run)
 The adapter pairs each tool call with its `ToolMessage` output and takes the last AI message as
 the final answer. It works on any list of LangChain messages, so LangChain agents that return
 their message history work too.
+
+## Haystack
+
+```python
+from attest import Attest, from_haystack_messages
+from haystack.dataclasses import ChatMessage
+
+result = agent.run(messages=[ChatMessage.from_user(question)])
+run = from_haystack_messages(result["messages"], allowed_tools=["search"])
+
+report = Attest().evaluate(run)
+```
+
+The adapter pairs each tool call with the `ToolCallResult` that answers it and takes the last
+assistant message as the final answer. It accepts `ChatMessage` objects or their `to_dict()`
+form, so saved runs work too. A tool result marked as an error keeps its text as the output.
 
 ## Anything else
 

@@ -20,7 +20,7 @@ def test_top_level_artifact_counts_as_evidence():
         artifacts=[Artifact(name="note.png", media_type="image/png", text="hello")],
     )
     assert traj.has_evidence() is True
-    assert "note.png" not in traj.evidence()
+    assert 'name="note.png"' in traj.evidence()
     assert traj.untrusted_text_segments()[0].subject == "note.png"
 
 
