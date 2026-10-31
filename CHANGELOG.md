@@ -6,6 +6,10 @@ All notable changes to `agent-attest` are documented here. This project follows
 ## [Unreleased]
 
 ### Added
+- Finding dispositions: a `VerdictPolicy` (with `ToolUsePolicy`) gives each finding a
+  `disposition` of `pass`, `review` or `block`, and `Report` gains `verdict` (the strictest
+  disposition), `blocking` and `scores`, so a security failure can't be averaged away. Pass
+  `Attest(verdict_policy=...)` to change the defaults; `passed` and `overall_score` are unchanged.
 - Opt-in response caching via `Attest(cache=True)` (or a shared dict), so re-evaluating an
   identical run reuses judge calls without collapsing `vote` self-consistency.
 - Spend controls: `Attest(budget=Budget(max_calls=..., max_tokens=...))` fails closed with

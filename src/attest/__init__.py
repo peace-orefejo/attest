@@ -22,6 +22,7 @@ from .providers import providers as list_providers
 from .results import PROMPT_VERSION, CheckResult, Finding, Report, Severity
 from .scoring.report import evaluate
 from .scoring.stats import Proportion, difference_is_real, wilson_interval
+from .scoring.verdict_policy import ToolUsePolicy, VerdictPolicy
 from .trajectory import Step, ToolCall, Trajectory
 
 __all__ = [
@@ -49,8 +50,10 @@ __all__ = [
     "Step",
     "TextSegment",
     "ToolCall",
+    "ToolUsePolicy",
     "Trajectory",
     "Usage",
+    "VerdictPolicy",
     "check_injection",
     "check_policy",
     "check_role_adherence",

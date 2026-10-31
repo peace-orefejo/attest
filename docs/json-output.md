@@ -42,8 +42,11 @@ The exit code says whether the command ran, not whether the agent passed.
 | `stats` | `rate`, `low`, `high`, `n` |
 | `models` | `provider`, `source` (`live` or `curated`), `models` |
 
-A `report` holds `results` (one per check), `overall_score` and `passed`. Each result and
-finding has the fields described in [How it works](concepts.md#results-and-findings).
+A `report` holds `results` (one per check), `overall_score`, `passed`, `verdict` (`pass`,
+`review` or `block`), `blocking` (the findings that blocked, each a `check`, `verdict` and
+`subject`) and `scores` (each check's score by name). Each result and finding has the fields
+described in [How it works](concepts.md#results-and-findings); a finding in a report also has
+its `disposition`. See [Reports](concepts.md#reports).
 
 From Python, `report.model_dump_json()` gives the same JSON as one `report` in `attest run`'s
 output, and a check's `result.model_dump_json()` the same as one `result` from `attest tools`,
@@ -58,6 +61,9 @@ attest run run.json | jq '.data.trajectories[].report.results[].findings[]
 
 # Fail a CI step unless every run passed
 attest run runs.jsonl | jq -e '.ok and .data.passed == .data.total'
+
+# Fail a CI step if any run was blocked
+attest run runs.jsonl | jq -e 'all(.data.trajectories[]; .report.verdict != "block")'
 ```
 
 ## Schemas

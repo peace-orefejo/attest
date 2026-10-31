@@ -30,6 +30,10 @@ The public API, importable as `from attest import ...`.
 
 ::: attest.Severity
 
+::: attest.VerdictPolicy
+
+::: attest.ToolUsePolicy
+
 ## Checks
 
 ::: attest.evaluate

@@ -101,6 +101,23 @@
           "additionalProperties": true,
           "title": "Metadata",
           "type": "object"
+        },
+        "disposition": {
+          "anyOf": [
+            {
+              "enum": [
+                "pass",
+                "review",
+                "block"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Disposition"
         }
       },
       "required": [

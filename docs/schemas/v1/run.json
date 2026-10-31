@@ -2,6 +2,30 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://peace-orefejo.github.io/attest/schemas/v1/run.json",
   "$defs": {
+    "BlockingFinding": {
+      "description": "A finding whose disposition blocked the report.",
+      "properties": {
+        "check": {
+          "title": "Check",
+          "type": "string"
+        },
+        "verdict": {
+          "title": "Verdict",
+          "type": "string"
+        },
+        "subject": {
+          "default": "",
+          "title": "Subject",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check",
+        "verdict"
+      ],
+      "title": "BlockingFinding",
+      "type": "object"
+    },
     "CheckResult": {
       "properties": {
         "check": {
@@ -101,6 +125,23 @@
           "additionalProperties": true,
           "title": "Metadata",
           "type": "object"
+        },
+        "disposition": {
+          "anyOf": [
+            {
+              "enum": [
+                "pass",
+                "review",
+                "block"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Disposition"
         }
       },
       "required": [
@@ -140,12 +181,49 @@
           "readOnly": true,
           "title": "Passed",
           "type": "boolean"
+        },
+        "verdict": {
+          "description": "The strictest disposition among the findings: pass, review or block.",
+          "enum": [
+            "pass",
+            "review",
+            "block"
+          ],
+          "readOnly": true,
+          "title": "Verdict",
+          "type": "string"
+        },
+        "blocking": {
+          "items": {
+            "$ref": "#/$defs/BlockingFinding"
+          },
+          "readOnly": true,
+          "title": "Blocking",
+          "type": "array"
+        },
+        "scores": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "readOnly": true,
+          "title": "Scores",
+          "type": "object"
         }
       },
       "required": [
         "results",
         "overall_score",
-        "passed"
+        "passed",
+        "verdict",
+        "blocking",
+        "scores"
       ],
       "title": "Report",
       "type": "object"

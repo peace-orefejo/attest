@@ -23,8 +23,10 @@ from .llm.response_cache import ResponseStore
 from .policy import EvaluationPolicy, PolicyInput, check_policy, load_policy
 from .providers import DEFAULT_PROVIDER, build_client, default_model, list_models, providers
 from .results import CheckResult, Report
+from .scoring.dispositions import apply_verdict_policy
 from .scoring.report import DEFAULT_CHECKS, evaluate, validate_evaluation_options
 from .scoring.stats import Proportion, wilson_interval
+from .scoring.verdict_policy import VerdictPolicy
 from .trajectory import Trajectory
 from .utils.json_types import JsonObject
 
@@ -45,6 +47,7 @@ class Attest:
         enforce_policy: bool = True,
         cache: CacheOption = False,
         budget: Budget | None = None,
+        verdict_policy: VerdictPolicy | None = None,
     ) -> None:
         self.provider = provider
         self.model = model or default_model(provider)
@@ -54,6 +57,7 @@ class Attest:
         self.enforce_policy = enforce_policy
         self._cache = _response_store(cache, provider=provider, model=self.model)
         self.budget = budget
+        self.verdict_policy = verdict_policy or VerdictPolicy()
         self.usage = Usage()
 
     def evaluate(
@@ -85,10 +89,12 @@ class Attest:
                 max_claims=max_claims,
                 extract=extract,
                 verify=verify,
+                verdict_policy=self.verdict_policy,
             )
             if policy is not None:
                 report.results.append(check_policy(traj, policy))
                 report.metadata.update(self.policy_identity())
+                report = apply_verdict_policy(report, self.verdict_policy)
         report.metadata["usage"] = self.usage.since(before).as_dict()
         return report
 
