@@ -19,12 +19,30 @@ result = report.by("faithfulness")
 
 1. The final answer is split into atomic, checkable claims. Hedges, opinions and generic advice
    are dropped.
-2. Claims are checked against the run's tool outputs in batches of 15, with one model call per batch.
-   At most 40 claims are checked; the summary says when a long answer was cut short.
+2. Claims are checked against the run's tool outputs and artifacts in batches of 15, with one
+   model call per batch. At most 40 claims are checked; the summary says when a long answer was
+   cut short.
 3. Each claim gets `supported`, `unsupported` or `unverifiable`, a reason, and the deciding quote.
+   When the quote comes from exactly one tool output or artifact, the finding's
+   `metadata["location"]` says which, such as `steps[2].tool_call.artifacts[0]`.
 
 The score is `supported / (supported + unsupported)`. Unverifiable claims don't count against
 the score, but they appear as warnings. The check passes only when nothing is unsupported.
+
+## Files as evidence
+
+Artifact text counts as evidence, so a claim answered from an attached document can be checked.
+PDFs, images and other binary files are read only when you opt in:
+
+```python
+grader = Attest(extract_artifacts=True)                    # data_base64 artifacts
+grader = Attest(extract_artifacts=True, allow_paths=True)  # path artifacts too
+```
+
+Extraction uses the same limits as the injection scan. A file that was cut short or couldn't be
+read is shown to the grading model as incomplete. Without the opt-in, binary and path artifacts
+are left out and listed in `metadata["artifacts_unread"]`; files read only in part are listed in
+`metadata["artifacts_incomplete"]`. See [Evidence](../concepts.md#evidence-and-the-grading-model).
 
 ## Choosing the standard
 

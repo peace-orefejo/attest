@@ -26,13 +26,22 @@ line it is one JSON object (a `.jsonl` file holds one per line).
 
 ## Evidence and the grading model
 
-Tool outputs are the only evidence attest trusts. Checks that need judgment, such as
-faithfulness, ask a language model (the **grading model**) one narrow question: does this
+Tool outputs and artifacts are the only evidence attest trusts. Checks that need judgment, such
+as faithfulness, ask a language model (the **grading model**) one narrow question: does this
 evidence support this claim?
 
 That is the difference from a plain "LLM judge", which reads the whole run and decides whether
-the answer looks good. The grading model sees each tool output in its own escaped block and
-never sees the agent's `thought` text, so confident reasoning can't talk it into a pass.
+the answer looks good. The grading model sees each tool output and each artifact in its own
+escaped block and never sees the agent's `thought` text, so confident reasoning can't talk it
+into a pass.
+
+An artifact's block comes right after the output of the tool that returned it; artifacts on the
+run itself come last. Artifacts with `source: "user_upload"` are not evidence. Artifact `text`
+is always used. Binary (`data_base64`) and `path` artifacts are read only when you opt in with
+`Attest(extract_artifacts=True)`, through the same size-limited extraction the injection scan
+uses; `path` artifacts also need `allow_paths=True`. A file that was cut short or couldn't be
+read is marked `complete="false"`, and the grading model is told not to count its missing parts
+as support. Files left out are listed in the result's `metadata["artifacts_unread"]`.
 
 ## Results and findings
 
