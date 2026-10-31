@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from ...llm import BudgetExceeded, call
+from ...llm import BudgetExceeded, ProviderConfigError, call
 from ...prompts.code_review.injection import CONFIRM_SYSTEM, confirm_user
 from .bounded import CharBudget
 
@@ -28,7 +28,7 @@ def confirm(
         return None
     try:
         return call(system=CONFIRM_SYSTEM, user=user, output=ConfirmOut, max_tokens=300)
-    except BudgetExceeded:
+    except (BudgetExceeded, ProviderConfigError):
         raise
     except Exception:
         return None

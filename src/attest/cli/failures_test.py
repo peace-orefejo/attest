@@ -78,3 +78,24 @@ def test_an_error_no_check_absorbs_is_a_json_command_failure(tmp_path, monkeypat
     assert payload["ok"] is False
     assert payload["error"]["code"] == "command_failed"
     assert "RuntimeError: provider unavailable" in payload["error"]["message"]
+
+
+class _KeyRejected(Exception):
+    status_code = 401
+
+
+class _Rejected:
+    def create(self, **kwargs):
+        raise _KeyRejected("Error code: 401 - {'error': 'invalid x-api-key sk-ant-SECRET'}")
+
+
+def test_a_rejected_api_key_is_a_json_provider_config_error(tmp_path, monkeypatch):
+    module = sys.modules["attest.cli.commands.role"]
+    monkeypatch.setattr("attest.cli.context.resolve_key", lambda provider: "sk-test")
+    monkeypatch.setattr(module, "llm_context", lambda provider, model: using(_Rejected()))
+    result = runner.invoke(app, ["role", _file(tmp_path, json.dumps(RUN).encode())])
+    assert result.exit_code == 1
+    error = _payload(result)["error"]
+    assert error["code"] == "provider_config"
+    assert "401" in error["message"]
+    assert "SECRET" not in result.stdout

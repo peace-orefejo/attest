@@ -6,6 +6,7 @@ import pytest
 
 import attest.llm.structured as llm
 from attest.checks.verify import VerdictOut
+from attest.llm import ProviderConfigError
 
 _EMPTY = AttributeError("'NoneType' object has no attribute 'parts'")
 
@@ -86,10 +87,11 @@ def test_hard_api_error_inside_retry_wrapper_is_not_retried():
     assert client.calls == 1
 
 
-def test_google_api_error_is_not_retried():
+def test_google_permission_error_stops_with_a_config_error():
     client = _FlakyClient(fails=99, exc=_wrapped(_GoogleError("403 PERMISSION_DENIED")))
-    with pytest.raises(_GoogleError):
+    with pytest.raises(ProviderConfigError) as raised:
         llm.call(system="s", user="u", output=VerdictOut, client=client)
+    assert raised.value.problem == "permission"
     assert client.calls == 1
 
 
@@ -130,5 +132,41 @@ class _NoneClient:
 def test_a_none_response_is_retried_then_fails_clearly():
     client = _NoneClient()
     with pytest.raises(RuntimeError, match="no parseable content"):
+        llm.call(system="s", user="u", output=VerdictOut, client=client)
+    assert client.calls == 3
+
+
+class _StatusError(Exception):
+    def __init__(self, status_code, body="{'error': 'sk-ant-secret-key in body'}"):
+        super().__init__(f"Error code: {status_code} - {body}")
+        self.status_code = status_code
+
+
+@pytest.mark.parametrize(
+    ("status", "problem"),
+    [(401, "authentication"), (403, "permission"), (404, "model_not_found")],
+)
+def test_configuration_errors_stop_without_retrying_or_leaking(status, problem):
+    client = _FlakyClient(fails=99, exc=_wrapped(_StatusError(status)))
+    with pytest.raises(ProviderConfigError) as raised:
+        llm.call(system="s", user="u", output=VerdictOut, client=client)
+    assert raised.value.problem == problem
+    assert raised.value.status == status
+    assert "sk-ant" not in str(raised.value)
+    assert raised.value.__cause__ is None
+    assert client.calls == 1
+
+
+@pytest.mark.parametrize("status", [429, 500, 503])
+def test_transient_provider_errors_are_retried(status):
+    client = _FlakyClient(fails=2, exc=_StatusError(status))
+    out = llm.call(system="s", user="u", output=VerdictOut, client=client)
+    assert out.verdict == "supported"
+    assert client.calls == 3
+
+
+def test_a_provider_outage_that_outlasts_the_retries_raises_the_provider_error():
+    client = _FlakyClient(fails=99, exc=_StatusError(503))
+    with pytest.raises(_StatusError):
         llm.call(system="s", user="u", output=VerdictOut, client=client)
     assert client.calls == 3

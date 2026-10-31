@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 from pydantic import BaseModel, Field
 
-from ..llm import BudgetExceeded
+from ..llm import BudgetExceeded, ProviderConfigError
 from ..results import Finding
 from ..utils.failures import failure_reason
 from .claim_findings import unchecked, with_missing_claims
@@ -26,7 +26,7 @@ def extract_safely(extract: ExtractFn, answer: str) -> Extraction:
     """The claims `extract` returns, or an unchecked finding when it raises or returns junk."""
     try:
         return Extraction(claims=list(extract(answer)))
-    except BudgetExceeded:
+    except (BudgetExceeded, ProviderConfigError):
         raise
     except Exception as error:
         reason = failure_reason("Claim extraction", error)
@@ -37,7 +37,7 @@ def verify_safely(verify: VerifyFn, claims: list[str], evidence: str) -> list[Fi
     """One finding per claim; claims a failed or partial verifier didn't judge are unchecked."""
     try:
         return with_missing_claims(claims, list(verify(claims, evidence)))
-    except BudgetExceeded:
+    except (BudgetExceeded, ProviderConfigError):
         raise
     except Exception as error:
         reason = failure_reason("Claim verification", error)

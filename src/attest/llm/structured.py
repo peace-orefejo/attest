@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from ..prompts.guard import GUARD
 from .budget import before_call, record_cache_hit, record_completion
 from .client import resolve_client
-from .errors import api_error, is_empty_response
+from .errors import api_error, config_error, is_empty_response, is_transient
 from .protocol import LLMClient
 from .response_cache import cache_key, response_cache
 
@@ -73,6 +73,12 @@ def call(
         try:
             result: object = _create(resolved, output, max_tokens, messages)
         except Exception as error:
+            misconfigured = config_error(error)
+            if misconfigured is not None:
+                raise misconfigured from None
+            if is_transient(error):
+                last_error = error
+                continue
             hard_error = api_error(error)
             if hard_error is not None and hard_error is not error:
                 raise hard_error from error
@@ -86,6 +92,8 @@ def call(
         if store is not None:
             store[key] = result
         return result
+    if last_error is not None and is_transient(last_error):
+        raise last_error
     raise RuntimeError(_EMPTY_RESPONSE_MESSAGE) from last_error
 
 

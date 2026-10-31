@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from ...llm import BudgetExceeded, call
+from ...llm import BudgetExceeded, ProviderConfigError, call
 from ...prompts.code_review.injection import EFFECT_SYSTEM, effect_user
 from ..models import PullRequest, ReviewOutput
 from .bounded import CharBudget
@@ -132,7 +132,7 @@ def ask_effect(payload: str, output: ReviewOutput, budget: CharBudget) -> Effect
         return None
     try:
         return call(system=EFFECT_SYSTEM, user=user, output=EffectOut, max_tokens=300)
-    except BudgetExceeded:
+    except (BudgetExceeded, ProviderConfigError):
         raise
     except Exception:
         return None

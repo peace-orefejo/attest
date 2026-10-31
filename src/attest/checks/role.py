@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from ..llm import BudgetExceeded, vote
+from ..llm import BudgetExceeded, ProviderConfigError, vote
 from ..prompts.role import ROLE_SYSTEM, role_user
 from ..results import CheckResult, Finding, Severity
 from ..trajectory import Trajectory
@@ -52,7 +52,7 @@ def check_role_adherence(traj: Trajectory, *, samples: int = 3) -> CheckResult:
             key=lambda result: result.verdict,
             samples=samples,
         )
-    except BudgetExceeded:
+    except (BudgetExceeded, ProviderConfigError):
         raise
     except Exception as error:
         reason = failure_reason("The role judge", error)

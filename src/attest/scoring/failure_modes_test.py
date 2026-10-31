@@ -10,7 +10,7 @@ from pydantic import BaseModel, ValidationError
 from attest import Attest, EvaluationPolicy, EvaluationRule
 from attest.code_review import PullRequest, ReviewOutput
 from attest.code_review.guidelines import parse_guidelines
-from attest.llm import BudgetExceeded
+from attest.llm import BudgetExceeded, ProviderConfigError
 from attest.trajectory import Step, ToolCall, Trajectory
 
 
@@ -160,7 +160,7 @@ def test_failed_guideline_check_raises_a_clear_error(grader):
         grader.review(PR, OUTPUTS, guidelines=rules)
 
 
-@pytest.mark.parametrize(
+MODEL_PATHS = pytest.mark.parametrize(
     "run_check",
     [
         lambda g: g.evaluate(_run(), checks=("faithfulness",)),
@@ -172,6 +172,9 @@ def test_failed_guideline_check_raises_a_clear_error(grader):
     ],
     ids=["extract", "verify", "role", "deep_injection", "tool_choice", "tool_error_answer"],
 )
+
+
+@MODEL_PATHS
 def test_budget_exceeded_always_propagates(run_check):
     with pytest.raises(BudgetExceeded):
         run_check(_budget_grader())
@@ -191,3 +194,28 @@ def test_malformed_responses_are_retried_before_failing():
     client = FailingClient(None)
     Attest(client=client).role_adherence(_run())
     assert client.calls == 3
+
+
+class _AuthError(Exception):
+    status_code = 401
+
+
+def _bad_key_grader(**kwargs) -> Attest:
+    return Attest(client=FailingClient(_AuthError("invalid x-api-key")), **kwargs)
+
+
+@MODEL_PATHS
+def test_a_bad_api_key_stops_every_check(run_check):
+    with pytest.raises(ProviderConfigError) as raised:
+        run_check(_bad_key_grader())
+    assert raised.value.problem == "authentication"
+
+
+def test_a_bad_api_key_stops_policy_rules():
+    with pytest.raises(ProviderConfigError):
+        _bad_key_grader(policy=_policy()).policy_check(_run())
+
+
+def test_a_bad_api_key_stops_review():
+    with pytest.raises(ProviderConfigError):
+        _bad_key_grader().review(PR, OUTPUTS)

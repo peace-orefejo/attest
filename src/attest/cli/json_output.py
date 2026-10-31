@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 from ..checks.judge_baseline import JudgeVerdict
 from ..code_review import ReviewResult
-from ..llm import Usage
+from ..llm import ProviderConfigError, Usage
 from ..results import CheckResult, Disposition
 from ..scoring.stats import Proportion
 from ..utils.failures import failure_reason
@@ -26,7 +26,7 @@ EXIT_ERROR = 1
 EXIT_INVALID_INPUT = 2
 EXIT_BUDGET_EXCEEDED = 3
 
-ErrorCode = Literal["invalid_input", "missing_api_key", "command_failed"]
+ErrorCode = Literal["invalid_input", "missing_api_key", "provider_config", "command_failed"]
 DemoOutcome = Literal["caught", "both_caught", "both_passed", "judge_only"]
 
 DataT = TypeVar("DataT", bound=BaseModel)
@@ -146,6 +146,8 @@ def json_command(name: str) -> Callable[[Callable[P, None]], Callable[P, None]]:
                 _fail(name, exc.code, str(exc), exc.exit_code)
             except (typer.Exit, typer.Abort):
                 raise
+            except ProviderConfigError as exc:
+                _fail(name, "provider_config", str(exc), EXIT_ERROR)
             except Exception as exc:
                 _fail(name, "command_failed", failure_reason("The command", exc), EXIT_ERROR)
 

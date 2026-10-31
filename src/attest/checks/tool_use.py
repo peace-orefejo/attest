@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from ..llm import BudgetExceeded, call, has_active_client
+from ..llm import BudgetExceeded, ProviderConfigError, call, has_active_client
 from ..prompts.tool_use import APPROPRIATE_SYSTEM, appropriate_prefix, appropriate_user
 from ..results import CheckResult, Finding, Severity
 from ..trajectory import ToolCall, Trajectory
@@ -118,7 +118,7 @@ def _judge_appropriate(
 ) -> None:
     try:
         judged = _check_appropriate(traj, tool_call, shared=shared)
-    except BudgetExceeded:
+    except (BudgetExceeded, ProviderConfigError):
         raise
     except Exception as error:
         review.appropriate_failed = True

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from ..llm import BudgetExceeded, call
+from ..llm import BudgetExceeded, ProviderConfigError, call
 from ..prompts.faithfulness import (
     batch_system,
     claims_user,
@@ -163,7 +163,7 @@ def _verify_batch(
 ) -> list[Finding]:
     try:
         verdicts = _batch_verdicts(batch, evidence, system, shared=shared)
-    except BudgetExceeded:
+    except (BudgetExceeded, ProviderConfigError):
         raise
     except Exception as error:
         reason = failure_reason("The verification call", error)

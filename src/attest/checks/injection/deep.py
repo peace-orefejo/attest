@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from pydantic import BaseModel, Field
 
 from ...content import TextSegment
-from ...llm import BudgetExceeded, vote
+from ...llm import BudgetExceeded, ProviderConfigError, vote
 from ...prompts.injection import AUTH_SYSTEM, authorization_user
 from ...results import Finding, Severity
 from ...trajectory import Trajectory
@@ -38,7 +38,7 @@ def run_deep_check(traj: Trajectory, segments: Sequence[TextSegment], samples: i
         outcome.findings.append(_truncated_context_finding(len(outcome.incomplete_locations)))
     try:
         auth = check_authorization(traj, view.text, samples=samples)
-    except BudgetExceeded:
+    except (BudgetExceeded, ProviderConfigError):
         raise
     except Exception as error:
         outcome.findings.append(_unchecked_finding(failure_reason("The deep check", error)))

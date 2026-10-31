@@ -18,7 +18,9 @@ When a command can't run, `ok` is `false` and `error` replaces `data`:
  "error": {"code": "missing_api_key", "message": "Set the anthropic API key ..."}}
 ```
 
-`error.code` is `invalid_input`, `missing_api_key` or `command_failed`. `command_failed` means
+`error.code` is `invalid_input`, `missing_api_key`, `provider_config` or `command_failed`.
+`provider_config` means the provider rejected the key (401), the key lacks permission (403) or
+the model doesn't exist (404); the message never includes the key. `command_failed` means
 an error the checks don't absorb stopped the command, such as a provider error during
 `attest review`; `message` names the error.
 
@@ -27,7 +29,7 @@ an error the checks don't absorb stopped the command, such as a provider error d
 | Code | Meaning |
 |---|---|
 | `0` | The command ran. |
-| `1` | A required API key is missing, or the command failed (`command_failed`). |
+| `1` | A required API key is missing or rejected (`missing_api_key`, `provider_config`), or the command failed (`command_failed`). |
 | `2` | The input or an option is invalid. |
 | `3` | A budget stopped `attest run`. The runs graded so far are still printed. |
 

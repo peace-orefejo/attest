@@ -4,7 +4,7 @@ import json
 
 from pydantic import BaseModel
 
-from ..llm import BudgetExceeded, vote
+from ..llm import BudgetExceeded, ProviderConfigError, vote
 from ..prompts.policy import POLICY_SYSTEM, policy_user
 from ..results import Finding, Severity
 from ..trajectory import Trajectory
@@ -30,7 +30,7 @@ def evaluate_semantic_rule(traj: Trajectory, rule: EvaluationRule, *, samples: i
     context = bounded_policy_context(traj)
     try:
         verdict = _judge(rule, context.text, samples=samples)
-    except BudgetExceeded:
+    except (BudgetExceeded, ProviderConfigError):
         raise
     except Exception as error:
         return _unchecked_finding(rule, failure_reason("The policy judge", error))
