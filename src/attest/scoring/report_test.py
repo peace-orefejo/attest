@@ -85,3 +85,63 @@ def test_user_upload_is_not_used_as_faithfulness_evidence():
 
     evaluate(traj, checks=["faithfulness"], extract=_fake_extract, verify=capture)
     assert "fabricated claim" not in seen["evidence"]
+
+
+def test_claims_past_the_cap_send_the_run_to_review():
+    # 60 claims, the first 40 supported: the 20 never checked must not let the run pass.
+    from attest import Attest
+    from attest.results import Finding, Severity
+    from attest.trajectory import Step, ToolCall, Trajectory
+
+    run = Trajectory(
+        task="t",
+        steps=[Step(tool_call=ToolCall(name="search", output="facts"))],
+        final_answer="a",
+    )
+
+    def supported(claims, evidence):
+        return [Finding(severity=Severity.PASS, verdict="supported", subject=c) for c in claims]
+
+    report = Attest().evaluate(
+        run,
+        checks=("faithfulness",),
+        extract=lambda _: [f"claim {i}" for i in range(60)],
+        verify=supported,
+    )
+    assert report.verdict == "review"
+    assert report.claim_coverage == 40 / 60
+    unchecked = [
+        f for f in report.by("faithfulness").findings if f.metadata.get("checked") is False
+    ]
+    assert len(unchecked) == 20 and all(f.disposition == "review" for f in unchecked)
+
+
+def test_a_report_without_a_policy_still_reviews_unchecked_claims():
+    from attest.checks.verify import judge_trajectory
+    from attest.results import Finding, Report, Severity
+    from attest.trajectory import Step, ToolCall, Trajectory
+
+    run = Trajectory(
+        task="t", steps=[Step(tool_call=ToolCall(name="s", output="facts"))], final_answer="a"
+    )
+
+    def supported(claims, evidence):
+        return [Finding(severity=Severity.PASS, verdict="supported", subject=c) for c in claims]
+
+    result = judge_trajectory(run, lambda _: [f"c{i}" for i in range(5)], supported, max_claims=3)
+    report = Report(results=[result])
+    assert report.verdict == "review" and report.passed is False
+
+
+def test_negative_max_claims_is_rejected():
+    import pytest
+
+    from attest import Attest
+    from attest.checks.verify import judge_trajectory
+    from attest.trajectory import Trajectory
+
+    run = Trajectory(task="t", steps=[], final_answer="a")
+    with pytest.raises(ValueError, match="max_claims"):
+        Attest().evaluate(run, checks=("faithfulness",), max_claims=-1)
+    with pytest.raises(ValueError, match="max_claims"):
+        judge_trajectory(run, lambda _: ["c"], lambda c, e: [], max_claims=-1)

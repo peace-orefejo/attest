@@ -262,10 +262,22 @@ is git-ignored if you'd rather keep the folder here.
 
 Reports on a private folder keep every metric but withhold the cases' contents: case ids
 become hashes, claim texts become `item-1`, `item-2`…, and error messages are dropped. They are
-marked `dataset_visibility: "private"`, and `compare.py` won't compare them with public
-reports. The withholding covers the report only: don't commit or upload the case files, and
-remember that a provider sees each case while grading it. The response cache
-(`--cache-dir`) quotes the cases too, so keep it private; `.bench-cache/` and `.cache/` are git-ignored.
+marked `dataset_visibility: "private"`, and `compare.py` won't compare them with public reports.
+
+This is pseudonymisation, not anonymisation. Categories, labels, predictions, timings and usage
+stay in the report, and anyone who can guess a case id can confirm it by hashing it. Set
+`ATTEST_BENCH_ID_KEY` to a secret kept outside the report to key the hash (HMAC-SHA256); use
+the same key across runs so their rows still match. A private run without the key prints a
+warning. Reports record a fingerprint of the key (never the key), and `compare.py` refuses to
+compare reports whose ids were hashed differently.
+
+Make the key random and high-entropy, such as the output of `openssl rand -hex 32`, never a
+word or passphrase. Anyone with a report can test guessed keys against its fingerprint offline,
+so a weak key can be brute-forced, and then every case id can be confirmed by hashing.
+
+The withholding covers the report only. Don't commit or upload the case files, and remember
+that the provider sees each case while grading it. The response cache (`--cache-dir`) quotes
+the cases too, so keep it private; `.bench-cache/` and `.cache/` are git-ignored.
 
 ## Layout
 

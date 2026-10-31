@@ -15,8 +15,36 @@ All notable changes to `agent-attest` are documented here. This project follows
   and is printed by the CLI as a `provider_config` error (exit 1).
 - Property-based tests (Hypothesis, dev only) for evidence escaping, error recovery,
   dispositions and claim completion.
+- `--max-claims N` on `attest run` and `attest review`, and `max_claims=` on `Attest.review()`,
+  set how many claims of each answer or output are checked (default 40). A negative value is
+  invalid input (exit 2 on the command line, `ValueError` in Python).
+- `CheckResult.dispositions`: each finding's disposition, the assigned one or else the one the
+  default `VerdictPolicy()` gives it.
 
 ### Changed
+- **Breaking:** `Report.passed` now means the run passed: `verdict == "pass"`. It used to mean
+  every check passed, so a run needing review could read `passed: true`. The old meaning is
+  `Report.checks_passed`. In `attest run`'s JSON, `passed` counts runs whose verdict is `pass`
+  and the new `checks_passed` counts the old way.
+- **Breaking:** the CLI's JSON is now `schema_version` `"2"`, because `passed` changed meaning.
+  The schemas are published under `schemas/v2/`; the v1 schemas stay where they were.
+- **Breaking:** claims past `max_claims` (40 by default) are reported `unverifiable` with
+  `metadata["checked"]` false, so they go to review. A long answer used to pass on its first 40
+  claims while the rest were never checked. In `attest review`, which grades each output's
+  claims the same way, an output with more than 40 claims is now dropped as unverified; raise
+  the cap with `--max-claims`. The summary says how many claims went unchecked, or that none
+  were checked when `max_claims` is 0.
+- A `Report` built by hand without `evaluate()`, whose findings have no disposition, now gets
+  the verdict (and `passed` and `blocking`) the default `VerdictPolicy()` would give it. It
+  used to judge each finding by severity alone, so a faithfulness result whose claims were all
+  `unverifiable`, a `warn` policy finding or an ignored tool error passed; they now go to
+  review, and a finding nothing checked (`unchecked`, or `metadata["checked"]` false) goes to
+  review too. `Finding.effective_disposition` keeps the severity-only rule for a finding on its
+  own.
+- The default verdict policy sends a finding nothing checked (`unchecked`, or
+  `metadata["checked"]` false) to review when its check has no rule for that verdict, such as
+  one from a custom check. It used to pass unless its severity was `fail`.
+- `max_claims` below 0 raises `ValueError`.
 - No failed or missing evaluation turns into a pass. When claim extraction, verification, the
   role, deep injection, tool-choice or policy judge, or a code review injection confirmation
   fails, the affected findings are inconclusive (`unchecked`, or `unverifiable` with

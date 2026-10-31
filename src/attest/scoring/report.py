@@ -26,8 +26,12 @@ DEFAULT_CHECKS = ("faithfulness", "tool_use")
 SUPPORTED_CHECKS = ("faithfulness", "tool_use", "injection", "role")
 
 
-def validate_evaluation_options(checks: Sequence[str], answer_kind: str) -> tuple[str, ...]:
+def validate_evaluation_options(
+    checks: Sequence[str], answer_kind: str, max_claims: int = MAX_CLAIMS
+) -> tuple[str, ...]:
     """Validate public evaluator options before any checks or LLM calls run."""
+    if max_claims < 0:
+        raise ValueError(f"max_claims must be 0 or more, not {max_claims}.")
     selected = tuple(checks)
     if not selected:
         raise ValueError("At least one check is required.")
@@ -69,7 +73,7 @@ def evaluate(
     `verdict_policy` sets each finding's disposition and so the report's `verdict`
     (default: `VerdictPolicy()`).
     """
-    selected = validate_evaluation_options(checks, answer_kind)
+    selected = validate_evaluation_options(checks, answer_kind, max_claims)
     resolved = resolve_answer_kind(traj, answer_kind)
 
     extractor: ExtractFn = (

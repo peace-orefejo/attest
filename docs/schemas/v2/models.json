@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://peace-orefejo.github.io/attest/schemas/v2/models.json",
+  "$defs": {
+    "ModelList": {
+      "description": "`attest models`: model ids for one provider.",
+      "properties": {
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "live",
+            "curated"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "models": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Models",
+          "type": "array"
+        }
+      },
+      "required": [
+        "provider",
+        "source",
+        "models"
+      ],
+      "title": "ModelList",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "2",
+      "default": "2",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "command": {
+      "const": "models",
+      "title": "Command",
+      "type": "string"
+    },
+    "ok": {
+      "const": true,
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "data": {
+      "$ref": "#/$defs/ModelList"
+    }
+  },
+  "required": [
+    "schema_version",
+    "command",
+    "ok",
+    "data"
+  ],
+  "title": "attest models",
+  "type": "object"
+}

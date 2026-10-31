@@ -42,3 +42,12 @@ def verify_safely(verify: VerifyFn, claims: list[str], evidence: str) -> list[Fi
     except Exception as error:
         reason = failure_reason("Claim verification", error)
         return [unchecked(claim, reason) for claim in claims]
+
+
+def judge_extraction(
+    extraction: Extraction, verify: VerifyFn, evidence: str, *, max_claims: int
+) -> list[Finding]:
+    """Verify the first `max_claims` claims, or report why extraction failed."""
+    if extraction.failure is not None:
+        return [extraction.failure]
+    return verify_safely(verify, extraction.claims[:max_claims], evidence)

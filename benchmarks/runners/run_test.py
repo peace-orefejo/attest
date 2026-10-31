@@ -224,8 +224,9 @@ def test_an_errored_case_keeps_its_items_and_counts_against_effective_accuracy(
 
 
 def test_external_datasets_folder_gives_a_private_report(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.delenv("ATTEST_BENCH_ID_KEY", raising=False)
     root = tmp_path / "private"
     (root / "tool_use").mkdir(parents=True)
     public = load_datasets().split("tool_use", "dev")
@@ -241,4 +242,15 @@ def test_external_datasets_folder_gives_a_private_report(
     assert all(row.id.startswith("case-") for row in report.cases)
     assert not {case.id for case in public} & {row.id for row in report.cases}
     assert all(i.key.startswith("item-") for row in report.cases for i in row.items)
-    assert "Private dataset" in capsys.readouterr().out
+    assert report.case_id_key is None
+    captured = capsys.readouterr()
+    assert "Private dataset" in captured.out
+    assert "ATTEST_BENCH_ID_KEY is not set" in captured.err
+
+    monkeypatch.setenv("ATTEST_BENCH_ID_KEY", "secret")
+    keyed_out = tmp_path / "keyed.json"
+    assert run.main(["--offline", "--datasets", str(root), "--out", str(keyed_out)]) == 0
+    keyed = BenchmarkReport.model_validate_json(keyed_out.read_text())
+    assert keyed.case_id_key is not None and "secret" not in keyed_out.read_text()
+    assert not {row.id for row in keyed.cases} & {row.id for row in report.cases}
+    assert "is not set" not in capsys.readouterr().err

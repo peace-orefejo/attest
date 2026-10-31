@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field
 
+from .disposition_rules import DEFAULT_RULES, Disposition, disposition_for, result_dispositions
 from .prompts.version import PROMPT_VERSION
 from .utils.json_types import JsonObject
-
-Disposition = Literal["pass", "review", "block"]
 
 
 class Severity(StrEnum):
@@ -31,10 +29,13 @@ class Finding(BaseModel):
 
     @property
     def effective_disposition(self) -> Disposition:
-        """The disposition `evaluate()` assigned, or block for an unassigned fail."""
+        """The disposition `evaluate()` assigned. Unassigned, and without knowing its check, a
+        fail blocks, a finding nothing checked (`unchecked`, or `metadata["checked"]` false) goes
+        to review, and the rest pass. `CheckResult.dispositions` also knows the check.
+        """
         if self.disposition is not None:
             return self.disposition
-        return "block" if self.severity is Severity.FAIL else "pass"
+        return disposition_for("", self, DEFAULT_RULES)
 
 
 class BlockingFinding(BaseModel):
@@ -58,6 +59,16 @@ class CheckResult(BaseModel):
     def failures(self) -> list[Finding]:
         return [f for f in self.findings if f.severity is Severity.FAIL]
 
+    @property
+    def dispositions(self) -> list[Disposition]:
+        """Each finding's disposition: the one `evaluate()` assigned, or else the one the
+        default `VerdictPolicy()` gives it, so a hand-built report gets the same verdict."""
+        defaults = result_dispositions(self.check, self.findings, DEFAULT_RULES)
+        return [
+            finding.disposition or default
+            for finding, default in zip(self.findings, defaults, strict=True)
+        ]
+
 
 class Report(BaseModel):
     results: list[CheckResult]
@@ -72,14 +83,21 @@ class Report(BaseModel):
     @computed_field
     @property
     def passed(self) -> bool:
-        """Every check passed. Doesn't account for `review`: gate on `verdict` instead."""
+        """The run passed: its `verdict` is `pass`. False when anything needs review or blocks."""
+        return self.verdict == "pass"
+
+    @computed_field
+    @property
+    def checks_passed(self) -> bool:
+        """Every check's own `passed` is true. Ignores dispositions, so a run can have
+        `checks_passed` true and still need review; gate on `verdict` or `passed`."""
         return all(r.passed for r in self.results)
 
     @computed_field
     @property
     def verdict(self) -> Disposition:
         """The strictest disposition among the findings: pass, review or block."""
-        dispositions = {f.effective_disposition for r in self.results for f in r.findings}
+        dispositions = {d for r in self.results for d in r.dispositions}
         if "block" in dispositions:
             return "block"
         return "review" if "review" in dispositions else "pass"
@@ -90,8 +108,8 @@ class Report(BaseModel):
         return [
             BlockingFinding(check=r.check, verdict=f.verdict, subject=f.subject)
             for r in self.results
-            for f in r.findings
-            if f.effective_disposition == "block"
+            for f, disposition in zip(r.findings, r.dispositions, strict=True)
+            if disposition == "block"
         ]
 
     @computed_field

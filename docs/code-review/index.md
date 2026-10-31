@@ -76,6 +76,7 @@ Options:
 | `deep` | `True` | Confirm injection hits with the grading model and check which outputs obeyed them. |
 | `limits` | `None` | An `EvidenceLimits` budget for large diffs. |
 | `answer_kind` | `"code"` | The answer kind used to grade each output. |
+| `max_claims` | `40` | The most claims checked per output. An output with more is dropped, since the rest were never checked. |
 
 For a custom pipeline, the steps are public too:
 

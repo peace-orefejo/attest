@@ -18,7 +18,7 @@ from ..scoring.stats import Proportion
 from ..utils.failures import failure_reason
 from .outcomes import TaskReport, TaskResult
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 SCHEMA_BASE_URL = f"https://peace-orefejo.github.io/attest/schemas/v{SCHEMA_VERSION}"
 
 EXIT_OK = 0
@@ -36,14 +36,15 @@ P = ParamSpec("P")
 class RunData(BaseModel):
     """`attest run`: one report per trajectory, plus totals for the whole file.
 
-    Gate on `verdicts`: `passed` counts runs whose checks all passed and doesn't account for
-    `review`.
+    `passed` counts runs whose verdict is `pass`; `checks_passed` counts runs whose checks all
+    passed, including runs that still need review.
     """
 
     trajectories: list[TaskReport]
     total: int
     evaluated: int
     passed: int
+    checks_passed: int
     verdicts: dict[Disposition, int]
     mean_overall_score: float | None
     usage: Usage
@@ -83,7 +84,7 @@ class Output(BaseModel, Generic[DataT]):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    schema_version: Literal["1"] = "1"
+    schema_version: Literal["2"] = "2"
     command: str
     ok: Literal[True] = True
     data: DataT
@@ -99,7 +100,7 @@ class ErrorOutput(BaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    schema_version: Literal["1"] = "1"
+    schema_version: Literal["2"] = "2"
     command: str
     ok: Literal[False] = False
     error: ErrorDetail

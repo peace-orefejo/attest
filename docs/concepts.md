@@ -87,8 +87,8 @@ or `--kind` to `attest run`:
 
 `evaluate()` runs faithfulness and tool use by default; pass `checks=` for others. It returns a
 `Report` with one result per check, plus a `policy` result when the `Attest` has a
-[policy](checks/policies.md). `passed` is true when every result passes, but it doesn't
-account for `review`: gate on the report's `verdict` (below). Its
+[policy](checks/policies.md). `passed` is true when the report's `verdict` (below) is
+`pass`; `checks_passed` is true when every check passed, even if something still needs review. Its
 `overall_score` is the mean of the scores that aren't `null`, and `scores` gives each check's
 score by name.
 
@@ -103,7 +103,9 @@ reported as success, a `compromised` injection, an out-of-scope request the agen
 and a failed `fail`-severity policy rule. These go to review: a tool error the agent ignored, an
 unnecessary tool call, a `warn`-severity policy rule, and a faithfulness result where no claim
 could be checked against the evidence. Injection warnings pass, and so do `unverifiable` claims
-when at least one other claim was checked. Any other failed finding blocks.
+when at least one other claim was checked. Any other failed finding blocks, and any other
+finding nothing checked (`unchecked`, or `metadata["checked"]` false) goes to review. A `Report`
+you build yourself, without `evaluate()`, gets the verdict the default policy would give it.
 
 ```python
 from attest import Attest, ToolUsePolicy, VerdictPolicy

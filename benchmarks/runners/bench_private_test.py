@@ -41,3 +41,12 @@ def test_private_ids_are_stable_and_errorless_rows_stay_errorless() -> None:
     assert private_case_id("a") == private_case_id("a") != private_case_id("b")
     [row] = withhold_case_details([_row()])
     assert row.error is None
+
+
+def test_a_key_makes_ids_uncheckable_without_it() -> None:
+    plain = private_case_id("vera-refund-42")
+    keyed = private_case_id("vera-refund-42", b"secret")
+    assert keyed != plain and keyed == private_case_id("vera-refund-42", b"secret")
+    assert keyed != private_case_id("vera-refund-42", b"other")
+    [row] = withhold_case_details([_row()], b"secret")
+    assert row.id == keyed

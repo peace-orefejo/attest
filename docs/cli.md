@@ -31,6 +31,7 @@ attest run runs.jsonl --checks faithfulness,tool_use,injection,role > report.jso
 | `--checks` | `faithfulness,tool_use` | Any of `faithfulness`, `tool_use`, `injection`, `role`. |
 | `--kind` | `factual` | Answer kind: `factual`, `plan`, `code` or `auto`. |
 | `--appropriate` | off | Add the model tool-choice check. |
+| `--max-claims N` | `40` | Check at most N claims per answer. Claims past the cap aren't checked, so the run goes to review. Must be 0 or more. |
 | `--max-calls`, `--max-tokens` | none | Stop before going over this budget (exit code 3). |
 | `--cache-dir PATH` | none | Reuse grading verdicts across runs. |
 
@@ -70,3 +71,4 @@ The file holds a [`PullRequest`](code-review/outputs.md#pullrequest) and its
 | `--follow` / `--no-follow` | on | Drop outputs that break a review rule. |
 | `--mode TYPE=MODE` | per type | Override a [gate mode](code-review/index.md#keep-or-drop-the-gate), e.g. `issue=strict`. Repeatable. |
 | `--deep` / `--no-deep` | on | Confirm injection hits with the grading model and check which outputs obeyed them. |
+| `--max-claims N` | `40` | Check at most N claims per output. An output with more is [dropped](code-review/outputs.md#what-drops-an-output). Must be 0 or more. |

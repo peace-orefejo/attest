@@ -11,7 +11,7 @@ from ...code_review.gate.defaults import DEFAULT_MODES
 from ...code_review.models import GATE_MODES, GateMode
 from ..context import require_key
 from ..json_output import emit, json_command
-from ..options import MODEL_OPTION, PROVIDER_OPTION
+from ..options import MAX_CLAIMS_OPTION, MODEL_OPTION, PROVIDER_OPTION, require_max_claims
 
 
 class ReviewFile(BaseModel):
@@ -44,6 +44,7 @@ def review(
         "--deep/--no-deep",
         help="LLM-confirm injection hits and check whether outputs obeyed them.",
     ),
+    max_claims: int = MAX_CLAIMS_OPTION,
     provider: str = PROVIDER_OPTION,
     model: str | None = MODEL_OPTION,
 ) -> None:
@@ -51,6 +52,7 @@ def review(
     request = _load_review(path)
     modes = _parse_modes(mode)
     rules = _load_rules(guidelines)
+    require_max_claims(max_claims)
     require_key(provider)
     try:
         result = Attest(provider=provider, model=model).review(
@@ -60,6 +62,7 @@ def review(
             follow_guidelines=follow,
             modes=modes,
             deep=deep,
+            max_claims=max_claims,
         )
     except ValueError as exc:
         raise typer.BadParameter(str(exc), param_hint="PATH") from exc
