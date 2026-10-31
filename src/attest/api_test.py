@@ -34,7 +34,7 @@ def test_client_is_built_lazily():
 
 def test_model_defaults_per_provider():
     judge = Attest(key="sk-ant-test-key")
-    assert judge.model == "claude-haiku-4-5"
+    assert judge.model == "claude-haiku-5-5"
 
 
 def test_unknown_provider_raises():
