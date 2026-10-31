@@ -26,12 +26,6 @@ The public API, importable as `from attest import ...`.
 
 ::: attest.Severity
 
-## Display
-
-::: attest.display.render
-
-::: attest.display.show
-
 ## Checks
 
 ::: attest.evaluate

@@ -12,10 +12,12 @@ from ...checks.injection import (
     load_regex_detector,
 )
 from ..context import llm_context, require_key
-from ..options import JSON_OPTION, MODEL_OPTION, PROVIDER_OPTION
+from ..json_output import json_command
+from ..options import MODEL_OPTION, PROVIDER_OPTION
 from ..single_check import run_single_check
 
 
+@json_command("injection")
 def injection(
     path: Path,
     deep: bool = typer.Option(
@@ -25,7 +27,6 @@ def injection(
     ),
     provider: str = PROVIDER_OPTION,
     model: str | None = MODEL_OPTION,
-    json_output: bool = JSON_OPTION,
     patterns: Path | None = typer.Option(
         None, "--patterns", help="JSON file containing additional named regex patterns."
     ),
@@ -53,7 +54,7 @@ def injection(
             extract_files=extract_files,
             allow_paths=allow_paths,
         )
-        run_single_check(path, check, json_output=json_output)
+        run_single_check("injection", path, check)
 
 
 def _detectors(patterns: Path | None, *, patterns_only: bool) -> list[InjectionDetector]:

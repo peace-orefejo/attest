@@ -9,29 +9,38 @@ from ...checks.judge_baseline import naive_judge
 from ...checks.verify import extract_claims, judge_trajectory, verify_claims
 from ...trajectory import Trajectory
 from ..context import llm_context, require_key
-from ..demo_view import DemoRow, demo_view
+from ..json_output import DemoComparison, DemoData, DemoOutcome, emit, json_command
 from ..loading import load_trajectories
-from ..options import JSON_OPTION, MODEL_OPTION, PROVIDER_OPTION
-from ..rendering import emit_json, print_blocks
+from ..options import MODEL_OPTION, PROVIDER_OPTION
+
+_OUTCOMES: dict[tuple[bool, bool], DemoOutcome] = {
+    (True, True): "caught",
+    (False, True): "both_caught",
+    (True, False): "both_passed",
+    (False, False): "judge_only",
+}
 
 
+@json_command("demo")
 def demo(
     path: Path = typer.Argument(Path("examples/trajectory.json")),
     provider: str = PROVIDER_OPTION,
     model: str | None = MODEL_OPTION,
-    json_output: bool = JSON_OPTION,
 ) -> None:
     """Run the naive LLM-judge and attest side by side — the headline comparison."""
     require_key(provider)
     with llm_context(provider, model):
-        rows = [_compare(traj) for traj in load_trajectories(path)]
-    if json_output:
-        emit_json([row.to_json() for row in rows])
-        return
-    print_blocks([demo_view(row) for row in rows])
+        comparisons = [_compare(traj) for traj in load_trajectories(path)]
+    emit("demo", DemoData(comparisons=comparisons))
 
 
-def _compare(traj: Trajectory) -> DemoRow:
+def _compare(traj: Trajectory) -> DemoComparison:
     verdict = naive_judge(traj)
     result = judge_trajectory(traj, partial(extract_claims, task=traj.task), verify_claims)
-    return DemoRow(trajectory=traj, verdict=verdict, result=result)
+    return DemoComparison(
+        task=traj.task,
+        answer=traj.final_answer,
+        judge=verdict,
+        attest=result,
+        outcome=_OUTCOMES[(verdict.passed, bool(result.failures))],
+    )

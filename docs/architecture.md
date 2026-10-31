@@ -2,8 +2,8 @@
 
 ![attest package layers](assets/diagrams/architecture.svg){ .diagram }
 
-attest is split into layers. Imports only point down: entry points use `display` and the
-features, and features use the shared foundation (the data models, `llm/`, `prompts/`) and
+attest is split into layers. Imports only point down: entry points use the features, and
+features use the shared foundation (the data models, `llm/`, `prompts/`) and
 `utils/`. The foundation never imports a feature, so a feature can't quietly become a
 dependency of everything else.
 
@@ -11,10 +11,9 @@ dependency of everything else.
 
 **Entry points.** `api.py` holds `Attest`, which keeps the provider, model, client and policy
 and runs checks with them. `cli/` is the `attest` command, one module per command group in
-`cli/commands/`. Both are thin and call into the features.
-
-**Display.** `display/` turns a `Report`, `CheckResult`, `ReviewResult` or `GateDecision` into
-the readable view used by `attest.show`, `attest.render` and the CLI.
+`cli/commands/`. Both are thin and call into the features. Every command prints its result
+through `cli/json_output.py`, which holds the versioned JSON envelope, the per-command output
+models and the JSON Schemas built from them.
 
 **Features.** One package per job:
 
@@ -49,11 +48,6 @@ the readable view used by `attest.show`, `attest.render` and the CLI.
 - **Incomplete is not clean.** Content that couldn't be scanned or extracted, or a budget that
   ran out, is reported as incomplete coverage, never as a pass.
 - **Clients are lazy.** Deterministic checks never create an API client, so they run with no key.
-- **Small files.** Modules stay short and focused, grouped into feature folders. A file that
-  grows past a couple of hundred lines gets split.
-- **Typed, structured values.** Data passed between steps is a Pydantic model, not a tuple or a
-  loose dict. The code passes strict pyright.
-- **Tests sit next to the code.** Each module's tests are in `<module>_test.py` beside it.
 
 ## Where things live
 
@@ -68,7 +62,4 @@ the readable view used by `attest.show`, `attest.render` and the CLI.
 | Supported models | `providers.py` |
 | Model calls, caching and budgets | `llm/` |
 | CLI commands | `cli/commands/` |
-| How results are printed | `display/` |
-
-The design notes behind code review mode and the injection roadmap are under
-[Design notes](design/code-review-mode.md).
+| The CLI's JSON output and schemas | `cli/json_output.py` (then run `docs/scripts/write_schemas.py`) |

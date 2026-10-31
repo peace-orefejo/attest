@@ -13,7 +13,6 @@ PROVIDER_OPTION = typer.Option(
 MODEL_OPTION = typer.Option(
     None, "--model", "-m", help="Model id; defaults to a sensible model for the provider."
 )
-JSON_OPTION = typer.Option(False, "--json", help="Emit machine-readable JSON.")
 KIND_OPTION = typer.Option(
     "factual",
     "--kind",

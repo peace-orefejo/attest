@@ -8,7 +8,19 @@ This check is deterministic and needs no API key.
 attest tools run.json
 ```
 
-![attest tools output](../assets/terminal/attest-tools.svg){ .terminal }
+Each tool call becomes a finding with the tool's name in `subject` and the step index in `step`:
+
+```json
+{
+  "severity": "pass",
+  "verdict": "correct",
+  "subject": "web_search",
+  "reason": "Allowed tool; no unhandled error.",
+  "evidence": null,
+  "step": 0,
+  "metadata": {"allowed": true, "error_handled": null, "appropriate": null}
+}
+```
 
 ```python
 judge.tool_use(run)

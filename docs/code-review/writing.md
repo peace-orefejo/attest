@@ -52,4 +52,4 @@ review, never as instructions. A pull request with no diffs raises `ValueError`.
 
 attest's own outputs get no special treatment. In `review()` each one is graded for
 faithfulness, checked against the guidelines, and gated, and an output that fails is dropped.
-The human view says "written by attest" in its subtitle.
+When attest wrote the outputs, `written` is `true` in the result.

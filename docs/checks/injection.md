@@ -8,7 +8,8 @@ attest injection run.json            # scan only, no API key
 attest injection run.json --deep     # also check whether the agent obeyed
 ```
 
-![attest injection output](../assets/terminal/attest-injection.svg){ .terminal }
+Each payload becomes a finding that quotes it in `evidence`, with its location and the detector
+that matched in `metadata`.
 
 ## Scan
 

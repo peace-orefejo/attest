@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://peace-orefejo.github.io/attest/schemas/v1/run.json",
+  "$defs": {
+    "CheckResult": {
+      "properties": {
+        "check": {
+          "title": "Check",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        },
+        "summary": {
+          "default": "",
+          "title": "Summary",
+          "type": "string"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "prompt_version": {
+          "default": "2026.10.30",
+          "title": "Prompt Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check",
+        "passed"
+      ],
+      "title": "CheckResult",
+      "type": "object"
+    },
+    "Finding": {
+      "properties": {
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "verdict": {
+          "title": "Verdict",
+          "type": "string"
+        },
+        "subject": {
+          "default": "",
+          "title": "Subject",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "severity",
+        "verdict"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "Report": {
+      "properties": {
+        "results": {
+          "items": {
+            "$ref": "#/$defs/CheckResult"
+          },
+          "title": "Results",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "overall_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "readOnly": true,
+          "title": "Overall Score"
+        },
+        "passed": {
+          "readOnly": true,
+          "title": "Passed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "results",
+        "overall_score",
+        "passed"
+      ],
+      "title": "Report",
+      "type": "object"
+    },
+    "RunData": {
+      "description": "`attest run`: one report per trajectory, plus totals for the whole file.",
+      "properties": {
+        "trajectories": {
+          "items": {
+            "$ref": "#/$defs/TaskReport"
+          },
+          "title": "Trajectories",
+          "type": "array"
+        },
+        "total": {
+          "title": "Total",
+          "type": "integer"
+        },
+        "evaluated": {
+          "title": "Evaluated",
+          "type": "integer"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "integer"
+        },
+        "mean_overall_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Mean Overall Score"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        },
+        "budget_exceeded": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Budget Exceeded"
+        }
+      },
+      "required": [
+        "trajectories",
+        "total",
+        "evaluated",
+        "passed",
+        "mean_overall_score",
+        "usage"
+      ],
+      "title": "RunData",
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "pass",
+        "warn",
+        "fail"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "TaskReport": {
+      "properties": {
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "report": {
+          "$ref": "#/$defs/Report"
+        }
+      },
+      "required": [
+        "task",
+        "report"
+      ],
+      "title": "TaskReport",
+      "type": "object"
+    },
+    "Usage": {
+      "properties": {
+        "calls": {
+          "default": 0,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "input_tokens": {
+          "default": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "default": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "cached_input_tokens": {
+          "default": 0,
+          "title": "Cached Input Tokens",
+          "type": "integer"
+        },
+        "cache_write_tokens": {
+          "default": 0,
+          "title": "Cache Write Tokens",
+          "type": "integer"
+        },
+        "cache_hits": {
+          "default": 0,
+          "title": "Cache Hits",
+          "type": "integer"
+        },
+        "tokens": {
+          "readOnly": true,
+          "title": "Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tokens"
+      ],
+      "title": "Usage",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "command": {
+      "const": "run",
+      "title": "Command",
+      "type": "string"
+    },
+    "ok": {
+      "const": true,
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "data": {
+      "$ref": "#/$defs/RunData"
+    }
+  },
+  "required": [
+    "schema_version",
+    "command",
+    "ok",
+    "data"
+  ],
+  "title": "attest run",
+  "type": "object"
+}

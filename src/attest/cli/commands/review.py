@@ -9,10 +9,9 @@ from ...api import Attest
 from ...code_review import PullRequest, ReviewGuidelines, ReviewOutput, load_guidelines
 from ...code_review.gate.defaults import DEFAULT_MODES
 from ...code_review.models import GATE_MODES, GateMode
-from ...display import view
 from ..context import require_key
-from ..options import JSON_OPTION, MODEL_OPTION, PROVIDER_OPTION
-from ..rendering import emit_json, print_view
+from ..json_output import emit, json_command
+from ..options import MODEL_OPTION, PROVIDER_OPTION
 
 
 class ReviewFile(BaseModel):
@@ -20,6 +19,7 @@ class ReviewFile(BaseModel):
     outputs: list[ReviewOutput] | None = None
 
 
+@json_command("review")
 def review(
     path: Path = typer.Argument(
         ...,
@@ -46,7 +46,6 @@ def review(
     ),
     provider: str = PROVIDER_OPTION,
     model: str | None = MODEL_OPTION,
-    json_output: bool = JSON_OPTION,
 ) -> None:
     """Check each code review output against the diff and your review rules (needs a key)."""
     request = _load_review(path)
@@ -64,10 +63,7 @@ def review(
         )
     except ValueError as exc:
         raise typer.BadParameter(str(exc), param_hint="PATH") from exc
-    if json_output:
-        emit_json(result.model_dump(mode="json"))
-        return
-    print_view(view(result))
+    emit("review", result)
 
 
 def _load_review(path: Path) -> ReviewFile:

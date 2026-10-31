@@ -1,4 +1,5 @@
-"""CLI for attest: run, tools, injection, role, review, demo, stats, models."""
+"""CLI for attest. Every command (run, tools, injection, role, review, demo, stats, models,
+schema) prints JSON."""
 
 from __future__ import annotations
 

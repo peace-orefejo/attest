@@ -5,7 +5,6 @@ mode checks each reviewer output against the code it describes, then decides whe
 
 ![Code review mode](../assets/diagrams/code-review-flow.svg){ .diagram }
 
-attest checks a reviewer's outputs against the code, and drops the ones the code doesn't back.
 Put it between your review pipeline and the people who read the results. If you don't have a
 reviewer, attest can [write the review itself](writing.md) and check that too.
 
@@ -45,70 +44,10 @@ payload = result.model_dump_json() # or store the decisions
 evidence, checks it against your [review guidelines](guidelines.md), and gates it. Outputs that
 carry no diffs or changed-file list of their own use the pull request's.
 
-The result has one decision per output:
-
-```json
-{
-  "decisions": [
-    {
-      "index": 0,
-      "output_type": "issue",
-      "text": "cart_total no longer checks for a missing user, so user.discount raises when user is None.",
-      "question": null,
-      "keep": true,
-      "mode": "lenient",
-      "score": 1.0,
-      "summary": "2/2 checkable claims grounded.",
-      "reasons": [],
-      "notes": [],
-      "omissions": []
-    },
-    {
-      "index": 1,
-      "output_type": "issue",
-      "text": "The loop in cart_total uses range(len(items) + 1) and reads past the end of items.",
-      "question": null,
-      "keep": false,
-      "mode": "lenient",
-      "score": 0.0,
-      "summary": "0/1 checkable claims grounded.",
-      "reasons": [
-        {
-          "severity": "fail",
-          "verdict": "unsupported",
-          "subject": "The loop in cart_total uses range(len(items) + 1).",
-          "reason": "The diff shows 'for item in items:', which iterates directly over items.",
-          "evidence": "for item in items:",
-          "step": 1,
-          "metadata": {}
-        }
-      ],
-      "notes": [],
-      "omissions": []
-    }
-  ],
-  "injection": {
-    "check": "code_injection",
-    "passed": true,
-    "summary": "No reviewer-steering text found in the added lines or PR text.",
-    "findings": [],
-    "metadata": {"verdict": "clean", "coverage_incomplete": false}
-  },
-  "guidelines": {"name": "REVIEW.md", "rules": [{"id": "G1", "text": "...", "section": "Issues"}]},
-  "written": false,
-  "kept": [0],
-  "dropped": [1]
-}
-```
-
-For people, `attest.show(result)` prints the same thing as a status line, a table with one row
-per output, and the reasons behind each dropped output. `attest.render(result)` returns it as
-plain text. From the shell, `attest review` does the same for a JSON file (see
-[Command line](../cli.md#attest-review)).
-
-The full script is `examples/code_review_gate.py`:
-
-![Code review gate output](../assets/terminal/code-review-gate.svg){ .terminal }
+The result has one decision per output, saying whether to keep it and why, plus `kept` and
+`dropped` lists of indexes. [Outputs and decisions](outputs.md) lists every field. From the
+shell, `attest review` prints the same result as JSON (see
+[Command line](../cli.md#attest-review)). The full script is `examples/code_review_gate.py`.
 
 Options:
 
@@ -122,12 +61,7 @@ Options:
 | `limits` | `None` | An `EvidenceLimits` budget for large diffs. |
 | `answer_kind` | `"code"` | The answer kind used to grade each output. |
 
-### Lower level
-
-`to_run`, `check_code_injection` and `gate` are still public. Use them to build a custom
-pipeline, for example to grade with your own `Report` or to gate outputs one at a time.
-`attest.code_review.review(pr, outputs, evaluate=...)` is the same one-call function with your
-own grading function in place of `Attest`.
+For a custom pipeline, `to_run`, `check_code_injection` and `gate` are public too.
 
 ## How code is graded
 
@@ -146,18 +80,10 @@ The `code` answer kind reads evidence the way a reviewer should:
 
 ## Large changes
 
-Each output's evidence is kept within a budget (`EvidenceLimits`, 12,000 characters per file
-and 60,000 per run by default; pass `limits=` to change it):
-
-- Lockfiles (npm, yarn, pnpm, uv, poetry, Cargo, go.sum) are reduced to the package version
-  changes they contain.
-- Generated and minified files are replaced by a note saying how many lines changed.
-- Large hand-written diffs keep whole hunks until the budget runs out, then note what was left
-  out.
-- The changed-file list is never cut.
-
-Each decision's `omissions` lists the files that had content left out and why, so you can show
-it alongside the decision. At the lower level, `to_run_with_omissions` returns the same list.
+Each output's evidence is kept within a budget (12,000 characters per file and 60,000 per run by
+default; pass `limits=EvidenceLimits(...)` to change it). Lockfiles are reduced to their version
+changes, generated files to a line count, and large diffs keep whole hunks until the budget runs
+out. The changed-file list is never cut. Each decision's `omissions` says what was left out.
 
 ## Next
 

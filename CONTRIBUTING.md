@@ -50,8 +50,7 @@ uv pip install --python /tmp/attest-core -e . pytest
 
 The package is layered. Imports only point down:
 
-- **Entry points:** `api.py` and `cli/`.
-- **Display:** `display/`, which turns results into the readable view.
+- **Entry points:** `api.py` and `cli/`. The CLI prints only JSON.
 - **Features:** `checks/`, `code_review/`, `policy/`, `extraction/`, `scoring/` and `adapters/`.
 - **Foundation:** the data models (`trajectory.py`, `results.py`, `content.py`),
   `providers.py`, `llm/` for model calls, caching and budgets, and `prompts/` for every prompt.
@@ -127,15 +126,16 @@ uv run --group docs mkdocs build --strict
 Add a new page to `nav` in `mkdocs.yml`. The strict build fails on broken links and on pages
 missing from the nav.
 
-The terminal images in `docs/assets/terminal/` come from real output. To refresh one, rerun the
-command, save its output next to the SVG as a `.txt` file, and render it:
+Every CLI command prints JSON through `src/attest/cli/json_output.py`. When you change what a
+command prints, or a model it prints (`CheckResult`, `Report`, `ReviewResult` and so on),
+regenerate the published schemas; a test fails until they match:
 
 ```bash
-FORCE_COLOR=1 COLUMNS=96 uv run attest run examples/trajectory.json > docs/assets/terminal/attest-run.txt
-uv run --group docs python docs/scripts/render_terminal.py \
-    docs/assets/terminal/attest-run.txt docs/assets/terminal/attest-run.svg \
-    --command "attest run examples/trajectory.json"
+uv run python docs/scripts/write_schemas.py
 ```
+
+Adding a field is fine within a schema version. Removing or renaming one, or changing its
+meaning, needs a new `SCHEMA_VERSION` and a changelog entry.
 
 Diagrams in `docs/assets/diagrams/` are hand-written SVG. Keep their colors on their own light
 background so they read in both themes.
