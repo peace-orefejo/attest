@@ -25,3 +25,6 @@ build/
 
 # Docs build output
 site/
+
+# Benchmark response cache (--cache-dir)
+.bench-cache/
