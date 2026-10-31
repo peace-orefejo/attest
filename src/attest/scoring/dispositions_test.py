@@ -308,3 +308,9 @@ def test_claim_coverage_ignores_an_answer_with_no_claims():
 def test_min_claim_coverage_must_be_a_share():
     with pytest.raises(ValidationError):
         VerdictPolicy(min_claim_coverage=1.5)
+
+
+def test_report_exposes_claim_coverage():
+    assert _faithfulness(1, 40).claim_coverage == 1 / 40
+    assert _faithfulness(0, 0).claim_coverage is None
+    assert Report(results=[]).claim_coverage is None

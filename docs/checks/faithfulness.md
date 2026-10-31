@@ -44,7 +44,9 @@ To require more, set a minimum share of claims checked; below it, the run goes t
 Attest(verdict_policy=VerdictPolicy(min_claim_coverage=0.8))   # at least 80% of claims checked
 ```
 
-Coverage is kept separate from the score: 1 claim checked out of 40 can still score 1.0.
+Coverage is kept separate from the score: 1 claim checked out of 40 can still score 1.0. The
+report gives it directly as `report.claim_coverage` (0 to 1, or `null` when faithfulness didn't
+run or the answer made no claims).
 
 ## Files as evidence
 
