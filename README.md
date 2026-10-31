@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/peace-orefejo/attest/main/docs/assets/brand/attest-logo-dark.svg">
+    <img alt="attest" src="https://raw.githubusercontent.com/peace-orefejo/attest/main/docs/assets/brand/attest-logo.svg" height="64">
+  </picture>
+</p>
+
 # attest
 
 **A reality-checker for AI agents.** It grades an agent's answer against what its tools
