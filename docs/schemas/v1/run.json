@@ -216,6 +216,19 @@
           "readOnly": true,
           "title": "Scores",
           "type": "object"
+        },
+        "claim_coverage": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Share of the answer's claims faithfulness checked against the evidence.\n\nNone when faithfulness didn't run or the answer made no claims. Kept separate from the\nfaithfulness score: 1 claim checked out of 40 can still score 1.0.",
+          "readOnly": true,
+          "title": "Claim Coverage"
         }
       },
       "required": [
@@ -224,7 +237,8 @@
         "passed",
         "verdict",
         "blocking",
-        "scores"
+        "scores",
+        "claim_coverage"
       ],
       "title": "Report",
       "type": "object"

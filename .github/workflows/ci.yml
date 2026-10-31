@@ -48,7 +48,7 @@ jobs:
 
       - name: Install (with file extraction)
         if: matrix.extras == 'files'
-        run: uv pip install --system -e ".[files]" pytest
+        run: uv pip install --system -e ".[files]" pytest hypothesis
 
       - name: Run tests
         run: python -m pytest -q

@@ -57,10 +57,12 @@ def with_missing_claims(claims: list[str], findings: list[Finding]) -> list[Find
     A verifier that drops claims must not make the answer look verified: a missing verdict
     is inconclusive (`checked` is false), never a pass.
     """
-    missing = len(claims) - len(findings)
+    returned = {finding.subject for finding in findings}
+    unanswered = [claim for claim in claims if claim not in returned]
+    unmatched = sum(finding.subject not in claims for finding in findings)
+    missing = max(len(claims) - len(findings), len(unanswered) - unmatched)
     if missing <= 0:
         return findings
-    returned = {finding.subject for finding in findings}
-    unanswered = [claim for claim in claims if claim not in returned] + claims
+    unanswered += claims
     reason = "The verifier returned no verdict for this claim."
     return findings + [unchecked(claim, reason) for claim in unanswered[:missing]]

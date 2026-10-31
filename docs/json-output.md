@@ -48,7 +48,8 @@ The exit code says whether the command ran, not whether the agent passed.
 
 A `report` holds `results` (one per check), `overall_score`, `passed`, `verdict` (`pass`,
 `review` or `block`), `blocking` (the findings that blocked, each a `check`, `verdict` and
-`subject`) and `scores` (each check's score by name). Each result and finding has the fields
+`subject`), `scores` (each check's score by name) and `claim_coverage` (the share of claims
+faithfulness checked, or `null`). Each result and finding has the fields
 described in [How it works](concepts.md#results-and-findings); a finding in a report also has
 its `disposition`. See [Reports](concepts.md#reports). Gate on `verdict`: `passed` only says
 every check passed, so an inconclusive run can have `passed: true` and `verdict: "review"`.

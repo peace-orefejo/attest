@@ -37,6 +37,17 @@ is `review`, not `pass`. Change it with
 `VerdictPolicy(on_inconclusive_faithfulness=...)`. An answer that makes no claims at all
 passes.
 
+**Minimum coverage.** A run where only a few claims could be checked still passes by default.
+To require more, set a minimum share of claims checked; below it, the run goes to review:
+
+```python
+Attest(verdict_policy=VerdictPolicy(min_claim_coverage=0.8))   # at least 80% of claims checked
+```
+
+Coverage is kept separate from the score: 1 claim checked out of 40 can still score 1.0. The
+report gives it directly as `report.claim_coverage` (0 to 1, or `null` when faithfulness didn't
+run or the answer made no claims).
+
 **A failed call is not a pass either.** If claim extraction or a verification call fails, or a
 verifier returns no verdict for a claim, the claims it covered are `unverifiable` with
 `metadata["checked"]` set to `false` and the error in `reason`. Each one is `review` (the same
