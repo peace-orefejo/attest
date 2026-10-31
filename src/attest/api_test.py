@@ -1,5 +1,7 @@
 """The Attest facade — all offline."""
 
+import pytest
+
 import attest.checks.injection.deep as inj
 import attest.checks.tool_recovery as tr
 from attest import Attest, CheckResult, Finding, Report, Severity
@@ -150,8 +152,20 @@ def test_attest_review_grades_with_faithfulness_in_code_mode(monkeypatch):
     judge = Attest(key="sk-ant-test-key")
     pr = PullRequest(diffs={"billing/cart.py": _CLEAN_DIFF}, changed_files=["billing/cart.py"])
     result = judge.review(pr, [ReviewOutput(output_type="issue", text="a")], deep=False)
-    assert calls == [{"checks": ("faithfulness",), "answer_kind": "code"}]
+    assert calls == [{"checks": ("faithfulness",), "answer_kind": "code", "max_claims": 40}]
     assert result.kept == [0]
+    judge.review(pr, [ReviewOutput(output_type="issue", text="a")], deep=False, max_claims=3)
+    assert calls[-1]["max_claims"] == 3
+
+
+def test_attest_review_rejects_a_negative_max_claims_before_any_work(monkeypatch):
+    def fail(*args, **kwargs):
+        raise AssertionError("nothing should run")
+
+    monkeypatch.setattr(Attest, "evaluate", fail)
+    pr = PullRequest(diffs={"billing/cart.py": _CLEAN_DIFF}, changed_files=["billing/cart.py"])
+    with pytest.raises(ValueError, match="max_claims"):
+        Attest(key="sk-ant-test-key").review(pr, None, deep=False, max_claims=-1)
 
 
 def test_evaluate_asks_about_unrecovered_errors_when_a_model_is_available(monkeypatch):

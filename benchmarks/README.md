@@ -271,6 +271,10 @@ the same key across runs so their rows still match. A private run without the ke
 warning. Reports record a fingerprint of the key (never the key), and `compare.py` refuses to
 compare reports whose ids were hashed differently.
 
+Make the key random and high-entropy, such as the output of `openssl rand -hex 32`, never a
+word or passphrase. Anyone with a report can test guessed keys against its fingerprint offline,
+so a weak key can be brute-forced, and then every case id can be confirmed by hashing.
+
 The withholding covers the report only. Don't commit or upload the case files, and remember
 that the provider sees each case while grading it. The response cache (`--cache-dir`) quotes
 the cases too, so keep it private; `.bench-cache/` and `.cache/` are git-ignored.

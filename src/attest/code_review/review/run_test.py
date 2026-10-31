@@ -6,10 +6,12 @@ import json
 import pytest
 
 from attest import CheckResult, Finding, Report, Severity
+from attest.checks.verify import MAX_CLAIMS
 from attest.code_review import PullRequest, ReviewOutput, ReviewResult, review
 from attest.code_review.guidelines import parse_guidelines
 from attest.code_review.review import with_pr_evidence
 from attest.code_review.tool_names import READ_GUIDELINES
+from attest.scoring.report import evaluate
 
 RUN = importlib.import_module("attest.code_review.review.run")
 GRADE = importlib.import_module("attest.code_review.review.grade")
@@ -340,3 +342,41 @@ def test_an_incomplete_injection_scan_is_a_warning(monkeypatch):
     result = review(CLEAN_PR, outputs, evaluate=_grader({"a": _report("supported")}), deep=False)
     assert result.kept == [0]
     assert any("injection scan did not check every hit" in w for w in result.warnings)
+
+
+def _claims_grader(max_claims: int = MAX_CLAIMS):
+    def supported(claims, evidence):
+        return [Finding(severity=Severity.PASS, verdict="supported", subject=c) for c in claims]
+
+    def grade(run):
+        claims = [f"claim {i}" for i in range(int(run.final_answer.split()[0]))]
+        return evaluate(
+            run,
+            checks=("faithfulness",),
+            extract=lambda _: claims,
+            verify=supported,
+            max_claims=max_claims,
+        )
+
+    return grade
+
+
+def test_an_output_past_the_claim_cap_is_dropped_with_the_cap_reason():
+    outputs = [
+        ReviewOutput(output_type="issue", text="40 claims"),
+        ReviewOutput(output_type="issue", text="41 claims"),
+    ]
+    result = review(CLEAN_PR, outputs, evaluate=_claims_grader(), deep=False)
+    kept, dropped = result.decisions
+    assert kept.keep and kept.reasons == []
+    assert not dropped.keep
+    assert [reason.subject for reason in dropped.reasons] == ["claim 40"]
+    assert "makes 41 claims" in dropped.reasons[0].reason
+    assert "at most 40 (max_claims)" in dropped.reasons[0].reason
+    assert "1 more was not checked" in dropped.summary
+
+
+def test_a_higher_claim_cap_keeps_the_longer_output():
+    outputs = [ReviewOutput(output_type="issue", text="41 claims")]
+    result = review(CLEAN_PR, outputs, evaluate=_claims_grader(max_claims=41), deep=False)
+    assert result.kept == [0]

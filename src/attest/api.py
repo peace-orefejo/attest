@@ -129,15 +129,21 @@ class Attest:
         deep: bool = True,
         limits: EvidenceLimits | None = None,
         answer_kind: str = "code",
+        max_claims: int = MAX_CLAIMS,
     ) -> ReviewResult:
         """Check every output of a code review and decide which to keep, in one call.
 
         Pass `guidelines` (markdown paths or text) to use the team's review rules; without them
         the built-in general standard applies. With no `outputs`, attest writes the review itself.
+        `max_claims` caps how many claims of each output are checked; an output with more is
+        dropped, since the rest were never checked.
         """
+        validate_evaluation_options(("faithfulness",), answer_kind, max_claims)
 
         def grade(run: Trajectory) -> Report:
-            return self.evaluate(run, checks=("faithfulness",), answer_kind=answer_kind)
+            return self.evaluate(
+                run, checks=("faithfulness",), answer_kind=answer_kind, max_claims=max_claims
+            )
 
         with self._llm_context():
             return review_outputs(

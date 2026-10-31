@@ -103,7 +103,9 @@ reported as success, a `compromised` injection, an out-of-scope request the agen
 and a failed `fail`-severity policy rule. These go to review: a tool error the agent ignored, an
 unnecessary tool call, a `warn`-severity policy rule, and a faithfulness result where no claim
 could be checked against the evidence. Injection warnings pass, and so do `unverifiable` claims
-when at least one other claim was checked. Any other failed finding blocks.
+when at least one other claim was checked. Any other failed finding blocks, and any other
+finding nothing checked (`unchecked`, or `metadata["checked"]` false) goes to review. A `Report`
+you build yourself, without `evaluate()`, gets the verdict the default policy would give it.
 
 ```python
 from attest import Attest, ToolUsePolicy, VerdictPolicy

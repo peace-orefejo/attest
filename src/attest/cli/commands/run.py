@@ -12,7 +12,13 @@ from ..context import require_key
 from ..evaluation import EvaluationSettings, evaluate_all
 from ..json_output import EXIT_BUDGET_EXCEEDED, RunData, emit, json_command
 from ..loading import load_trajectories
-from ..options import KIND_OPTION, MODEL_OPTION, PROVIDER_OPTION
+from ..options import (
+    KIND_OPTION,
+    MAX_CLAIMS_OPTION,
+    MODEL_OPTION,
+    PROVIDER_OPTION,
+    require_max_claims,
+)
 from ..outcomes import RunOutcome
 
 
@@ -28,6 +34,7 @@ def run(
         False, "--appropriate", help="Also run the LLM tool-choice check (1 call per tool call)."
     ),
     kind: str = KIND_OPTION,
+    max_claims: int = MAX_CLAIMS_OPTION,
     provider: str = PROVIDER_OPTION,
     model: str | None = MODEL_OPTION,
     max_calls: int | None = typer.Option(
@@ -42,6 +49,7 @@ def run(
 ) -> None:
     """Full report on a trajectory (or JSONL): runs the chosen checks + an overall score."""
     selected = _selected_checks(checks, kind)
+    require_max_claims(max_claims)
     require_key(provider)
     trajectories = load_trajectories(path)
 
@@ -51,7 +59,9 @@ def run(
         budget=_budget(max_calls, max_tokens),
         cache=cache_dir or False,
     )
-    settings = EvaluationSettings(checks=selected, appropriate=appropriate, kind=kind)
+    settings = EvaluationSettings(
+        checks=selected, appropriate=appropriate, kind=kind, max_claims=max_claims
+    )
     outcome = evaluate_all(judge, trajectories, settings)
 
     emit("run", _run_data(outcome))

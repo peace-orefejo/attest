@@ -169,6 +169,32 @@ def test_all_unverifiable_and_capped_keeps_the_cap_note():
     assert "first 2 claims" in result.summary
 
 
+def test_max_claims_zero_checks_nothing_and_says_so():
+    seen: list[list[str]] = []
+
+    def verify(claims, evidence):
+        seen.append(claims)
+        return []
+
+    result = judge_trajectory(
+        _example(), lambda a: [f"c{i}" for i in range(60)], verify, max_claims=0
+    )
+    assert seen == [[]]
+    assert result.summary == (
+        "None of the 60 claims could be checked against the evidence. "
+        "(max_claims is 0, so no claim was checked)"
+    )
+    assert result.metadata["claims_unchecked"] == 60
+
+
+def test_cap_note_uses_the_singular_for_one_claim():
+    def supported(claims, evidence):
+        return [Finding(severity=Severity.PASS, verdict="supported", subject=c) for c in claims]
+
+    result = judge_trajectory(_example(), lambda a: ["c1", "c2"], supported, max_claims=1)
+    assert result.summary.endswith("(checked the first claim; 1 more was not checked)")
+
+
 def test_no_claims_still_scores_full():
     result = judge_trajectory(_example(), lambda a: [], _unverifiable)
     assert result.score == 1.0

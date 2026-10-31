@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from ..api import Attest
+from ..checks.verify import MAX_CLAIMS
 from ..llm import BudgetExceeded
 from ..trajectory import Trajectory
 from .outcomes import RunOutcome, TaskReport
@@ -12,6 +13,7 @@ class EvaluationSettings(BaseModel):
     checks: list[str]
     appropriate: bool
     kind: str
+    max_claims: int = MAX_CLAIMS
 
 
 def evaluate_all(
@@ -39,5 +41,6 @@ def _evaluate_one(judge: Attest, traj: Trajectory, settings: EvaluationSettings)
         checks=settings.checks,
         appropriate=settings.appropriate,
         answer_kind=settings.kind,
+        max_claims=settings.max_claims,
     )
     return TaskReport(task=traj.task, report=report)

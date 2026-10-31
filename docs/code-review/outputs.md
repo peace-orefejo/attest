@@ -100,12 +100,17 @@ decision plus the output's identity and scores.
 | Faithfulness `unsupported` | drop | drop |
 | Faithfulness `unverifiable` | keep | drop |
 | A claim no model judged (a failed call, `metadata["checked"]` is `false`) | drop | drop |
+| More claims than `max_claims` (40 by default): each claim past the cap is unchecked | drop | drop |
 | One of your rules broken (with `follow_guidelines=True`) | drop | drop |
 | Guideline missed (with `follow_guidelines=True`) | keep, listed as a note | keep, listed as a note |
 | Injection `payload` in this output's files | drop | drop |
 | Injection `compromised`, this output affected | drop | drop |
 | Injection `compromised`, another output affected | keep, listed as a note | keep, listed as a note |
 | Injection `suspicious` | keep, listed as a note | keep, listed as a note |
+
+An output past the claim cap lists each unchecked claim in `reasons`, and its `summary` says how
+many were not checked. Raise the cap with `review(..., max_claims=60)` or `attest review
+--max-claims 60`.
 
 Injection findings in files outside the output's `paths()` are ignored. Override the mode with
 `review(..., modes={"issue": "strict"})` or `gate(report, "issue", mode="strict")`.

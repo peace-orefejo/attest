@@ -76,17 +76,82 @@ def _all_findings(report: Report) -> list[tuple[str, Finding]]:
     return [(result.check, finding) for result in report.results for finding in result.findings]
 
 
+def _disposed(report: Report) -> list[tuple[str, Finding, str]]:
+    return [
+        (result.check, finding, disposition)
+        for result in report.results
+        for finding, disposition in zip(result.findings, result.dispositions, strict=True)
+    ]
+
+
 @given(reports)
 def test_the_verdict_is_the_strictest_disposition_and_blocking_lists_the_blocks(report):
-    found = _all_findings(report)
-    strictest = max((RANK[f.effective_disposition] for _, f in found), default=0)
+    found = _disposed(report)
+    strictest = max((RANK[d] for _, _, d in found), default=0)
     assert RANK[report.verdict] == strictest
     assert report.blocking == [
         BlockingFinding(check=check, verdict=f.verdict, subject=f.subject)
-        for check, f in found
-        if f.effective_disposition == "block"
+        for check, f, d in found
+        if d == "block"
     ]
     assert (report.verdict == "block") == bool(report.blocking)
+    for _, finding, disposition in found:
+        if finding.disposition is not None:
+            assert disposition == finding.disposition
+
+
+def _cleared(report: Report) -> Report:
+    return report.model_copy(
+        update={
+            "results": [
+                r.model_copy(
+                    update={
+                        "findings": [f.model_copy(update={"disposition": None}) for f in r.findings]
+                    }
+                )
+                for r in report.results
+            ]
+        }
+    )
+
+
+unassigned_findings = st.builds(
+    Finding,
+    severity=st.sampled_from(list(Severity)),
+    verdict=st.sampled_from([*VERDICTS, "unchecked"]),
+    subject=st.text(max_size=8),
+    metadata=st.fixed_dictionaries(
+        {},
+        optional={
+            "allowed": st.booleans(),
+            "appropriate": st.booleans(),
+            "error_handled": st.booleans(),
+            "checked": st.booleans(),
+        },
+    ),
+)
+unassigned_reports = st.builds(
+    Report,
+    results=st.lists(
+        st.builds(
+            CheckResult,
+            check=st.sampled_from(CHECKS),
+            passed=st.booleans(),
+            score=scores,
+            findings=st.lists(unassigned_findings, max_size=4),
+        ),
+        max_size=4,
+    ),
+)
+
+
+@given(st.one_of(unassigned_reports, reports.map(_cleared)))
+def test_a_report_without_dispositions_agrees_with_the_default_policy(report):
+    applied = apply_verdict_policy(report, VerdictPolicy())
+    assert report.verdict == applied.verdict
+    assert report.passed == applied.passed
+    assert report.blocking == applied.blocking
+    assert [r.dispositions for r in report.results] == [r.dispositions for r in applied.results]
 
 
 @given(reports, st.none() | policies)
@@ -101,19 +166,7 @@ def test_applying_a_policy_is_idempotent_and_leaves_the_input_alone(report, poli
 
 @given(reports, st.none() | policies)
 def test_earlier_dispositions_do_not_change_the_outcome(report, policy):
-    cleared = report.model_copy(
-        update={
-            "results": [
-                r.model_copy(
-                    update={
-                        "findings": [f.model_copy(update={"disposition": None}) for f in r.findings]
-                    }
-                )
-                for r in report.results
-            ]
-        }
-    )
-    assert apply_verdict_policy(report, policy) == apply_verdict_policy(cleared, policy)
+    assert apply_verdict_policy(report, policy) == apply_verdict_policy(_cleared(report), policy)
 
 
 @given(reports, st.none() | policies)

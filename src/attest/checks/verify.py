@@ -18,14 +18,16 @@ from ..utils.failures import failure_reason
 from .artifact_evidence import ArtifactExtraction, current_extraction, gather_evidence
 from .claim_findings import (
     NO_EVIDENCE_REASON,
+    ClaimTally,
     ClaimVerdict,
-    faithfulness_summary,
+    claims_summary,
     is_unchecked,
+    over_cap_findings,
     unchecked,
     unverifiable,
     verdict_finding,
 )
-from .claim_steps import ExtractFn, VerifyFn, extract_safely, verify_safely
+from .claim_steps import ExtractFn, VerifyFn, extract_safely, judge_extraction
 from .profiles import get_profile
 from .provenance import with_locations
 
@@ -80,48 +82,24 @@ def judge_trajectory(
         raise ValueError(f"max_claims must be 0 or more, not {max_claims}.")
     extraction = extract_safely(extract, traj.final_answer)
     claims = extraction.claims
-    capped = len(claims) > max_claims
     evidence = gather_evidence(traj, artifacts or current_extraction())
-    checked = claims[:max_claims]
-    verdicts = (
-        [extraction.failure]
-        if extraction.failure is not None
-        else verify_safely(verify, checked, evidence.text)
-    )
-    findings = with_locations(verdicts, evidence.blocks) + [
-        unchecked(claim, _over_cap_reason(len(claims), max_claims)) for claim in claims[max_claims:]
-    ]
-    supported = sum(finding.verdict == "supported" for finding in findings)
-    unsupported = sum(finding.verdict == "unsupported" for finding in findings)
-    checkable = supported + unsupported
-    unscorable = bool(findings) and not checkable
-    summary = faithfulness_summary(supported, checkable, len(findings))
-    if extraction.failure is not None:
-        summary = "The answer's claims could not be extracted, so none were checked."
-    if capped:
-        summary += (
-            f" (checked the first {max_claims} claims; "
-            f"{len(claims) - max_claims} more were not checked)"
-        )
+    verdicts = judge_extraction(extraction, verify, evidence.text, max_claims=max_claims)
+    findings = with_locations(verdicts, evidence.blocks) + over_cap_findings(claims, max_claims)
+    tally = ClaimTally.of(findings)
     return CheckResult(
         check="faithfulness",
-        passed=unsupported == 0,
-        score=None if unscorable else (supported / checkable if checkable else 1.0),
-        summary=summary,
+        passed=tally.unsupported == 0,
+        score=tally.score,
+        summary=claims_summary(
+            tally, len(claims), max_claims, extracted=extraction.failure is None
+        ),
         findings=findings,
         metadata={
             **evidence.metadata(),
-            "claims_checked": checkable,
+            "claims_checked": tally.checkable,
             "claims_total": len(claims),
             "claims_unchecked": sum(is_unchecked(finding) for finding in findings),
         },
-    )
-
-
-def _over_cap_reason(total: int, max_claims: int) -> str:
-    return (
-        f"Not checked: the answer makes {total} claims and faithfulness checks at most "
-        f"{max_claims} (max_claims)."
     )
 
 
