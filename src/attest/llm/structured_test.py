@@ -116,3 +116,19 @@ def test_gemini_empty_candidate_is_retried():
     client = _FlakyClient(fails=1, exc=_wrapped(TypeError("'NoneType' object is not iterable")))
     llm.call(system="s", user="u", output=VerdictOut, client=client)
     assert client.calls == 2
+
+
+class _NoneClient:
+    def __init__(self):
+        self.calls = 0
+
+    def create(self, **kwargs):
+        self.calls += 1
+        return None
+
+
+def test_a_none_response_is_retried_then_fails_clearly():
+    client = _NoneClient()
+    with pytest.raises(RuntimeError, match="no parseable content"):
+        llm.call(system="s", user="u", output=VerdictOut, client=client)
+    assert client.calls == 3

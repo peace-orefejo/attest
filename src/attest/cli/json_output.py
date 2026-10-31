@@ -15,6 +15,7 @@ from ..code_review import ReviewResult
 from ..llm import Usage
 from ..results import CheckResult, Disposition
 from ..scoring.stats import Proportion
+from ..utils.failures import failure_reason
 from .outcomes import TaskReport, TaskResult
 
 SCHEMA_VERSION = "1"
@@ -25,7 +26,7 @@ EXIT_ERROR = 1
 EXIT_INVALID_INPUT = 2
 EXIT_BUDGET_EXCEEDED = 3
 
-ErrorCode = Literal["invalid_input", "missing_api_key"]
+ErrorCode = Literal["invalid_input", "missing_api_key", "command_failed"]
 DemoOutcome = Literal["caught", "both_caught", "both_passed", "judge_only"]
 
 DataT = TypeVar("DataT", bound=BaseModel)
@@ -128,7 +129,11 @@ def emit(command: str, data: BaseModel) -> None:
 
 
 def json_command(name: str) -> Callable[[Callable[P, None]], Callable[P, None]]:
-    """Turn input errors raised inside a command into a JSON error envelope on stdout."""
+    """Turn errors raised inside a command into a JSON error envelope on stdout.
+
+    Bad input exits 2. Any other failure, such as a provider error a check doesn't absorb,
+    is `command_failed` and exits 1.
+    """
 
     def decorate(command: Callable[P, None]) -> Callable[P, None]:
         @functools.wraps(command)
@@ -139,6 +144,10 @@ def json_command(name: str) -> Callable[[Callable[P, None]], Callable[P, None]]:
                 _fail(name, "invalid_input", _bad_parameter_message(exc), EXIT_INVALID_INPUT)
             except CommandError as exc:
                 _fail(name, exc.code, str(exc), exc.exit_code)
+            except (typer.Exit, typer.Abort):
+                raise
+            except Exception as exc:
+                _fail(name, "command_failed", failure_reason("The command", exc), EXIT_ERROR)
 
         return wrapper
 

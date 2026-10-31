@@ -37,6 +37,12 @@ is `review`, not `pass`. Change it with
 `VerdictPolicy(on_inconclusive_faithfulness=...)`. An answer that makes no claims at all
 passes.
 
+**A failed call is not a pass either.** If claim extraction or a verification call fails, or a
+verifier returns no verdict for a claim, the claims it covered are `unverifiable` with
+`metadata["checked"]` set to `false` and the error in `reason`. Each one is `review` (the same
+`on_inconclusive_faithfulness` setting), even when other claims were supported.
+`metadata["claims_unchecked"]` counts them.
+
 ## Files as evidence
 
 Artifact text counts as evidence, so a claim answered from an attached document can be checked.

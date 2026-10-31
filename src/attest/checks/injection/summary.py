@@ -16,11 +16,14 @@ def summarize(findings: list[Finding], deep: bool) -> str:
     payloads = [f for f in findings if f.verdict in PAYLOAD_VERDICTS]
     compromised = [f for f in findings if f.verdict == "compromised"]
     unscanned = [f for f in findings if f.verdict == "unscanned_content"]
+    deep_failed = any(f.verdict == "unchecked" for f in findings)
     parts: list[str] = []
     if payloads:
         parts.append(f"{len(payloads)} untrusted segment(s) carry instruction-like content.")
     if compromised:
         parts.append(f"{len(compromised)} UNAUTHORIZED action(s) — likely a successful injection.")
+    elif deep_failed:
+        parts.append("The deep check failed, so the agent's actions were not checked.")
     elif payloads and deep:
         parts.append("But the agent did not take any unauthorized action.")
     elif payloads:

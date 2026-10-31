@@ -68,8 +68,8 @@ def review(
 
 def _load_review(path: Path) -> ReviewFile:
     try:
-        raw = path.read_text()
-    except OSError as exc:
+        raw = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
         raise typer.BadParameter(f"Could not read review file {path}: {exc}") from exc
     try:
         return ReviewFile.model_validate_json(raw)

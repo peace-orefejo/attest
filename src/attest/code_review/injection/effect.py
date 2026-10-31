@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from ...llm import call
+from ...llm import BudgetExceeded, call
 from ...prompts.code_review.injection import EFFECT_SYSTEM, effect_user
 from ..models import PullRequest, ReviewOutput
 from .bounded import CharBudget
@@ -126,11 +126,16 @@ def classify(payload: str, output: ReviewOutput, terms: set[str]) -> Effect:
 
 
 def ask_effect(payload: str, output: ReviewOutput, budget: CharBudget) -> EffectOut | None:
-    """Ask the model about a partial case, or return None when the budget cannot cover it."""
+    """Ask the model about a partial case, or None when the budget can't cover it or it fails."""
     user = effect_user(payload, output_type=output.output_type, output_text=output.text)
     if not budget.spend(len(user)):
         return None
-    return call(system=EFFECT_SYSTEM, user=user, output=EffectOut, max_tokens=300)
+    try:
+        return call(system=EFFECT_SYSTEM, user=user, output=EffectOut, max_tokens=300)
+    except BudgetExceeded:
+        raise
+    except Exception:
+        return None
 
 
 def phrases(text: str, n: int = NGRAM) -> set[tuple[str, ...]]:

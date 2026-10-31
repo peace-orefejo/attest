@@ -7,7 +7,8 @@
         "code": {
           "enum": [
             "invalid_input",
-            "missing_api_key"
+            "missing_api_key",
+            "command_failed"
           ],
           "title": "Code",
           "type": "string"

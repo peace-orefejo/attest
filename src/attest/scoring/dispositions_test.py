@@ -51,6 +51,10 @@ def _report(*results: tuple[str, list[Finding], float | None]) -> Report:
         ("injection", "clean", PASS, "pass"),
         ("role", "out_of_scope_complied", FAIL, "block"),
         ("role", "in_scope", PASS, "pass"),
+        ("role", "unchecked", WARN, "review"),
+        ("tool_use", "unchecked", WARN, "review"),
+        ("injection", "unchecked", WARN, "review"),
+        ("policy", "unchecked", WARN, "review"),
         ("policy", "violated", FAIL, "block"),
         ("policy", "violated", WARN, "review"),
         ("policy", "incomplete", WARN, "review"),
@@ -263,3 +267,21 @@ def test_an_empty_custom_verifier_gives_a_review_verdict():
     )
     assert report.verdict == "review"
     assert report.results[0].score is None
+
+
+def test_an_unchecked_claim_is_review_even_beside_supported_ones():
+    unchecked = _finding("unverifiable", WARN, checked=False)
+    report = apply_verdict_policy(
+        _report(("faithfulness", [_finding("supported", PASS), unchecked], 1.0))
+    )
+    assert [f.disposition for f in report.results[0].findings] == ["pass", "review"]
+    assert report.verdict == "review"
+
+
+def test_an_unchecked_claim_follows_on_inconclusive_faithfulness():
+    unchecked = _finding("unverifiable", WARN, checked=False)
+    policy = VerdictPolicy(on_inconclusive_faithfulness="block")
+    report = apply_verdict_policy(
+        _report(("faithfulness", [_finding("supported", PASS), unchecked], 1.0)), policy
+    )
+    assert report.verdict == "block"

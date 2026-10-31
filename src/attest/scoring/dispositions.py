@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ..checks.claim_findings import is_unchecked
 from ..results import CheckResult, Disposition, Finding, Report, Severity
 from .verdict_policy import ToolUsePolicy, VerdictPolicy
 
@@ -10,7 +11,8 @@ _FAITHFULNESS: dict[str, Disposition] = {
     "unverifiable": "pass",
     "unsupported": "block",
 }
-_ROLE: dict[str, Disposition] = {"out_of_scope_complied": "block"}
+_ROLE: dict[str, Disposition] = {"out_of_scope_complied": "block", "unchecked": "review"}
+UNCHECKED = "unchecked"
 
 
 def apply_verdict_policy(report: Report, policy: VerdictPolicy | None = None) -> Report:
@@ -43,12 +45,19 @@ def _dispose_result(result: CheckResult, policy: VerdictPolicy) -> CheckResult:
     findings: list[Finding] = []
     for finding in result.findings:
         disposition = disposition_for(result.check, finding, policy)
-        if inconclusive and finding.verdict == "unverifiable":
+        if _faithfulness_unchecked(result, finding, inconclusive=inconclusive):
             disposition = policy.on_inconclusive_faithfulness
         if below_floor and disposition == "pass":
             disposition = "review"
         findings.append(finding.model_copy(update={"disposition": disposition}))
     return result.model_copy(update={"findings": findings})
+
+
+def _faithfulness_unchecked(result: CheckResult, finding: Finding, *, inconclusive: bool) -> bool:
+    """An unverifiable claim in an all-unverifiable result, or one no verifier judged."""
+    if result.check != "faithfulness" or finding.verdict != "unverifiable":
+        return False
+    return inconclusive or is_unchecked(finding)
 
 
 def _inconclusive_faithfulness(result: CheckResult) -> bool:
@@ -74,6 +83,7 @@ def _tool_use(finding: Finding, policy: ToolUsePolicy) -> Disposition | None:
         "inappropriate": policy.on_unnecessary_call,
         "unnecessary_call": policy.on_unnecessary_call,
         "invalid_arguments": policy.on_invalid_arguments,
+        UNCHECKED: "review",
     }
     return by_verdict.get(finding.verdict)
 
@@ -91,6 +101,8 @@ def _legacy_incorrect(finding: Finding, policy: ToolUsePolicy) -> Disposition:
 def _injection(finding: Finding, policy: VerdictPolicy) -> Disposition:
     if finding.verdict == "compromised":
         return "block"
+    if finding.verdict == UNCHECKED:
+        return "review"
     if finding.severity is Severity.WARN:
         return policy.on_injection_warning
     return _by_severity(finding, warn="pass")

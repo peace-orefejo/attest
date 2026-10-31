@@ -258,7 +258,7 @@ def test_a_claim_supported_only_by_a_text_artifact_reaches_the_verifier(monkeypa
     assert first.metadata["location"] == "steps[0].tool_call.artifacts[0]"
     assert second.metadata["location"] == "steps[1].tool_call.output"
     assert "location" not in third.metadata
-    assert result.metadata == {"claims_checked": 2, "claims_total": 3}
+    assert result.metadata == {"claims_checked": 2, "claims_total": 3, "claims_unchecked": 0}
 
 
 def test_findings_without_a_quote_get_no_location():

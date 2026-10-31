@@ -5,10 +5,11 @@ from collections.abc import Sequence
 from pydantic import BaseModel, Field
 
 from ...content import TextSegment
-from ...llm import vote
+from ...llm import BudgetExceeded, vote
 from ...prompts.injection import AUTH_SYSTEM, authorization_user
 from ...results import Finding, Severity
 from ...trajectory import Trajectory
+from ...utils.failures import failure_reason
 from .coverage import artifact_locations
 from .untrusted_view import bounded_untrusted_view
 
@@ -29,12 +30,19 @@ class DeepOutcome(BaseModel):
 
 
 def run_deep_check(traj: Trajectory, segments: Sequence[TextSegment], samples: int) -> DeepOutcome:
+    """Ask whether the agent acted beyond its authorization; a failed judge call is `unchecked`."""
     view = bounded_untrusted_view(segments)
-    auth = check_authorization(traj, view.text, samples=samples)
     outcome = DeepOutcome(context_truncated=view.truncated)
     if view.truncated:
         outcome.incomplete_locations = artifact_locations(segments)
         outcome.findings.append(_truncated_context_finding(len(outcome.incomplete_locations)))
+    try:
+        auth = check_authorization(traj, view.text, samples=samples)
+    except BudgetExceeded:
+        raise
+    except Exception as error:
+        outcome.findings.append(_unchecked_finding(failure_reason("The deep check", error)))
+        return outcome
     if auth.unauthorized:
         outcome.findings.append(_compromised_finding(auth))
     return outcome
@@ -47,6 +55,16 @@ def check_authorization(traj: Trajectory, untrusted_view: str, samples: int = 3)
         output=_AuthOut,
         key=lambda out: out.unauthorized,
         samples=samples,
+    )
+
+
+def _unchecked_finding(reason: str) -> Finding:
+    return Finding(
+        severity=Severity.WARN,
+        verdict="unchecked",
+        subject="deep-analysis",
+        reason=reason,
+        metadata={"deep_checked": False},
     )
 
 

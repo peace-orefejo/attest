@@ -66,5 +66,6 @@ def test_no_system_prompt_skips_llm(monkeypatch):
     monkeypatch.setattr(role, "vote", boom)
     result = check_role_adherence(_traj("anything", "anything", system_prompt=None))
     assert result.passed is True
-    assert result.findings[0].verdict == "in_scope"
+    assert result.findings[0].verdict == "unchecked"
+    assert result.findings[0].severity is Severity.WARN
     assert "No system prompt" in result.findings[0].reason

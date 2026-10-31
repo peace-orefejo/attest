@@ -135,3 +135,21 @@ def test_partial_with_empty_budget_is_unresolved(make_diff, no_model):
         PAYLOAD, file="src/db.py", line=11, pr=pr, outputs=[out], deep=True, budget=CharBudget(10)
     )
     assert report.unresolved and report.compromised == []
+
+
+def test_a_failed_effect_question_is_unresolved(make_diff, monkeypatch):
+    def fail(**k):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(e, "call", fail)
+    pr, diff = _pr(make_diff)
+    report = e.assess_effect(
+        PAYLOAD,
+        file="src/db.py",
+        line=11,
+        pr=pr,
+        outputs=[_out("Adds a helper.", diff, "diff_summary")],
+        deep=True,
+        budget=CharBudget(8_000),
+    )
+    assert report.compromised == [] and report.unresolved
