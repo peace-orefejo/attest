@@ -104,7 +104,8 @@ print(report.passed, report.overall_score)
 ```
 
 In Python a run is a `Trajectory`. [`examples/quickstart.py`](examples/quickstart.py) builds
-one by hand, and `from_langgraph_messages` converts a LangGraph run.
+one by hand, and `from_langgraph_messages` and
+`from_haystack_messages` convert LangGraph and Haystack runs.
 
 **Code review**
 
