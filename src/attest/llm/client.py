@@ -22,6 +22,11 @@ def resolve_client() -> LLMClient:
     return _active_client.get() or default_client()
 
 
+def has_active_client() -> bool:
+    """Whether a client was scoped with `using`, so a judge call won't fall back to the default."""
+    return _active_client.get() is not None
+
+
 @contextlib.contextmanager
 def using(client: LLMClient) -> Generator[None]:
     """Run the enclosed calls against a specific provider-bound client."""

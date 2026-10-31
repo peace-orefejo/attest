@@ -72,6 +72,8 @@ The public API, importable as `from attest import ...`.
 
 ::: attest.from_langgraph_messages
 
+::: attest.from_haystack_messages
+
 ## Statistics
 
 ::: attest.wilson_interval

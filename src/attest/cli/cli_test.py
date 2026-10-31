@@ -57,6 +57,21 @@ def test_tools_prints_the_json_envelope(tmp_path):
     assert entry["result"]["passed"] is True
 
 
+def test_tools_without_a_model_reports_unrecovered_errors_unchecked(tmp_path):
+    trajectory = _trajectory()
+    trajectory["steps"][0]["tool_call"]["output"] = "Error: rate limited"
+    path = tmp_path / "trajectory.json"
+    path.write_text(json.dumps(trajectory))
+
+    result = runner.invoke(app, ["tools", str(path)])
+
+    assert result.exit_code == 0
+    check = _payload(result)["data"]["trajectories"][0]["result"]
+    assert check["passed"] is False
+    assert check["findings"][0]["verdict"] == "error_silent"
+    assert check["findings"][0]["metadata"]["recovery"] == "unchecked"
+
+
 def test_jsonl_error_identifies_line(tmp_path):
     path = tmp_path / "trajectories.jsonl"
     path.write_text(json.dumps(_trajectory()) + '\n{"task": "incomplete"}\n')

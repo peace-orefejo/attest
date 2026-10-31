@@ -59,3 +59,10 @@ class Detection(BaseModel):
     step: int | None = None
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     metadata: JsonObject = Field(default_factory=dict)
+
+
+class ArtifactText(BaseModel):
+    """Text read out of a binary or path artifact; `complete` is False when it was cut short."""
+
+    text: str
+    complete: bool = True

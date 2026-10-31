@@ -30,7 +30,7 @@ models and the JSON Schemas built from them.
 | `policy/` | Project rules: models, loading from YAML or JSON, deterministic and semantic evaluation. |
 | `extraction/` | Bounded text extraction from PDFs, images, XML, CSV, HTML and JSON for the injection scan. |
 | `scoring/` | `evaluate()`, which runs the selected checks and assembles a `Report`. |
-| `adapters/` | Converters from agent frameworks to runs. LangGraph is built in. |
+| `adapters/` | Converters from agent frameworks to runs. LangGraph and Haystack are built in. |
 
 **Foundation.**
 

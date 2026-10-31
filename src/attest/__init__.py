@@ -1,5 +1,6 @@
 """attest — evidence-grounded evaluation for AI agent trajectories."""
 
+from .adapters.haystack import from_haystack_messages
 from .adapters.langgraph import from_langgraph_messages
 from .api import Attest
 from .checks.injection import (
@@ -63,6 +64,7 @@ __all__ = [
     "evaluate",
     "extract_artifact",
     "extract_claims",
+    "from_haystack_messages",
     "from_langgraph_messages",
     "grounded_verifier",
     "judge_trajectory",

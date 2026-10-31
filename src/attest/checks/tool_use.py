@@ -1,16 +1,16 @@
-"""Tool-use correctness: allowed-tool + error-handling checks, optional LLM appropriateness."""
+"""Tool-use correctness: allowed tools, error recovery, optional LLM appropriateness."""
 
 from __future__ import annotations
 
 from pydantic import BaseModel
 
-from ..llm import call
+from ..llm import call, has_active_client
 from ..prompts.tool_use import APPROPRIATE_SYSTEM, appropriate_prefix, appropriate_user
 from ..results import CheckResult, Finding, Severity
 from ..trajectory import ToolCall, Trajectory
+from .tool_recovery import RecoveryReview, review_recovery
 
-_ERROR_PREFIXES = ("error", "exception", "traceback")
-_ERROR_MARKERS = ("traceback (most recent call last)", "error:", "exception:")
+_RECOVERED = ("retried", "fallback", "acknowledged")
 
 
 class _AppropriatenessOut(BaseModel):
@@ -22,22 +22,37 @@ class _AppropriatenessOut(BaseModel):
 
 class ToolCallReview(BaseModel):
     allowed: bool
-    error_handled: bool | None
+    recovery: RecoveryReview | None
     appropriate: bool | None
     appropriate_reason: str = ""
 
 
-def check_tool_use(traj: Trajectory, *, appropriate: bool = False) -> CheckResult:
-    """Review each tool call. `appropriate=True` adds the LLM tool-choice check."""
+def check_tool_use(
+    traj: Trajectory, *, appropriate: bool = False, check_answer: bool | None = None
+) -> CheckResult:
+    """Review each tool call. `appropriate=True` adds the LLM tool-choice check.
+
+    A tool error that no retry or declared fallback recovered is checked against the final
+    answer with one model call. `check_answer` turns that on or off; by default it runs when
+    `appropriate=True` or a client is scoped with `attest.llm.using`, and the error is reported
+    as `unchecked` otherwise.
+    """
+    if check_answer is None:
+        check_answer = appropriate or has_active_client()
     allowed_tools = set(traj.allowed_tools or [])
     calls = traj.tool_calls()
     shared = len(calls) > 1
-    findings = [
-        _review_finding(
-            traj, step, tool_call, allowed_tools, appropriate=appropriate, shared=shared
+    findings: list[Finding] = []
+    for step, tool_call in calls:
+        review = ToolCallReview(
+            allowed=not allowed_tools or tool_call.name in allowed_tools,
+            recovery=review_recovery(traj, step, tool_call, check_answer=check_answer),
+            appropriate=None,
         )
-        for step, tool_call in calls
-    ]
+        if appropriate:
+            judged = _check_appropriate(traj, tool_call, shared=shared)
+            review.appropriate, review.appropriate_reason = judged.appropriate, judged.reason
+        findings.append(_finding(step, tool_call, review, allowed_tools))
     correct = sum(finding.verdict == "correct" for finding in findings)
     return CheckResult(
         check="tool_use",
@@ -48,23 +63,15 @@ def check_tool_use(traj: Trajectory, *, appropriate: bool = False) -> CheckResul
     )
 
 
-def _review_finding(
-    traj: Trajectory,
-    step: int,
-    tool_call: ToolCall,
-    allowed_tools: set[str],
-    *,
-    appropriate: bool,
-    shared: bool,
+def _finding(
+    step: int, tool_call: ToolCall, review: ToolCallReview, allowed_tools: set[str]
 ) -> Finding:
-    review = _review(traj, step, tool_call, allowed_tools, appropriate=appropriate, shared=shared)
-    is_error = review.error_handled is not None
+    recovery = review.recovery
+    error_text = tool_call.output.strip()[:160] or None
 
-    def finding(
-        verdict: str, severity: Severity, reason: str, evidence: str | None = None
-    ) -> Finding:
+    def finding(verdict: str, reason: str, evidence: str | None = None) -> Finding:
         return Finding(
-            severity=severity,
+            severity=Severity.PASS if verdict == "correct" else Severity.FAIL,
             verdict=verdict,
             subject=tool_call.name,
             step=step,
@@ -72,52 +79,30 @@ def _review_finding(
             evidence=evidence,
             metadata={
                 "allowed": review.allowed,
-                "error_handled": review.error_handled,
+                "recovery": recovery.recovery if recovery else None,
+                "recovered_at": recovery.recovered_at if recovery else None,
                 "appropriate": review.appropriate,
             },
         )
 
     if not review.allowed:
         return finding(
-            "incorrect",
-            Severity.FAIL,
+            "disallowed_tool",
             f"'{tool_call.name}' is not in the agent's allowed tools {sorted(allowed_tools)}.",
         )
-    if is_error and not review.error_handled:
-        return finding(
-            "incorrect",
-            Severity.FAIL,
-            "The tool returned an error that no later step addressed.",
-            tool_call.output.strip()[:160] or None,
-        )
+    if recovery is not None and recovery.recovery == "claimed_success":
+        return finding("error_claimed_success", _error_reason(recovery), error_text)
+    if recovery is not None and recovery.recovery not in _RECOVERED:
+        return finding("error_silent", _error_reason(recovery), error_text)
     if review.appropriate is False:
         return finding(
             "incorrect",
-            Severity.FAIL,
             review.appropriate_reason or "Not an appropriate tool choice for this step.",
         )
-    return finding(
-        "correct", Severity.PASS, review.appropriate_reason or "Allowed tool; no unhandled error."
+    reason = review.appropriate_reason or (
+        _error_reason(recovery) if recovery else "Allowed tool; no error."
     )
-
-
-def _review(
-    traj: Trajectory,
-    step: int,
-    tool_call: ToolCall,
-    allowed_tools: set[str],
-    *,
-    appropriate: bool,
-    shared: bool,
-) -> ToolCallReview:
-    is_error = _looks_like_error(tool_call.output)
-    judged = _check_appropriate(traj, tool_call, shared=shared) if appropriate else None
-    return ToolCallReview(
-        allowed=not allowed_tools or tool_call.name in allowed_tools,
-        error_handled=_handled_later(traj, step) if is_error else None,
-        appropriate=judged.appropriate if judged else None,
-        appropriate_reason=judged.reason if judged else "",
-    )
+    return finding("correct", reason)
 
 
 def _check_appropriate(
@@ -132,15 +117,22 @@ def _check_appropriate(
     )
 
 
-def _looks_like_error(output: str) -> bool:
-    text = output.strip().lower()
-    if not text:
-        return True
-    return text.startswith(_ERROR_PREFIXES) or any(marker in text for marker in _ERROR_MARKERS)
-
-
-def _handled_later(traj: Trajectory, error_step: int) -> bool:
-    return any(step > error_step for step, _ in traj.tool_calls())
+def _error_reason(recovery: RecoveryReview) -> str:
+    unrecovered = "The tool returned an error that no retry or declared fallback recovered"
+    reasons = {
+        "retried": f"The tool returned an error; a retry at step {recovery.recovered_at} worked.",
+        "fallback": (
+            f"The tool returned an error; the fallback at step {recovery.recovered_at} worked."
+        ),
+        "acknowledged": f"{unrecovered}, and the final answer says it failed.",
+        "silent": f"{unrecovered}, and the final answer doesn't mention it.",
+        "claimed_success": f"{unrecovered}, but the final answer says it succeeded.",
+        "unchecked": (
+            f"{unrecovered}. No model was available to check whether the final answer "
+            "reports the failure."
+        ),
+    }
+    return reasons[recovery.recovery]
 
 
 def _summarize(findings: list[Finding]) -> str:
@@ -151,8 +143,11 @@ def _summarize(findings: list[Finding]) -> str:
     parts = [f"{correct}/{len(findings)} tool calls correct.", f"Sequence: {sequence}."]
     issues = [finding for finding in findings if finding.verdict != "correct"]
     if not issues:
-        parts.append("All tools allowed; no unhandled errors.")
+        parts.append("All tools allowed; no unrecovered errors.")
         return " ".join(parts)
     details = "; ".join(f"step {f.step} ({f.subject}) — {f.reason}" for f in issues)
     parts.append(f"Issues: {details}")
+    unchecked = sum(f.metadata.get("recovery") == "unchecked" for f in findings)
+    if unchecked:
+        parts.append(f"{unchecked} error(s) unchecked: no model read the final answer.")
     return " ".join(parts)

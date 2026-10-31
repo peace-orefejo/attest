@@ -2,6 +2,7 @@
 
 import attest.checks.verify as v
 from attest.checks.verify import judge_trajectory, verify_claims
+from attest.content import Artifact
 from attest.results import Finding, Severity
 from attest.trajectory import Step, ToolCall, Trajectory
 
@@ -205,3 +206,64 @@ def test_extract_claims_ignores_a_blank_task(monkeypatch):
     monkeypatch.setattr(v, "call", fake_call)
     v.extract_claims("Paris is larger.", task="   ")
     assert seen["user"] == "Final answer to decompose:\n\nParis is larger."
+
+
+def _refund_run() -> Trajectory:
+    policy = Artifact(
+        name="refund-policy.pdf",
+        source="retrieved_file",
+        text="Customers may request a full refund within 30 days of purchase.",
+    )
+    return Trajectory(
+        task="What is the refund window?",
+        steps=[
+            Step(
+                tool_call=ToolCall(
+                    name="fetch_document", output="Fetched 1 file.", artifacts=[policy]
+                )
+            ),
+            Step(tool_call=ToolCall(name="search", output="Shipping takes 5 days.")),
+        ],
+        final_answer="Refunds are allowed within 30 days. Shipping takes 5 days.",
+    )
+
+
+def test_a_claim_supported_only_by_a_text_artifact_reaches_the_verifier(monkeypatch):
+    seen = {}
+
+    def fake_call(**kwargs):
+        seen.update(kwargs)
+        return v._BatchOut(
+            verdicts=[
+                v._ClaimVerdict(
+                    claim=1, verdict="supported", evidence_quote="full refund within 30 days"
+                ),
+                v._ClaimVerdict(
+                    claim=2, verdict="supported", evidence_quote="Shipping takes  5 days."
+                ),
+                v._ClaimVerdict(claim=3, verdict="unverifiable", evidence_quote="days"),
+            ]
+        )
+
+    monkeypatch.setattr(v, "call", fake_call)
+    claims = ["Refunds are allowed within 30 days", "Shipping takes 5 days", "It is fast"]
+    result = judge_trajectory(_refund_run(), lambda _: claims, verify_claims)
+
+    assert (
+        '<artifact location="steps[0].tool_call.artifacts[0]" name="refund-policy.pdf" '
+        'source="retrieved_file" from_tool="fetch_document">\n'
+        "Customers may request a full refund within 30 days of purchase.\n</artifact>"
+    ) in seen["prefix"]
+    first, second, third = result.findings
+    assert first.metadata["location"] == "steps[0].tool_call.artifacts[0]"
+    assert second.metadata["location"] == "steps[1].tool_call.output"
+    assert "location" not in third.metadata
+    assert result.metadata == {}
+
+
+def test_findings_without_a_quote_get_no_location():
+    def fake_verify(claims, evidence):
+        return [Finding(severity=Severity.PASS, verdict="supported", subject=c) for c in claims]
+
+    result = judge_trajectory(_refund_run(), lambda _: ["c"], fake_verify)
+    assert result.findings[0].metadata == {}
