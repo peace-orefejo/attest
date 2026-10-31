@@ -16,7 +16,7 @@ Grade an agent's answer against what its tools actually returned.
 [![PyPI](https://img.shields.io/pypi/v/agent-attest)](https://pypi.org/project/agent-attest/)
 [![Python](https://img.shields.io/pypi/pyversions/agent-attest)](https://pypi.org/project/agent-attest/)
 [![CI](https://github.com/peace-orefejo/attest/actions/workflows/ci.yml/badge.svg)](https://github.com/peace-orefejo/attest/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 [**Documentation**](https://peace-orefejo.github.io/attest/) ·
 [Getting started](https://peace-orefejo.github.io/attest/getting-started/) ·
@@ -132,3 +132,11 @@ uv run pytest
 ```
 
 Tests run offline with no API key. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+<br>
+
+## License
+
+Copyright © 2026 Adepeju Orefejo. Licensed under the [GNU AGPL v3.0](LICENSE): you can use,
+modify and share attest, but any version you distribute or run as a network service must be
+released under the same license, with its source. Versions 0.7.0 and earlier were MIT.
