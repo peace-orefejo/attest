@@ -28,6 +28,11 @@ def _setup_differences(
             f"dataset versions differ ({old.dataset_version[:12]} vs "
             f"{new.dataset_version[:12]}): the cases or labels changed"
         )
+    if old.dataset_visibility != new.dataset_visibility:
+        reasons.append(
+            f"one report is on a public dataset and the other on a private one "
+            f"({old.dataset_visibility} vs {new.dataset_visibility})"
+        )
     if old.split != new.split:
         reasons.append(f"splits differ ({old.split} vs {new.split})")
     before, after = old.settings.model_dump(), new.settings.model_dump()

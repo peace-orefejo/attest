@@ -20,6 +20,7 @@ from bench_cases import CHECKS, SPLITS, CheckName
 from bench_check_metrics import Prices
 from bench_grade import OFFLINE_CHECKS, GradeSettings
 from bench_load import DATASETS_DIR, DatasetError, load_datasets
+from bench_private import withhold_case_details
 from bench_report import DEFAULT_MIN_COVERAGE
 from bench_run import run_benchmark
 from bench_summary import markdown_summary
@@ -59,7 +60,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="share of cases per check that must be graded for a publishable report "
         f"(default {DEFAULT_MIN_COVERAGE})",
     )
-    parser.add_argument("--datasets", type=Path, default=DATASETS_DIR, help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--datasets",
+        type=Path,
+        default=DATASETS_DIR,
+        help="folder of case files (default: the public benchmarks/datasets). Any other folder "
+        "is treated as private: it may cover only some checks, and the report withholds case "
+        "contents",
+    )
     parser.add_argument("--out", type=Path, default=None, help="write the JSON report here")
     return parser
 
@@ -76,8 +84,9 @@ def main(argv: list[str] | None = None) -> int:
         needs_model = [c for c in checks if c not in OFFLINE_CHECKS]
         if needs_model:
             parser.error(f"{', '.join(needs_model)} needs a model; drop --offline")
+    private = args.datasets.resolve() != DATASETS_DIR.resolve()
     try:
-        datasets = load_datasets(args.datasets)
+        datasets = load_datasets(args.datasets, allow_missing=private)
     except DatasetError as exc:
         print(f"dataset error: {exc}", file=sys.stderr)
         return 2
@@ -93,6 +102,13 @@ def main(argv: list[str] | None = None) -> int:
         prices=Prices(input=args.price_per_mtok_in, output=args.price_per_mtok_out),
         min_coverage=args.min_coverage,
     )
+    if private:
+        report = report.model_copy(
+            update={
+                "dataset_visibility": "private",
+                "cases": withhold_case_details(report.cases),
+            }
+        )
     if args.out is not None:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(report.model_dump_json(indent=2) + "\n", encoding="utf-8")

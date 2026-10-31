@@ -30,14 +30,20 @@ def case_file(root: Path, check: CheckName, split: Split) -> Path:
     return root / check / f"{split}.jsonl"
 
 
-def load_datasets(root: Path = DATASETS_DIR) -> Datasets:
+def load_datasets(root: Path = DATASETS_DIR, *, allow_missing: bool = False) -> Datasets:
     """Load every case file under `root`, rejecting anything that breaks a dataset rule.
 
-    Each file must exist (an empty file is fine). Case ids are unique across all files, an id
-    may not appear in both dev and held-out, and each case's `check` must match its folder.
+    Each file must exist (an empty file is fine) unless `allow_missing`, which a private
+    dataset covering only some checks uses. Case ids are unique across all files, an id may not
+    appear in both dev and held-out, and each case's `check` must match its folder.
     """
+    if not root.is_dir():
+        raise DatasetError(f"{root}: datasets folder not found")
     cases: dict[CheckName, dict[Split, list[Case]]] = {
-        check: {split: load_file(case_file(root, check, split), check) for split in SPLITS}
+        check: {
+            split: load_file(case_file(root, check, split), check, allow_missing=allow_missing)
+            for split in SPLITS
+        }
         for check in CHECKS
     }
     _reject_split_leaks(cases)
@@ -45,9 +51,11 @@ def load_datasets(root: Path = DATASETS_DIR) -> Datasets:
     return Datasets(cases=cases, version=dataset_version(root))
 
 
-def load_file(path: Path, check: CheckName) -> list[Case]:
+def load_file(path: Path, check: CheckName, *, allow_missing: bool = False) -> list[Case]:
     """Parse one JSONL case file; every error names the file and line."""
     if not path.is_file():
+        if allow_missing:
+            return []
         raise DatasetError(f"{path}: case file is missing")
     cases: list[Case] = []
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):

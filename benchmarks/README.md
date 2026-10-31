@@ -247,6 +247,26 @@ duplicate claim texts, and a `confirmed` case with fewer than two annotators.
 Editing any case file changes `dataset_version`, so reports from before and after an edit are
 flagged as not comparable.
 
+## Private datasets
+
+Runs from your own agents can hold customer data, so keep them out of this repository. Put them
+in any other folder with the same layout, `<check>/{dev,heldout}.jsonl`, and pass it with
+`--datasets`:
+
+```bash
+uv run python benchmarks/runners/run.py --datasets ~/vera-cases --out vera.json
+```
+
+A private folder may cover only some checks; missing files count as empty. `benchmarks/private/`
+is git-ignored if you'd rather keep the folder here.
+
+Reports on a private folder keep every metric but withhold the cases' contents: case ids
+become hashes, claim texts become `item-1`, `item-2`…, and error messages are dropped. They are
+marked `dataset_visibility: "private"`, and `compare.py` won't compare them with public
+reports. The withholding covers the report only: don't commit or upload the case files, and
+remember that a provider sees each case while grading it. The response cache
+(`--cache-dir`) quotes the cases too, so keep it private; `.bench-cache/` and `.cache/` are git-ignored.
+
 ## Layout
 
 ```
@@ -254,6 +274,7 @@ benchmarks/
 ├── README.md
 ├── annotations/guidelines.md    labelling rules (draft)
 ├── datasets/<check>/{dev,heldout}.jsonl
+├── private/                     your own cases (git-ignored)
 ├── runners/                     case model, loading, grading, metrics, reports, compare
 └── reports/                     run output; published reports are committed on purpose
 ```

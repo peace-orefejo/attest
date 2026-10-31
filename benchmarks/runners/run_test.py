@@ -221,3 +221,24 @@ def test_an_errored_case_keeps_its_items_and_counts_against_effective_accuracy(
     assert faith.binary["evidence_sufficiency"].effective_recall.value == 0.0
     assert not report.all_cases_graded and not report.budget_exhausted
     assert any("faithfulness coverage 0.0%" in r for r in report.not_publishable_because)
+
+
+def test_external_datasets_folder_gives_a_private_report(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = tmp_path / "private"
+    (root / "tool_use").mkdir(parents=True)
+    public = load_datasets().split("tool_use", "dev")
+    (root / "tool_use" / "dev.jsonl").write_text(
+        "".join(case.model_dump_json() + "\n" for case in public)
+    )
+    out = tmp_path / "private.json"
+    assert run.main(["--offline", "--datasets", str(root), "--out", str(out)]) == 0
+
+    report = BenchmarkReport.model_validate_json(out.read_text())
+    assert report.dataset_visibility == "private"
+    assert report.checks["tool_use"].coverage.attempted == len(public)
+    assert all(row.id.startswith("case-") for row in report.cases)
+    assert not {case.id for case in public} & {row.id for row in report.cases}
+    assert all(i.key.startswith("item-") for row in report.cases for i in row.items)
+    assert "Private dataset" in capsys.readouterr().out

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -18,6 +19,9 @@ DEFAULT_MIN_COVERAGE = 0.95
 class BenchmarkReport(BaseModel):
     format_version: int = FORMAT_VERSION
     dataset_version: str
+    dataset_visibility: Literal["public", "private"] = "public"
+    """Private: the cases live outside this repository and the report withholds their contents
+    (case ids are hashed, claim texts and error messages are removed)."""
     attest_version: str
     prompt_version: str
     provider: str

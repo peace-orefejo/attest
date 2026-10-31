@@ -87,6 +87,7 @@ def test_like_for_like_reports_are_compatible() -> None:
     ("overrides", "reason"),
     [
         ({"dataset_version": "v2"}, "dataset versions differ"),
+        ({"dataset_visibility": "private"}, "public dataset and the other on a private one"),
         ({"split": "heldout"}, "splits differ"),
         ({"settings": GradeSettings(offline=True)}, "setting offline differs"),
         ({"settings": GradeSettings(answer_kind="plan")}, "setting answer_kind differs"),

@@ -147,3 +147,17 @@ def test_dataset_version_changes_with_any_edit(tmp_path: Path) -> None:
     assert dataset_version(root) == before
     (root / "role_adherence" / "heldout.jsonl").write_text("\n")
     assert dataset_version(root) != before
+
+
+def test_missing_files_are_allowed_for_a_partial_dataset(tmp_path: Path) -> None:
+    root = tmp_path / "private"
+    (root / "prompt_injection").mkdir(parents=True)
+    (root / "prompt_injection" / "dev.jsonl").write_text(json.dumps(_case()) + "\n")
+    datasets = load_datasets(root, allow_missing=True)
+    assert [case.id for case in datasets.split("prompt_injection", "dev")] == ["c1"]
+    assert datasets.split("faithfulness", "dev") == []
+
+
+def test_missing_datasets_folder_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(DatasetError, match="not found"):
+        load_datasets(tmp_path / "nope", allow_missing=True)

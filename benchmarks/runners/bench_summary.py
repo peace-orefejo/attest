@@ -25,6 +25,7 @@ def markdown_summary(report: BenchmarkReport) -> str:
         f"{report.provider}/{report.model or 'no model (offline)'}, "
         f"datasets {report.dataset_version[:12]}",
         "",
+        *_private_note(report),
         *_publish_banner(report),
         READING_GUIDE,
         "",
@@ -140,3 +141,14 @@ def _notes(report: BenchmarkReport) -> list[str]:
     for check, reason in report.skipped_checks.items():
         notes.append(f"- Skipped {check}: {reason}")
     return notes
+
+
+def _private_note(report: BenchmarkReport) -> list[str]:
+    if report.dataset_visibility != "private":
+        return []
+    return [
+        "> **Private dataset.** The cases aren't in this repository, and this report withholds "
+        "their contents: case ids are hashed, claim texts and error messages removed. Others "
+        "can't reproduce these numbers.",
+        "",
+    ]
