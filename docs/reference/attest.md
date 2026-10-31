@@ -1,3 +1,7 @@
+---
+description: "API reference for the attest Python package: Attest, Trajectory, Report, CheckResult, Finding and every check."
+---
+
 # attest
 
 The public API, importable as `from attest import ...`.

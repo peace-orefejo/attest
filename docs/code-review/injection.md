@@ -1,3 +1,7 @@
+---
+description: "Find instructions planted in a pull request to steer an AI code reviewer, and see which review outputs obeyed them."
+---
+
 # Injection in diffs
 
 A pull request is written by its author, and so is everything an AI reviewer reads about it.

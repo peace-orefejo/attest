@@ -1,3 +1,7 @@
+---
+description: "Every attest command and option: run, tools, injection, role, review, demo, stats, models and schema."
+---
+
 # Command line
 
 Run commands take a `.json` file with one run, or a `.jsonl` file with one run per line. Every

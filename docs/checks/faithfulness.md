@@ -1,3 +1,7 @@
+---
+description: "The faithfulness check splits an agent's answer into claims and verifies each one against the real tool outputs to catch hallucinations."
+---
+
 # Faithfulness
 
 **Question:** is every claim in the final answer backed by what the tools returned?

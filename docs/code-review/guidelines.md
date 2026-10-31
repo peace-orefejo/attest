@@ -1,3 +1,7 @@
+---
+description: "Give attest your team's code review rules in a markdown file, and drop AI review comments that break them."
+---
+
 # Review guidelines
 
 Most teams have rules for code review: what to flag, what to leave alone, how to word a

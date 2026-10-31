@@ -1,5 +1,5 @@
 site_name: attest
-site_description: Evidence-grounded evaluation for AI agents. Check every claim against what the tools actually returned.
+site_description: attest checks AI agent answers against what their tools actually returned, catching made-up facts, misused tools and prompt injection.
 site_url: https://peace-orefejo.github.io/attest/
 repo_url: https://github.com/peace-orefejo/attest
 repo_name: peace-orefejo/attest
@@ -8,6 +8,7 @@ copyright: Copyright &copy; 2026 Adepeju Orefejo · AGPL-3.0 License
 
 theme:
   name: material
+  custom_dir: overrides
   features:
     - content.code.copy
     - content.action.edit

@@ -1,3 +1,7 @@
+---
+description: "Let attest write a pull request review itself, then check and gate its own output like any other AI reviewer."
+---
+
 # Writing the review
 
 attest can review a pull request itself. It always follows the general standard as a baseline,

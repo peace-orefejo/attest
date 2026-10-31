@@ -1,3 +1,7 @@
+---
+description: "How the attest codebase is organised: entry points, feature packages, the shared foundation and the design rules."
+---
+
 # Architecture
 
 ![attest package layers](assets/diagrams/architecture.svg){ .diagram }

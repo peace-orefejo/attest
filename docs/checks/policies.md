@@ -1,3 +1,7 @@
+---
+description: "Enforce your project's own rules on every AI agent run: required and forbidden text, tool order, allowed tools and rubric checks."
+---
+
 # Policies
 
 A policy is a set of your project's own rules. Attach it to an `Attest` instance once and it is

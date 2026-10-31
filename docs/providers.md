@@ -1,3 +1,7 @@
+---
+description: "Grade AI agents with Anthropic, OpenAI or Gemini models in attest, choose a model, and bring your own LLM client."
+---
+
 # Models and providers
 
 attest grades with Anthropic, OpenAI or Gemini models. Pick one when you create the judge:

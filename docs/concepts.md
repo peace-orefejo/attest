@@ -1,3 +1,7 @@
+---
+description: "How attest grades AI agents: runs, evidence from tool outputs, atomic claims, verdicts, answer kinds and scores with confidence intervals."
+---
+
 # How it works
 
 ![How attest checks an answer](assets/diagrams/how-it-works.svg){ .diagram }

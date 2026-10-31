@@ -1,3 +1,7 @@
+---
+description: "The JSON every attest command prints: the versioned envelope, exit codes, fields per command, jq examples and JSON Schemas."
+---
+
 # JSON output
 
 Every `attest` command prints one JSON document on stdout, and nothing else:

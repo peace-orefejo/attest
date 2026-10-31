@@ -1,3 +1,7 @@
+---
+description: "attest checks AI agent answers against what their tools actually returned, catching made-up facts, misused tools and prompt injection, with JSON output."
+---
+
 # attest
 
 **A reality-checker for AI agents.** attest grades an agent's answer against what its tools

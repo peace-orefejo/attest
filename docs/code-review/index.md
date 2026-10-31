@@ -1,3 +1,7 @@
+---
+description: "Check AI code reviewer outputs against the diff: keep real issues, drop false ones and wrong summaries before people see them."
+---
+
 # Code review mode
 
 AI code reviewers flag false issues and write summaries that don't match the diff. Code review
