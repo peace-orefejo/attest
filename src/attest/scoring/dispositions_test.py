@@ -245,3 +245,21 @@ def test_the_default_tool_use_policy_raises_no_warning(recwarn):
 
 def test_the_deprecated_option_keeps_its_old_default():
     assert ToolUsePolicy().on_invalid_arguments == "review"
+
+
+def test_an_empty_custom_verifier_gives_a_review_verdict():
+    from attest import Attest
+
+    traj = Trajectory(
+        task="q",
+        steps=[Step(tool_call=ToolCall(name="search", arguments={}, output="data"))],
+        final_answer="a",
+    )
+    report = Attest(key="x").evaluate(
+        traj,
+        checks=("faithfulness",),
+        extract=lambda a: ["c1", "c2"],
+        verify=lambda claims, evidence: [],
+    )
+    assert report.verdict == "review"
+    assert report.results[0].score is None

@@ -23,6 +23,7 @@ from .claim_findings import (
     faithfulness_summary,
     unverifiable,
     verdict_finding,
+    with_missing_claims,
 )
 from .profiles import get_profile
 from .provenance import with_locations
@@ -76,7 +77,9 @@ def judge_trajectory(
     claims = extract(traj.final_answer)
     capped = len(claims) > max_claims
     evidence = gather_evidence(traj, artifacts or current_extraction())
-    findings = with_locations(verify(claims[:max_claims], evidence.text), evidence.blocks)
+    checked = claims[:max_claims]
+    verdicts = with_missing_claims(checked, verify(checked, evidence.text))
+    findings = with_locations(verdicts, evidence.blocks)
     supported = sum(finding.verdict == "supported" for finding in findings)
     unsupported = sum(finding.verdict == "unsupported" for finding in findings)
     checkable = supported + unsupported

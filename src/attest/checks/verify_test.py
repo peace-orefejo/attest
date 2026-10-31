@@ -289,3 +289,25 @@ def test_claims_total_counts_claims_past_the_cap():
     result = judge_trajectory(_example(), lambda a: claims, verify, max_claims=3)
     assert result.metadata["claims_checked"] == 3
     assert result.metadata["claims_total"] == 5
+
+
+def test_a_verifier_that_returns_nothing_is_inconclusive_not_a_pass():
+    claims = [f"c{i}" for i in range(10)]
+    result = judge_trajectory(_example(), lambda a: claims, lambda c, e: [])
+    assert result.score is None
+    assert [f.verdict for f in result.findings] == ["unverifiable"] * 10
+    assert result.metadata["claims_checked"] == 0
+    assert "no verdict" in result.findings[0].reason
+
+
+def test_claims_the_verifier_skipped_are_filled_in_as_unverifiable():
+    def verify(claims, evidence):
+        return [Finding(severity=Severity.PASS, verdict="supported", subject="c1")]
+
+    result = judge_trajectory(_example(), lambda a: ["c0", "c1", "c2"], verify)
+    assert [(f.subject, f.verdict) for f in result.findings] == [
+        ("c1", "supported"),
+        ("c0", "unverifiable"),
+        ("c2", "unverifiable"),
+    ]
+    assert result.score == 1.0
