@@ -1,3 +1,7 @@
+---
+description: "Install attest, set an API key and grade your first AI agent run from the command line or Python in a few minutes."
+---
+
 # Getting started
 
 ## Install

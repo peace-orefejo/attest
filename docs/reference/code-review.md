@@ -1,3 +1,7 @@
+---
+description: "API reference for attest.code_review: review(), PullRequest, ReviewOutput, ReviewResult, gate() and guidelines."
+---
+
 # attest.code_review
 
 Code review mode, importable as `from attest.code_review import ...`.

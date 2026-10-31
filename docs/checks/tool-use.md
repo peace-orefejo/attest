@@ -1,3 +1,7 @@
+---
+description: "The tool-use check flags calls to tools an agent wasn't allowed to use and tool errors it ignored. Deterministic, no API key needed."
+---
+
 # Tool use
 
 **Question:** did the agent call tools it's allowed to use, and deal with their errors?

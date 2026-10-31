@@ -1,3 +1,7 @@
+---
+description: "Use attest with LangChain, LangGraph or any agent framework, and gate CI on pass rates with confidence intervals."
+---
+
 # Integrations
 
 attest grades a `Trajectory`, so it works with any framework once you convert the agent's

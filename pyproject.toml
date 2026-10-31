@@ -50,9 +50,11 @@ files = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/adepeju4/attest"
-Repository = "https://github.com/adepeju4/attest"
-Issues = "https://github.com/adepeju4/attest/issues"
+Homepage = "https://peace-orefejo.github.io/attest/"
+Documentation = "https://peace-orefejo.github.io/attest/"
+Repository = "https://github.com/peace-orefejo/attest"
+Issues = "https://github.com/peace-orefejo/attest/issues"
+Changelog = "https://peace-orefejo.github.io/attest/changelog/"
 
 [project.scripts]
 attest = "attest.cli:app"

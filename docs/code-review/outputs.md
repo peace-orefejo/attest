@@ -1,3 +1,7 @@
+---
+description: "Reference for attest's code review types: ReviewOutput, PullRequest, ReviewResult, OutputDecision and GateDecision."
+---
+
 # Outputs and decisions
 
 ## ReviewOutput
