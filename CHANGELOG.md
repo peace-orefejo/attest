@@ -5,6 +5,39 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+- `VerdictPolicy(min_claim_coverage=...)`: a run whose faithfulness check covered less than this
+  share of the answer's claims goes to review. Off by default; kept separate from the score.
+- `Report.claim_coverage`: the share of claims faithfulness checked (0 to 1, or `None`).
+- `ProviderConfigError`, raised when the provider rejects the API key (401), the key lacks
+  permission (403) or the model doesn't exist (404). It stops the evaluation instead of
+  becoming review results, never includes the key or the provider's response in its message,
+  and is printed by the CLI as a `provider_config` error (exit 1).
+- Property-based tests (Hypothesis, dev only) for evidence escaping, error recovery,
+  dispositions and claim completion.
+
+### Changed
+- No failed or missing evaluation turns into a pass. When claim extraction, verification, the
+  role, deep injection, tool-choice or policy judge, or a code review injection confirmation
+  fails, the affected findings are inconclusive (`unchecked`, or `unverifiable` with
+  `metadata["checked"]` false) with the error in `reason`, and go to review. Budget stops and
+  provider configuration errors still stop the evaluation.
+- Rate limits, timeouts and server errors (408, 409, 429, 5xx) are retried before a call fails.
+  A `None` or wrongly typed structured response is retried like an empty one.
+- A claim whose check failed or got no verdict is `review` even beside supported claims;
+  `metadata["claims_unchecked"]` counts them.
+- **Breaking:** a run with no system prompt gets an `unchecked` role result (review) instead of
+  passing, since there is no role to check against.
+- **Breaking:** `allowed_tools=[]` allows no tools; `None` still allows every tool.
+- Code review: an issue whose grading failed is dropped in every gate mode, and a failed
+  injection confirmation leaves the hit unresolved, so the scan is never `clean`.
+- The CLI prints a JSON error instead of a traceback for files that aren't valid UTF-8
+  (`invalid_input`) and for errors no check absorbs (`command_failed`).
+
+### Fixed
+- A custom verifier that answered one claim twice and skipped another no longer hides the
+  skipped claim.
+
 ## [0.8.1] - 2026-10-31
 
 ### Fixed

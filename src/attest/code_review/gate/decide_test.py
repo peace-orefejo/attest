@@ -437,3 +437,14 @@ def test_breaking_the_built_in_standard_is_only_a_note():
     decision = gate(report, "issue", mode="strict")
     assert decision.keep
     assert [f.verdict for f in decision.notes] == ["breaks_guideline", "misses_guideline"]
+
+
+@pytest.mark.parametrize("mode", ["lenient", "strict"])
+def test_a_claim_no_verifier_judged_drops_the_output_in_every_mode(mode):
+    unchecked = Finding(
+        severity=Severity.WARN, verdict="unverifiable", subject="c", metadata={"checked": False}
+    )
+    report = Report(results=[CheckResult(check="faithfulness", passed=True, findings=[unchecked])])
+    decision = gate(report, "issue", mode=mode)
+    assert not decision.keep
+    assert decision.reasons == [unchecked]

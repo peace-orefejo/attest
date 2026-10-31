@@ -1,5 +1,8 @@
+import pytest
+
 import attest.code_review.injection.confirm as c
 from attest.code_review.injection.bounded import CharBudget
+from attest.llm import BudgetExceeded
 
 
 def test_confirm_parses_and_frames_text_as_data(monkeypatch):
@@ -44,3 +47,21 @@ def test_long_text_is_truncated_before_the_call(monkeypatch):
     c.confirm("x" * 10_000, file="a", segment_kind="string", signal="s", budget=CharBudget(5_000))
     assert len(seen["user"]) < 2_000
     assert "truncated=true" in seen["user"]
+
+
+def test_a_failed_confirmation_leaves_the_hit_unresolved(monkeypatch):
+    def fail(**k):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(c, "call", fail)
+    budget = CharBudget(5_000)
+    assert c.confirm("text", file="a", segment_kind="comment", signal="s", budget=budget) is None
+
+
+def test_budget_exceeded_propagates_from_confirmation(monkeypatch):
+    def over(**k):
+        raise BudgetExceeded("over")
+
+    monkeypatch.setattr(c, "call", over)
+    with pytest.raises(BudgetExceeded):
+        c.confirm("text", file="a", segment_kind="comment", signal="s", budget=CharBudget(5_000))

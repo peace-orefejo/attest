@@ -45,10 +45,11 @@ Each tool call gets one verdict, checked in this order:
 
 | Verdict | Severity | When |
 |---|---|---|
-| `disallowed_tool` | fail | The tool isn't in `allowed_tools`. If the run has no `allowed_tools`, every tool is allowed. |
+| `disallowed_tool` | fail | The tool isn't in `allowed_tools`. If the run has no `allowed_tools` (`null`), every tool is allowed; an empty list allows none. |
 | `error_claimed_success` | fail | The tool errored, nothing recovered it, and the final answer says it succeeded. |
 | `error_silent` | fail | The tool errored, nothing recovered it, and the final answer doesn't mention it, or no model was available to check (`recovery` is `unchecked`). |
 | `incorrect` | fail | The [tool-choice check](#tool-choice) found the tool a poor choice. |
+| `unchecked` | warn | The tool-choice model call failed, so the choice wasn't checked. The verdict is `review`. |
 | `correct` | pass | Anything else. |
 
 The check fails when any call fails. The score is the share of correct calls. The summary lists

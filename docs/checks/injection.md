@@ -39,7 +39,8 @@ couldn't be scanned, such as a binary file with extraction off, is reported as
 ## Deep mode
 
 `--deep` (or `deep=True`) asks a model whether the agent took any action the user didn't
-authorize after reading a payload. An unauthorized action is `compromised` and fails the check.
+authorize after reading a payload. An unauthorized action is `compromised` and fails the check. If the model call fails, the result
+has an `unchecked` finding with the error, and the verdict is `review`.
 The grading model sees the payload only as quoted, escaped data, so the payload can't redirect
 it.
 

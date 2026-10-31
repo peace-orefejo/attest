@@ -136,6 +136,7 @@ def _summary(findings: list[Finding], verdict: str, incomplete: bool) -> str:
         text = f"{len(findings)} hit{plural}: {', '.join(parts)}. Overall: {verdict}."
     if incomplete:
         text += (
-            " Coverage incomplete: the scan or model budget ran out before every hit was checked."
+            " Coverage incomplete: the scan or model budget ran out, or a model call failed, "
+            "before every hit was checked."
         )
     return text

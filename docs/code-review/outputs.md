@@ -99,6 +99,7 @@ decision plus the output's identity and scores.
 |---|---|---|
 | Faithfulness `unsupported` | drop | drop |
 | Faithfulness `unverifiable` | keep | drop |
+| A claim no model judged (a failed call, `metadata["checked"]` is `false`) | drop | drop |
 | One of your rules broken (with `follow_guidelines=True`) | drop | drop |
 | Guideline missed (with `follow_guidelines=True`) | keep, listed as a note | keep, listed as a note |
 | Injection `payload` in this output's files | drop | drop |

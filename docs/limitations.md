@@ -45,6 +45,37 @@ an execution) is outside what attest does today.
   everything was checked; `metadata["claims_checked"]` and `claims_total` say how much was, and
   `VerdictPolicy(min_claim_coverage=...)` sends low-coverage runs to review.
 
+## Failures and bad input
+
+No failure and no missing input turns into a `pass`.
+
+| What happens | Result |
+|---|---|
+| A budget runs out (`BudgetExceeded`) | Raised. `attest run` stops, prints the runs graded so far and exits 3. |
+| The provider rejects the key (401), the key lacks permission (403) or the model doesn't exist (404) | `ProviderConfigError` is raised and every check stops: it's a setup mistake, not an inconclusive evaluation. The CLI prints a `provider_config` error and exits 1. The message never includes the key or the provider's response. |
+| A rate limit, timeout or server error (408, 409, 429, 5xx) | Retried up to three attempts in all; if it keeps failing, the affected findings are inconclusive (`review`). |
+| Claim extraction or verification fails, or a verifier skips a claim | Those claims are `unverifiable` with `metadata["checked"]` false and the error in `reason`. Verdict `review`. |
+| The role, deep injection, tool-choice or policy (`evidence`, `rubric`) model call fails | An `unchecked` finding with the error. Verdict `review`. |
+| The tool-error answer question fails | The error's `recovery` is `unchecked`, so the call is `error_silent`. Verdict `review`. |
+| A code review injection confirmation fails | The hit stays unconfirmed and coverage is incomplete, so the scan is never `clean`. |
+| A code review guideline check or writer call fails | Raised. The CLI prints a `command_failed` error and exits 1. |
+| No steps | Claims have no evidence, so they're `unverifiable` (`review`). Tool use and injection have nothing to flag. |
+| An empty final answer, or one with no claims | Faithfulness has nothing to check and passes. Unrecovered tool errors are still checked. |
+| No system prompt | Role is `unchecked` (`review`), with no model call. |
+| `allowed_tools` is `null` / `[]` | Every tool is allowed / no tool is allowed. |
+| A tool call with no output | Counted as a tool error. |
+| A very long output, or an artifact that can't be read | Injection reports `unscanned_content`; faithfulness shows the artifact as incomplete and lists it in `metadata`. |
+| Control characters, markup or odd arguments | Treated as data: escaped in prompts and printed as valid JSON. |
+| A file that isn't valid UTF-8 or valid JSON | The CLI prints an `invalid_input` error and exits 2. |
+
+A malformed or empty model response is retried twice, then fails like any other call. In
+`evaluate()`, a failed call never stops the other checks: only the affected findings are
+inconclusive. The exceptions are a budget stop and a provider configuration error, which stop
+the evaluation.
+
+`unscanned_content` follows `VerdictPolicy(on_injection_warning=...)`, which is `pass` by
+default; set it to `review` to gate on full scan coverage.
+
 ## Using results safely
 
 - Gate on `verdict`, and treat `review` as "a person should look", not as a pass.

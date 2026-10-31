@@ -138,11 +138,14 @@ def test_retried_and_fallback_targets_are_later_successful_calls(run, outcome):
 def test_disallowed_tools_always_win_and_error_free_allowed_calls_are_correct(run, outcome):
     with _answer(outcome):
         result = check_tool_use(run, check_answer=True)
-    allowed = set(run.allowed_tools or [])
+
+    def allowed(name: str) -> bool:
+        return run.allowed_tools is None or name in run.allowed_tools
+
     calls = _calls_by_step(run)
     for finding in result.findings:
         call = calls[finding.step]
-        if allowed and call.name not in allowed:
+        if not allowed(call.name):
             assert finding.verdict == "disallowed_tool"
         elif not is_error(call):
             assert finding.verdict == "correct"
@@ -157,13 +160,16 @@ def test_the_answer_decides_unrecovered_errors(run, outcome):
         "not_mentioned": ("silent", "error_silent"),
         "succeeded": ("claimed_success", "error_claimed_success"),
     }[outcome]
-    allowed = set(run.allowed_tools or [])
+
+    def allowed(name: str) -> bool:
+        return run.allowed_tools is None or name in run.allowed_tools
+
     for finding in result.findings:
         recovery = finding.metadata["recovery"]
         if recovery in (None, "retried", "fallback"):
             continue
         assert recovery == expected[0]
-        if not allowed or finding.subject in allowed:
+        if allowed(finding.subject):
             assert finding.verdict == expected[1]
 
 
