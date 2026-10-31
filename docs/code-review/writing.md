@@ -4,9 +4,10 @@ description: "Let attest write a pull request review itself, then check and gate
 
 # Writing the review
 
-attest can review a pull request itself. It always follows the general standard as a baseline,
-and your [guidelines](guidelines.md) add to it and win where they conflict. Its review is then
-checked and gated like any other reviewer's.
+attest can review a pull request itself. It follows a built-in
+[general standard](guidelines.md#with-no-file), and your [review rules](guidelines.md) add to it
+and win where they conflict. Its review gets no special treatment: each output is then graded,
+checked against your rules and gated like any other reviewer's, and `result.written` is `True`.
 
 ## Three ways to run it
 
@@ -26,14 +27,14 @@ result.written    # True
 result.filter()   # the outputs attest wrote and kept
 ```
 
-From the shell, leave `outputs` out of the review file:
-
-```bash
-attest review pr.json -g REVIEW.md
-```
+From the shell, put only the pull request in the review file, `pr.json`:
 
 ```json
 {"pr": {"title": "Apply the user's discount", "diffs": {"billing/cart.py": "--- a/billing/cart.py\n..."}}}
+```
+
+```bash
+attest review pr.json -g REVIEW.md
 ```
 
 ## What it produces
@@ -42,7 +43,7 @@ attest review pr.json -g REVIEW.md
 
 | Output | How many | Evidence |
 |---|---|---|
-| `issue` | One per real problem the change introduces, or none. | The diff of the file it names (every diff if that file isn't in the pull request), plus the changed-file list. |
+| `issue` | One per real problem the change introduces, or none. | The diff of the file the issue names (or every diff, if it names a file the pull request doesn't change), plus the changed-file list. |
 | `diff_summary` | One per changed file. | That file's diff. |
 | `group_summary` | One overview of the whole pull request. | Every diff and the changed-file list. Its `group_name` is the pull request's title. |
 
@@ -51,9 +52,3 @@ Each output is scoped to the diffs it is about, so it is graded against the righ
 The writer reviews only what the pull request changes. Large diffs are cut to the same
 `EvidenceLimits` budget as grading. The title, description and diffs are treated as data to
 review, never as instructions. A pull request with no diffs raises `ValueError`.
-
-## Checked like any reviewer
-
-attest's own outputs get no special treatment. In `review()` each one is graded for
-faithfulness, checked against the guidelines, and gated, and an output that fails is dropped.
-When attest wrote the outputs, `written` is `true` in the result.

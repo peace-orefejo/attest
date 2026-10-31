@@ -8,6 +8,9 @@ description: "attest checks AI agent answers against what their tools actually r
 actually returned. It catches made-up facts, misused tools and prompt-injection slips that a
 "does this look good?" grader waves through.
 
+attest grades a **run**: a JSON record of one task, with the question, each tool call and what
+it returned, and the agent's final answer.
+
 ```bash
 pip install agent-attest      # the command and the import are both `attest`
 attest run your-run.json      # prints JSON
@@ -42,27 +45,28 @@ those outputs are the only evidence attest accepts.
 
 ## What it checks
 
-| Check | Question | Needs a model? |
-|---|---|---|
-| [Faithfulness](checks/faithfulness.md) | Is every claim in the answer backed by a tool output? | Yes |
-| [Tool use](checks/tool-use.md) | Did the agent call allowed tools and handle their errors? | No |
-| [Prompt injection](checks/injection.md) | Did tool outputs carry hidden instructions, and did the agent obey them? | Only for `--deep` |
-| [Role adherence](checks/role.md) | Did the agent stay inside its system prompt's job? | Yes |
-| [Policies](checks/policies.md) | Did the run follow your project's own rules? | Only for semantic rules |
+| Check | Question | Name in results | Needs an API key? |
+|---|---|---|---|
+| [Faithfulness](checks/faithfulness.md) | Is every claim in the answer backed by a tool output? | `faithfulness` | Yes |
+| [Tool use](checks/tool-use.md) | Did the agent call allowed tools and handle their errors? | `tool_use` | No |
+| [Prompt injection](checks/injection.md) | Did tool outputs carry hidden instructions, and did the agent obey them? | `injection` | Only to check obedience (`--deep`) |
+| [Role adherence](checks/role.md) | Did the agent stay inside its system prompt's job? | `role` | Yes |
+| [Policies](checks/policies.md) (Python only) | Did the run follow your project's own rules? | `policy` | Only for `evidence` and `rubric` rules |
 
-Scores come with [95% confidence intervals](concepts.md#scores-and-error-bars), so you can tell a
-real improvement from noise.
+`attest stats` turns a pass count into a rate with a
+[95% confidence interval](concepts.md#pass-rates-and-confidence), so you can tell a real
+improvement from noise.
 
 ## Code review mode
 
 attest can also check the outputs of an AI code reviewer: flagged issues, diff summaries, group
-summaries and answers to questions about a change. Each one is checked against the diff, and a
-gate decides whether to keep or drop it. See [Code review mode](code-review/index.md).
+summaries and answers to questions about a change. Each one is checked against the diff, then
+kept or dropped before people see it. See [Code review mode](code-review/index.md).
 
 ## Next steps
 
 - [Getting started](getting-started.md): install, set a key and grade your first run.
-- [How it works](concepts.md): runs, claims, verdicts and scores.
-- [Command line](cli.md): every command and flag.
-- [JSON output](json-output.md): the shape of every command's output, with JSON Schemas.
-- [Contributing](contributing.md): set up a dev environment and send a change.
+- [How it works](concepts.md): runs, evidence, findings, verdicts and reports.
+- The checks, starting with [Faithfulness](checks/faithfulness.md).
+- [Command line](cli.md) and [JSON output](json-output.md).
+- [Integrations](integrations.md): LangGraph, your own logs, and CI.

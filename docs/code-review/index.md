@@ -14,17 +14,28 @@ reviewer, attest can [write the review itself](writing.md) and check that too.
 
 ## The four output types
 
-| Type | Example | Default gate |
-|---|---|---|
-| `issue` | "`cart_total` reads past the end of `items`." | lenient |
-| `diff_summary` | "Adds retry with exponential backoff to `fetch_user`." | strict |
-| `group_summary` | "Auth group: moves session checks into middleware across 3 files." | strict |
-| `canvas_answer` | Q: "Does this change the public API?" A: "No, only private helpers changed." | strict |
+| Type | What it is | Example | Default gate mode |
+|---|---|---|---|
+| `issue` | A problem the reviewer flagged. | "`cart_total` reads past the end of `items`." | lenient |
+| `diff_summary` | A summary of one file's changes. | "Adds retry with exponential backoff to `fetch_user`." | strict |
+| `group_summary` | A summary of several related files, or the whole pull request. | "Moves session checks into middleware across 3 files." | strict |
+| `canvas_answer` | An answer to a question someone asked about the change. | Q: "Does this change the public API?" A: "No, only private helpers changed." | strict |
 
-A **lenient** gate drops an output only when the code contradicts it. A **strict** gate also
-drops it when the code shown doesn't support it. Issues default to lenient because a real bug
-often depends on code the reviewer didn't paste. Summaries and answers are meant to describe
-the change, so anything the diff doesn't show is a problem.
+## Keep or drop: the gate
+
+After an output is graded, the **gate** decides whether to keep it (show it to people) or drop
+it. The gate mode only changes how faithfulness problems count:
+
+- **lenient** drops the output when the code contradicts it (`unsupported`).
+- **strict** also drops it when the code shown doesn't back it up (`unverifiable`).
+
+Issues default to lenient because a real bug often depends on code the reviewer didn't include.
+Summaries and answers describe the change itself, so a claim the diff doesn't show is a problem.
+
+In both modes, an output is also dropped if it breaks one of your
+[review rules](guidelines.md) or obeyed text planted in the pull request
+([injection](injection.md)). [What drops an output](outputs.md#what-drops-an-output) has the
+full table.
 
 ## End to end
 
@@ -58,29 +69,36 @@ Options:
 | Argument | Default | Meaning |
 |---|---|---|
 | `outputs` | `None` | The reviewer's outputs. Leave it out and attest [writes the review](writing.md). |
-| `guidelines` | `None` | Your review rules: a markdown path, markdown text, or a list of paths. With `None`, outputs are checked for faithfulness only, and attest's own reviewer uses the general standard. |
+| `guidelines` | `None` | Your [review rules](guidelines.md): a markdown file, markdown text, or a list of files. Without them, outputs are checked for faithfulness only. |
 | `follow_guidelines` | `True` | Check outputs against your rules and drop the ones that break one. Has no effect without `guidelines`. |
 | `modes` | `None` | Override the gate mode per output type, e.g. `{"issue": "strict"}`. |
-| `deep` | `True` | Confirm injection hits with a model and check which outputs obeyed them. |
+| `deep` | `True` | Confirm injection hits with the grading model and check which outputs obeyed them. |
 | `limits` | `None` | An `EvidenceLimits` budget for large diffs. |
 | `answer_kind` | `"code"` | The answer kind used to grade each output. |
 
-For a custom pipeline, `to_run`, `check_code_injection` and `gate` are public too.
+For a custom pipeline, the steps are public too:
+
+- `to_run(output)` turns one output into a run whose tool outputs are its diffs and file reads.
+- `check_code_injection(pr, outputs)` scans the pull request (see [Injection in diffs](injection.md)).
+- `gate(report, output_type, injection=..., paths=..., output_index=...)` decides one output.
 
 ## How code is graded
 
-The `code` answer kind reads evidence the way a reviewer should:
+Each output is graded like any other answer: attest turns it into a run whose evidence is the
+diffs (and any files the reviewer read), then checks each claim with the `code`
+[answer kind](../concepts.md#answer-kinds). That standard reads evidence the way a reviewer
+should:
 
 - Lines starting with `+` were added, lines starting with `-` were removed and are gone, and
   unmarked lines are unchanged context.
 - The language's standard semantics count as evidence. `range(len(xs))` yields only valid
   indices, and 900 seconds is 15 minutes.
-- If the run includes `list_changed_files`, that list is complete. A claim that some other file
-  changed is unsupported.
+- The pull request's list of changed files is complete. A claim that some other file changed is
+  unsupported.
 - The code wins over comments, docstrings and commit messages. A comment can't make a claim true.
 - Recommendations and speculation about intent are dropped before grading.
-- A `read_guidelines` step holds the team's [review rules](guidelines.md). They settle what the
-  team requires, never what the code does.
+- Your [review rules](guidelines.md) are part of the evidence. They settle what the team
+  requires, never what the code does.
 
 ## Large changes
 
@@ -93,5 +111,5 @@ out. The changed-file list is never cut. Each decision's `omissions` says what w
 
 - [Review guidelines](guidelines.md): your team's review rules, and the general standard.
 - [Writing the review](writing.md): attest as the reviewer.
-- [Outputs and decisions](outputs.md): the `ReviewOutput`, `ReviewResult` and `GateDecision` fields.
+- [Outputs and decisions](outputs.md): every field of the inputs and the result.
 - [Injection in diffs](injection.md): instructions planted in a pull request for the reviewer.

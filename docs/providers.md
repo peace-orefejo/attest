@@ -4,7 +4,7 @@ description: "Grade AI agents with Anthropic, OpenAI or Gemini models in attest,
 
 # Models and providers
 
-attest grades with Anthropic, OpenAI or Gemini models. Pick one when you create the judge:
+attest grades with Anthropic, OpenAI or Gemini models. Pick one when you create the `Attest` grader:
 
 ```python
 from attest import Attest
@@ -24,11 +24,11 @@ On the command line, pass `--provider` and `--model` to any command that grades 
 | `gemini` | `pip install "agent-attest[gemini]"` | `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
 
 Keys are read from the environment or from a `.env` file in the working directory or a parent.
-You can also pass `key=` to `Attest`.
+You can also pass the chosen provider's key as `key=` to `Attest`.
 
 Each provider defaults to a small, fast model, so grading a run costs cents. A stronger model
 catches subtler errors. Compare models on your own labeled runs before you switch, and use
-[`difference_is_real`](concepts.md#scores-and-error-bars) to check that the gap isn't noise.
+[`difference_is_real`](concepts.md#pass-rates-and-confidence) to check that the gap isn't noise.
 
 ## Your own client
 

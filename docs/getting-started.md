@@ -23,12 +23,13 @@ working directory or a parent works too.
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-The tool-use check and the shallow injection scan run without any key.
+`attest tools` and `attest injection` (without `--deep`) run without a key. `attest run` always
+needs one.
 
 ## Describe a run
 
 attest grades a **run**: the task, the tool calls the agent made, what each tool returned, and
-the final answer. Save one as JSON:
+the final answer. In Python a run is a `Trajectory`. Save this one as `run.json`:
 
 ```json
 {
@@ -63,8 +64,10 @@ A file ending in `.jsonl` holds one run per line.
 attest run run.json > report.json
 ```
 
-The claim that Paris is larger comes back as an `unsupported` finding, with the tool output that
-contradicts it in `evidence`. [JSON output](json-output.md) describes every field.
+`report.json` holds one report for the run, with a result for each check (faithfulness and tool
+use by default). The claim that Paris is larger comes back as a finding with
+`"verdict": "unsupported"` and the contradicting tool output in `evidence`.
+[JSON output](json-output.md) describes every field.
 
 ## From Python
 
@@ -72,23 +75,26 @@ contradicts it in `evidence`. [JSON output](json-output.md) describes every fiel
 from attest import Attest, Trajectory
 
 run = Trajectory.model_validate_json(open("run.json").read())
-judge = Attest()
+grader = Attest()
 
-report = judge.evaluate(run)
+report = grader.evaluate(run)
 print(report.passed, report.overall_score)
 for finding in report.by("faithfulness").failures:
     print(finding.subject, "->", finding.reason)
 ```
 
-Single checks have their own methods:
+`evaluate()` runs faithfulness and tool use. Pass `checks=` to choose others, or call a single
+check directly:
 
 ```python
-judge.tool_use(run)                # offline
-judge.injection(run, deep=True)    # deep mode checks whether the agent acted on a payload
-judge.role_adherence(run)
+grader.evaluate(run, checks=("faithfulness", "tool_use", "injection", "role"))
+
+grader.tool_use(run)                # no key needed
+grader.injection(run, deep=True)    # deep: also check whether the agent obeyed a payload
+grader.role_adherence(run)
 ```
 
-Results are Pydantic models, so `report.model_dump_json()` gives the same JSON the command line
-prints.
+Results are Pydantic models. `report.model_dump_json()` gives the same JSON as one
+`data.trajectories[].report` in `attest run`'s output.
 
 Next, read [How it works](concepts.md) to see what each verdict means.
