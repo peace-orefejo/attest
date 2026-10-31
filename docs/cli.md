@@ -11,7 +11,7 @@ command prints [JSON](json-output.md). Commands that use a model accept `--provi
 | Command | Does | Needs a key? |
 |---|---|---|
 | `attest run FILE` | Grades every run in FILE with the chosen checks. | Yes |
-| `attest tools FILE` | Tool-use check. `--appropriate` adds a model check of each tool choice. | Only with `--appropriate` |
+| `attest tools FILE` | Tool-use check. `--appropriate` adds a model check of each tool choice; `--check-answer` asks a model whether the final answer reports unrecovered tool errors. | Only with `--appropriate` or `--check-answer` |
 | `attest injection FILE` | Prompt-injection scan. `--deep` checks whether the agent obeyed. | Only with `--deep` |
 | `attest role FILE` | Role-adherence check. | Yes |
 | `attest review FILE` | Checks an AI code reviewer's outputs. | Yes |

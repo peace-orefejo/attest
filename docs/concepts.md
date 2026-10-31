@@ -20,7 +20,8 @@ line it is one JSON object (a `.jsonl` file holds one per line).
 | `task` | What the user asked. |
 | `system_prompt` | The agent's instructions. The role check uses it as the job description. |
 | `allowed_tools` | Tools the agent may call. Calls outside this list fail the tool-use check. |
-| `steps` | Each step has an optional `thought` and an optional `tool_call` with `name`, `arguments` and `output`. |
+| `tool_fallbacks` | Optional. For each tool, the tools that can stand in for it when it errors, such as `{"charge_card": ["charge_card_backup"]}`. |
+| `steps` | Each step has an optional `thought` and an optional `tool_call` with `name`, `arguments`, `output` and an optional `is_error` that overrides attest's guess. |
 | `artifacts` | Files or images the agent received, such as a PDF or a screenshot. |
 | `final_answer` | What the agent told the user. |
 

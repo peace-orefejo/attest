@@ -17,6 +17,7 @@ class ToolCall(BaseModel):
     arguments: JsonObject = Field(default_factory=dict)
     output: str = ""
     artifacts: list[Artifact] = Field(default_factory=list[Artifact])
+    is_error: bool | None = None
 
 
 class Step(BaseModel):
@@ -41,6 +42,7 @@ class Trajectory(BaseModel):
     task: str
     system_prompt: str | None = None
     allowed_tools: list[str] | None = None
+    tool_fallbacks: dict[str, list[str]] = Field(default_factory=dict[str, list[str]])
     steps: list[Step] = Field(default_factory=list[Step])
     artifacts: list[Artifact] = Field(default_factory=list[Artifact])
     final_answer: str

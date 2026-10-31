@@ -1,6 +1,7 @@
 """The Attest facade — all offline."""
 
 import attest.checks.injection.deep as inj
+import attest.checks.tool_recovery as tr
 from attest import Attest, CheckResult, Finding, Report, Severity
 from attest.code_review import PullRequest, ReviewOutput
 from attest.llm import using
@@ -77,6 +78,27 @@ def test_deterministic_evaluate_runs_without_building_client():
     judge = Attest()
     report = judge.evaluate(_traj(), checks=["tool_use"])
     assert report.passed is True
+    assert judge._client is None
+
+
+def test_tool_use_check_answer_routes_the_configured_client(monkeypatch):
+    sentinel = object()
+    seen = {}
+
+    def spy(**kwargs):
+        seen["client"] = _resolve_client()
+        return tr._AnswerReport(outcome="succeeded")
+
+    monkeypatch.setattr(tr, "call", spy)
+    result = Attest(client=sentinel).tool_use(_traj(output="Error: declined"), check_answer=True)
+    assert seen["client"] is sentinel
+    assert result.findings[0].verdict == "error_claimed_success"
+
+
+def test_tool_use_without_a_model_reports_unchecked():
+    judge = Attest()
+    result = judge.tool_use(_traj(output="Error: declined"))
+    assert result.findings[0].metadata["recovery"] == "unchecked"
     assert judge._client is None
 
 
