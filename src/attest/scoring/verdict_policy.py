@@ -25,7 +25,7 @@ class ToolUsePolicy(BaseModel):
     on_unhandled_error: Disposition = "review"
     on_claimed_success: Disposition = "block"
     on_unnecessary_call: Disposition = "review"
-    on_invalid_arguments: Disposition | None = None
+    on_invalid_arguments: Disposition = "review"
 
     @model_validator(mode="after")
     def _warn_on_unused_option(self) -> Self:

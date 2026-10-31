@@ -93,7 +93,7 @@ def judge_trajectory(
         metadata={
             **evidence.metadata(),
             "claims_checked": checkable,
-            "claims_total": len(findings),
+            "claims_total": len(claims),
         },
     )
 

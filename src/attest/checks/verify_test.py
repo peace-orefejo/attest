@@ -279,3 +279,13 @@ def test_coverage_counts_checked_and_total_claims():
     result = judge_trajectory(_example(), lambda a: ["c1", "c2"], verify)
     assert result.metadata["claims_checked"] == 1
     assert result.metadata["claims_total"] == 2
+
+
+def test_claims_total_counts_claims_past_the_cap():
+    def verify(claims, evidence):
+        return [Finding(severity=Severity.PASS, verdict="supported", subject=c) for c in claims]
+
+    claims = [f"c{i}" for i in range(5)]
+    result = judge_trajectory(_example(), lambda a: claims, verify, max_claims=3)
+    assert result.metadata["claims_checked"] == 3
+    assert result.metadata["claims_total"] == 5

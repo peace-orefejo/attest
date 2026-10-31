@@ -104,7 +104,7 @@ from attest import Attest
 grader = Attest()                      # or Attest(provider="openai" | "gemini")
 report = grader.evaluate(run)
 
-print(report.passed, report.overall_score)
+print(report.verdict)                 # pass, review or block
 ```
 
 In Python a run is a `Trajectory`. [`examples/quickstart.py`](examples/quickstart.py) builds

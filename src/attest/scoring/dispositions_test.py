@@ -241,3 +241,7 @@ def test_the_default_tool_use_policy_raises_no_warning(recwarn):
     ToolUsePolicy()
     VerdictPolicy()
     assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
+
+
+def test_the_deprecated_option_keeps_its_old_default():
+    assert ToolUsePolicy().on_invalid_arguments == "review"

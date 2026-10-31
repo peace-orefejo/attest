@@ -73,7 +73,7 @@ def _tool_use(finding: Finding, policy: ToolUsePolicy) -> Disposition | None:
         "error_claimed_success": policy.on_claimed_success,
         "inappropriate": policy.on_unnecessary_call,
         "unnecessary_call": policy.on_unnecessary_call,
-        "invalid_arguments": policy.on_invalid_arguments or "review",
+        "invalid_arguments": policy.on_invalid_arguments,
     }
     return by_verdict.get(finding.verdict)
 

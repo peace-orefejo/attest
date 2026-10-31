@@ -283,6 +283,7 @@ def test_run_prints_one_report_per_trajectory_and_totals(tmp_path, monkeypatch):
     assert [item["task"] for item in data["trajectories"]] == ["search", "search"]
     assert data["trajectories"][0]["report"]["passed"] is True
     assert (data["total"], data["evaluated"], data["passed"]) == (2, 2, 2)
+    assert data["verdicts"] == {"pass": 2, "review": 0, "block": 0}
     assert data["mean_overall_score"] == 1.0
     assert data["usage"]["calls"] == 0
     assert data["budget_exceeded"] is None
@@ -462,3 +463,21 @@ def test_review_of_a_pr_without_diffs_is_a_usage_error(tmp_path, monkeypatch):
     result = runner.invoke(app, ["review", str(path)])
     assert result.exit_code == 2
     assert "no diffs to review" in _error(result)
+
+
+def test_run_counts_an_inconclusive_run_as_review_even_though_it_passed(tmp_path, monkeypatch):
+    from attest import Attest
+    from attest.results import CheckResult, Finding, Report, Severity
+    from attest.scoring.dispositions import apply_verdict_policy
+
+    def fake(self, traj, **kwargs):
+        unverifiable = Finding(severity=Severity.WARN, verdict="unverifiable", subject="claim")
+        result = CheckResult(check="faithfulness", passed=True, findings=[unverifiable])
+        return apply_verdict_policy(Report(results=[result]))
+
+    monkeypatch.setattr(Attest, "evaluate", fake)
+    monkeypatch.setattr("attest.cli.context.resolve_key", lambda provider: "sk-test")
+    result = runner.invoke(app, ["run", _two_trajectories(tmp_path), "--checks", "faithfulness"])
+    data = _payload(result)["data"]
+    assert data["passed"] == 2
+    assert data["verdicts"] == {"pass": 0, "review": 2, "block": 0}

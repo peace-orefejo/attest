@@ -87,7 +87,8 @@ or `--kind` to `attest run`:
 
 `evaluate()` runs faithfulness and tool use by default; pass `checks=` for others. It returns a
 `Report` with one result per check, plus a `policy` result when the `Attest` has a
-[policy](checks/policies.md). The report passes only when every result passes. Its
+[policy](checks/policies.md). `passed` is true when every result passes, but it doesn't
+account for `review`: gate on the report's `verdict` (below). Its
 `overall_score` is the mean of the scores that aren't `null`, and `scores` gives each check's
 score by name.
 
