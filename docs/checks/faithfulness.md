@@ -20,8 +20,9 @@ result = report.by("faithfulness")
 1. The final answer is split into atomic, checkable claims. Hedges, opinions and generic advice
    are dropped.
 2. Claims are checked against the run's tool outputs and artifacts in batches of 15, with one
-   model call per batch. At most 40 claims are checked; the summary says when a long answer was
-   cut short.
+   model call per batch. At most 40 claims are checked (`max_claims=` on `evaluate()`). Each claim
+   past the cap is reported `unverifiable` with `checked` false, so a long answer goes to
+   `review` instead of passing on its first 40 claims.
 3. Each claim gets `supported`, `unsupported` or `unverifiable`, a reason, and the deciding quote.
    When the quote comes from exactly one tool output or artifact, the finding's
    `metadata["location"]` says which, such as `steps[2].tool_call.artifacts[0]`.

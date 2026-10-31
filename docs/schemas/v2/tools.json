@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://peace-orefejo.github.io/attest/schemas/v2/tools.json",
+  "$defs": {
+    "CheckData": {
+      "description": "`attest tools`, `injection` and `role`: one check result per trajectory.",
+      "properties": {
+        "trajectories": {
+          "items": {
+            "$ref": "#/$defs/TaskResult"
+          },
+          "title": "Trajectories",
+          "type": "array"
+        }
+      },
+      "required": [
+        "trajectories"
+      ],
+      "title": "CheckData",
+      "type": "object"
+    },
+    "CheckResult": {
+      "properties": {
+        "check": {
+          "title": "Check",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        },
+        "summary": {
+          "default": "",
+          "title": "Summary",
+          "type": "string"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "prompt_version": {
+          "default": "2026.10.31",
+          "title": "Prompt Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check",
+        "passed"
+      ],
+      "title": "CheckResult",
+      "type": "object"
+    },
+    "Finding": {
+      "properties": {
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "verdict": {
+          "title": "Verdict",
+          "type": "string"
+        },
+        "subject": {
+          "default": "",
+          "title": "Subject",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "disposition": {
+          "anyOf": [
+            {
+              "enum": [
+                "pass",
+                "review",
+                "block"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Disposition"
+        }
+      },
+      "required": [
+        "severity",
+        "verdict"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "pass",
+        "warn",
+        "fail"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "TaskResult": {
+      "properties": {
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/$defs/CheckResult"
+        }
+      },
+      "required": [
+        "task",
+        "result"
+      ],
+      "title": "TaskResult",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "2",
+      "default": "2",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "command": {
+      "const": "tools",
+      "title": "Command",
+      "type": "string"
+    },
+    "ok": {
+      "const": true,
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "data": {
+      "$ref": "#/$defs/CheckData"
+    }
+  },
+  "required": [
+    "schema_version",
+    "command",
+    "ok",
+    "data"
+  ],
+  "title": "attest tools",
+  "type": "object"
+}

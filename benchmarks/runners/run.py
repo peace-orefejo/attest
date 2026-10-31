@@ -20,7 +20,7 @@ from bench_cases import CHECKS, SPLITS, CheckName
 from bench_check_metrics import Prices
 from bench_grade import OFFLINE_CHECKS, GradeSettings
 from bench_load import DATASETS_DIR, DatasetError, load_datasets
-from bench_private import withhold_case_details
+from bench_private import id_key_from_env, withhold_case_details
 from bench_report import DEFAULT_MIN_COVERAGE
 from bench_run import run_benchmark
 from bench_summary import markdown_summary
@@ -106,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         report = report.model_copy(
             update={
                 "dataset_visibility": "private",
-                "cases": withhold_case_details(report.cases),
+                "cases": withhold_case_details(report.cases, id_key_from_env()),
             }
         )
     if args.out is not None:

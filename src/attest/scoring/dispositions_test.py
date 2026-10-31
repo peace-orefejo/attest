@@ -109,7 +109,7 @@ def test_min_score_turns_passing_findings_into_review():
     floored = apply_verdict_policy(raw, VerdictPolicy(min_score={"faithfulness": 0.9}))
     assert floored.verdict == "review"
     assert {f.disposition for f in floored.results[0].findings} == {"review"}
-    assert floored.passed is True
+    assert floored.passed is False and floored.checks_passed is True
 
 
 def test_min_score_ignores_unscored_and_passing_checks():
@@ -176,7 +176,7 @@ def test_evaluate_fills_dispositions_and_verdict():
     assert report.blocking[0].check == "faithfulness"
     assert report.passed is False
     dumped = report.model_dump()
-    assert {"verdict", "blocking", "scores", "passed", "overall_score"} <= dumped.keys()
+    assert {"verdict", "blocking", "scores", "passed", "checks_passed"} <= dumped.keys()
 
 
 def test_attest_threads_verdict_policy():

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://peace-orefejo.github.io/attest/schemas/v2/error.json",
+  "$defs": {
+    "ErrorDetail": {
+      "properties": {
+        "code": {
+          "enum": [
+            "invalid_input",
+            "missing_api_key",
+            "provider_config",
+            "command_failed"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ErrorDetail",
+      "type": "object"
+    }
+  },
+  "description": "A command that could not run. Printed on stdout like any other output.",
+  "properties": {
+    "schema_version": {
+      "const": "2",
+      "default": "2",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "command": {
+      "title": "Command",
+      "type": "string"
+    },
+    "ok": {
+      "const": false,
+      "default": false,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "error": {
+      "$ref": "#/$defs/ErrorDetail"
+    }
+  },
+  "required": [
+    "schema_version",
+    "command",
+    "ok",
+    "error"
+  ],
+  "title": "attest error",
+  "type": "object"
+}

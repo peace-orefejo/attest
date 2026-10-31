@@ -122,6 +122,7 @@ def test_a_policy_changes_only_dispositions(report, policy):
     strip = {
         "results": {"__all__": {"findings": {"__all__": {"disposition"}}}},
         "verdict": True,
+        "passed": True,
         "blocking": True,
     }
     assert applied.model_dump(exclude=strip) == report.model_dump(exclude=strip)

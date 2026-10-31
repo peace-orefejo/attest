@@ -72,7 +72,14 @@ class Report(BaseModel):
     @computed_field
     @property
     def passed(self) -> bool:
-        """Every check passed. Doesn't account for `review`: gate on `verdict` instead."""
+        """The run passed: its `verdict` is `pass`. False when anything needs review or blocks."""
+        return self.verdict == "pass"
+
+    @computed_field
+    @property
+    def checks_passed(self) -> bool:
+        """Every check's own `passed` is true. Ignores dispositions, so a run can have
+        `checks_passed` true and still need review; gate on `verdict` or `passed`."""
         return all(r.passed for r in self.results)
 
     @computed_field

@@ -74,6 +74,7 @@ def _run_data(outcome: RunOutcome) -> RunData:
         total=outcome.total,
         evaluated=len(outcome.reports),
         passed=sum(item.report.passed for item in outcome.reports),
+        checks_passed=sum(item.report.checks_passed for item in outcome.reports),
         verdicts=_verdict_counts(outcome),
         mean_overall_score=outcome.mean_overall_score,
         usage=outcome.usage,

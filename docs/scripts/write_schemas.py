@@ -1,4 +1,4 @@
-"""Write the JSON Schema of every CLI command's output to docs/schemas/v1/.
+"""Write the JSON Schema of every CLI command's output to docs/schemas/v<SCHEMA_VERSION>/.
 
 uv run python docs/scripts/write_schemas.py
 """

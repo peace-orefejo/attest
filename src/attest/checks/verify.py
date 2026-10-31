@@ -74,6 +74,7 @@ def judge_trajectory(
 
     If `extract` or `verify` raises (anything but `BudgetExceeded`), the claims it covered are
     reported `unverifiable` with `metadata["checked"]` false and the reason, never as a pass.
+    Claims beyond `max_claims` are reported the same way, so a capped answer can't pass.
     """
     extraction = extract_safely(extract, traj.final_answer)
     claims = extraction.claims
@@ -85,7 +86,9 @@ def judge_trajectory(
         if extraction.failure is not None
         else verify_safely(verify, checked, evidence.text)
     )
-    findings = with_locations(verdicts, evidence.blocks)
+    findings = with_locations(verdicts, evidence.blocks) + [
+        unchecked(claim, _over_cap_reason(len(claims), max_claims)) for claim in claims[max_claims:]
+    ]
     supported = sum(finding.verdict == "supported" for finding in findings)
     unsupported = sum(finding.verdict == "unsupported" for finding in findings)
     checkable = supported + unsupported
@@ -94,7 +97,10 @@ def judge_trajectory(
     if extraction.failure is not None:
         summary = "The answer's claims could not be extracted, so none were checked."
     if capped:
-        summary += f" (checked the first {max_claims} claims)"
+        summary += (
+            f" (checked the first {max_claims} claims; "
+            f"{len(claims) - max_claims} more were not checked)"
+        )
     return CheckResult(
         check="faithfulness",
         passed=unsupported == 0,
@@ -107,6 +113,13 @@ def judge_trajectory(
             "claims_total": len(claims),
             "claims_unchecked": sum(is_unchecked(finding) for finding in findings),
         },
+    )
+
+
+def _over_cap_reason(total: int, max_claims: int) -> str:
+    return (
+        f"Not checked: the answer makes {total} claims and faithfulness checks at most "
+        f"{max_claims}. Raise max_claims to check every claim."
     )
 
 

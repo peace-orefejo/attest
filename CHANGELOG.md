@@ -17,6 +17,15 @@ All notable changes to `agent-attest` are documented here. This project follows
   dispositions and claim completion.
 
 ### Changed
+- **Breaking:** `Report.passed` now means the run passed: `verdict == "pass"`. It used to mean
+  every check passed, so a run needing review could read `passed: true`. The old meaning is
+  `Report.checks_passed`. In `attest run`'s JSON, `passed` counts runs whose verdict is `pass`
+  and the new `checks_passed` counts the old way.
+- **Breaking:** the CLI's JSON is now `schema_version` `"2"`, because `passed` changed meaning.
+  The schemas are published under `schemas/v2/`; the v1 schemas stay where they were.
+- **Breaking:** claims past `max_claims` (40 by default) are reported `unverifiable` with
+  `metadata["checked"]` false, so they go to review. A long answer used to pass on its first 40
+  claims while the rest were never checked.
 - No failed or missing evaluation turns into a pass. When claim extraction, verification, the
   role, deep injection, tool-choice or policy judge, or a code review injection confirmation
   fails, the affected findings are inconclusive (`unchecked`, or `unverifiable` with

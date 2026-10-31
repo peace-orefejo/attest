@@ -48,7 +48,7 @@ def test_tools_prints_the_json_envelope(tmp_path):
 
     assert result.exit_code == 0
     payload = _payload(result)
-    assert payload["schema_version"] == "1"
+    assert payload["schema_version"] == "2"
     assert payload["command"] == "tools"
     assert payload["ok"] is True
     entry = payload["data"]["trajectories"][0]
@@ -313,7 +313,7 @@ def test_schema_prints_the_json_schema_of_a_command():
     result = runner.invoke(app, ["schema", "run"])
     assert result.exit_code == 0
     schema = _payload(result)
-    assert schema["$id"].endswith("/schemas/v1/run.json")
+    assert schema["$id"].endswith("/schemas/v2/run.json")
     assert schema["properties"]["command"]["const"] == "run"
     assert set(schema["required"]) == {"schema_version", "command", "ok", "data"}
 
@@ -465,7 +465,7 @@ def test_review_of_a_pr_without_diffs_is_a_usage_error(tmp_path, monkeypatch):
     assert "no diffs to review" in _error(result)
 
 
-def test_run_counts_an_inconclusive_run_as_review_even_though_it_passed(tmp_path, monkeypatch):
+def test_run_counts_an_inconclusive_run_as_review_not_passed(tmp_path, monkeypatch):
     from attest import Attest
     from attest.results import CheckResult, Finding, Report, Severity
     from attest.scoring.dispositions import apply_verdict_policy
@@ -479,5 +479,6 @@ def test_run_counts_an_inconclusive_run_as_review_even_though_it_passed(tmp_path
     monkeypatch.setattr("attest.cli.context.resolve_key", lambda provider: "sk-test")
     result = runner.invoke(app, ["run", _two_trajectories(tmp_path), "--checks", "faithfulness"])
     data = _payload(result)["data"]
-    assert data["passed"] == 2
+    assert data["passed"] == 0
+    assert data["checks_passed"] == 2
     assert data["verdicts"] == {"pass": 0, "review": 2, "block": 0}

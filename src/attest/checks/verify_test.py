@@ -1,6 +1,7 @@
 """Faithfulness aggregation and the batched verifier, all offline."""
 
 import attest.checks.verify as v
+from attest.checks.claim_findings import is_unchecked
 from attest.checks.verify import judge_trajectory, verify_claims
 from attest.content import Artifact
 from attest.results import Finding, Severity
@@ -92,8 +93,12 @@ def test_max_claims_caps_the_work():
 
     result = judge_trajectory(_example(), fake_extract, fake_verify, max_claims=10)
     assert seen["n"] == 10
-    assert len(result.findings) == 10
-    assert "first 10 claims" in result.summary
+    assert len(result.findings) == 100
+    assert "first 10 claims; 90 more were not checked" in result.summary
+    skipped = result.findings[10:]
+    assert [f.subject for f in skipped] == [f"claim {i}" for i in range(10, 100)]
+    assert all(is_unchecked(f) and "max_claims" in f.reason for f in skipped)
+    assert result.metadata["claims_unchecked"] == 90
 
 
 def test_verify_claims_batches_and_maps(monkeypatch):
@@ -160,7 +165,7 @@ def test_all_unverifiable_claims_have_no_score():
 def test_all_unverifiable_and_capped_keeps_the_cap_note():
     result = judge_trajectory(_example(), lambda a: ["c1", "c2", "c3"], _unverifiable, max_claims=2)
     assert result.score is None
-    assert result.summary.startswith("None of the 2 claims could be checked")
+    assert result.summary.startswith("None of the 3 claims could be checked")
     assert "first 2 claims" in result.summary
 
 
