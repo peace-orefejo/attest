@@ -7,6 +7,7 @@ import os
 from collections.abc import Generator, Mapping, Sequence
 from contextlib import AbstractContextManager
 
+from .checks.artifact_evidence import ArtifactExtraction, extracting_artifacts
 from .checks.injection import DEFAULT_DETECTORS, InjectionDetector, check_injection
 from .checks.judge_baseline import JudgeVerdict, naive_judge
 from .checks.role import check_role_adherence
@@ -32,7 +33,13 @@ CacheOption = bool | ResponseStore | str | os.PathLike[str]
 
 
 class Attest:
-    """A configured evaluator. Pick a provider + model once; evaluate many trajectories."""
+    """A configured evaluator. Pick a provider + model once; evaluate many trajectories.
+
+    `extract_artifacts=True` lets faithfulness read binary (`data_base64`) artifacts as
+    evidence, through the same bounded extraction the injection scan uses; `path` artifacts
+    are read from disk only when `allow_paths=True` too. Without it, only text artifacts and
+    tool outputs are evidence.
+    """
 
     def __init__(
         self,
@@ -45,6 +52,8 @@ class Attest:
         enforce_policy: bool = True,
         cache: CacheOption = False,
         budget: Budget | None = None,
+        extract_artifacts: bool = False,
+        allow_paths: bool = False,
     ) -> None:
         self.provider = provider
         self.model = model or default_model(provider)
@@ -55,6 +64,9 @@ class Attest:
         self._cache = _response_store(cache, provider=provider, model=self.model)
         self.budget = budget
         self.usage = Usage()
+        self.artifact_extraction = ArtifactExtraction(
+            enabled=extract_artifacts, allow_paths=allow_paths
+        )
 
     def evaluate(
         self,
@@ -75,7 +87,7 @@ class Attest:
             selected, appropriate=appropriate, deep=deep, extract=extract, verify=verify
         ) or (policy is not None and policy.needs_llm)
         before = self.usage.model_copy()
-        with self._llm_context(needs_llm):
+        with self._llm_context(needs_llm), extracting_artifacts(self.artifact_extraction):
             report = evaluate(
                 traj,
                 checks=selected,
