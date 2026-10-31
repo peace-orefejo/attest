@@ -1,4 +1,5 @@
 ---
+title: "Code review mode"
 description: "Check AI code reviewer outputs against the diff: keep real issues, drop false ones and wrong summaries before people see them."
 ---
 
