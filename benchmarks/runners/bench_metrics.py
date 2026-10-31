@@ -1,4 +1,4 @@
-"""Pure metric functions: confusion matrices, violation detection with Wilson intervals, latency."""
+"""Pure metric functions: confusion matrices, binary detection with Wilson intervals, latency."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from collections.abc import Iterable, Sequence
 from pydantic import BaseModel
 
 from attest import wilson_interval
-from bench_rows import MISSING
+from bench_rows import UNGRADED_PREDICTIONS
 
 Pair = tuple[str, str]
 """(expected, predicted) for one labelled item."""
@@ -35,7 +35,7 @@ class Confusion(BaseModel):
 
 
 class Detection(BaseModel):
-    """Binary violation detection: any violation label is positive, clean labels negative."""
+    """One binary view: labels outside the view's negative set are positive."""
 
     tp: int
     fp: int
@@ -84,15 +84,15 @@ def confusion(pairs: Sequence[Pair], labels: Sequence[str]) -> Confusion:
     return Confusion(labels=ordered, matrix=matrix)
 
 
-def is_violation(label: str, clean: frozenset[str]) -> bool:
-    """A violation label. `missing` (attest returned no finding) is never a detection."""
-    return label not in clean and label != MISSING
+def is_positive(label: str, negative: frozenset[str]) -> bool:
+    """A positive label. `missing`, `error` and `not_run` are never a detection."""
+    return label not in negative and label not in UNGRADED_PREDICTIONS
 
 
-def detection(pairs: Sequence[Pair], clean: frozenset[str]) -> Detection:
+def detection(pairs: Sequence[Pair], negative: frozenset[str]) -> Detection:
     tp = fp = fn = tn = 0
     for expected, predicted in pairs:
-        actual, flagged = is_violation(expected, clean), is_violation(predicted, clean)
+        actual, flagged = is_positive(expected, negative), is_positive(predicted, negative)
         tp += actual and flagged
         fp += flagged and not actual
         fn += actual and not flagged

@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 
 from attest import wilson_interval
-from bench_cases import CLEAN_LABELS, LABELS
-from bench_check_metrics import Prices, check_metrics
+from bench_cases import BINARY_VIEWS, LABELS
+from bench_check_metrics import Prices, binary_metrics, check_metrics
 from bench_metrics import (
     accuracy,
     claim_coverage,
@@ -17,6 +17,9 @@ from bench_metrics import (
     rate,
 )
 from bench_rows import CaseRow, CaseUsage, item
+
+SUPPORTED_ONLY = frozenset({"supported"})
+TOOL_CLEAN = BINARY_VIEWS["tool_use"][0].negative
 
 # Faithfulness pairs (expected, predicted), counted by hand:
 #   supported   -> supported x3, unverifiable x1
@@ -55,11 +58,11 @@ def test_confusion_matrix_matches_hand_count() -> None:
     assert sum(sum(row.values()) for row in result.matrix.values()) == len(PAIRS)
 
 
-def test_violation_detection_matches_hand_count() -> None:
+def test_detection_matches_hand_count() -> None:
     # positives: unsupported, unverifiable (5 items); flagged: unverifiable/unsupported preds.
     # tp: (unsup,unsup)x2 + (unver,unver) = 3; fn: (unsup,sup) + (unver,missing) = 2
     # fp: (sup,unver) = 1; tn: (sup,sup)x3 = 3
-    found = detection(PAIRS, CLEAN_LABELS["faithfulness"])
+    found = detection(PAIRS, SUPPORTED_ONLY)
     assert (found.tp, found.fp, found.fn, found.tn) == (3, 1, 2, 3)
     assert found.precision.value == pytest.approx(3 / 4)
     assert found.recall.value == pytest.approx(3 / 5)
@@ -82,7 +85,7 @@ def test_per_label_scores() -> None:
 
 def test_empty_denominators_are_none_not_zero() -> None:
     assert rate(0, 0).value is None
-    found = detection([("supported", "supported")], CLEAN_LABELS["faithfulness"])
+    found = detection([("supported", "supported")], SUPPORTED_ONLY)
     assert found.precision.value is None and found.recall.value is None and found.f1 is None
     assert found.false_positive_rate.value == 0.0
 
@@ -103,7 +106,7 @@ def test_multiclass_tool_use_confusion() -> None:
     matrix = confusion(pairs, LABELS["tool_use"]).matrix
     assert matrix["error_claimed_success"]["error_silent"] == 1
     assert matrix["correct"]["error_silent"] == 1
-    found = detection(pairs, CLEAN_LABELS["tool_use"])
+    found = detection(pairs, TOOL_CLEAN)
     assert (found.tp, found.fp, found.fn, found.tn) == (2, 1, 0, 1)
 
 
@@ -144,7 +147,7 @@ def _row(
     )
 
 
-def test_check_metrics_skip_errored_rows_and_break_down_by_category() -> None:
+def test_check_metrics_grade_only_graded_rows_and_break_down_by_category() -> None:
     rows = [
         _row(
             "a",
@@ -161,17 +164,70 @@ def test_check_metrics_skip_errored_rows_and_break_down_by_category() -> None:
             category="supported_claim",
             source="synthetic",
             label_status="confirmed",
+            status="errored",
+            items=[item("k0", "supported", "error")],
             error="boom",
         ),
     ]
     metrics = check_metrics("faithfulness", rows, Prices(input=1.0, output=10.0))
-    assert (metrics.cases, metrics.graded_cases, metrics.errored_cases) == (4, 3, 1)
+    covered = metrics.coverage
+    assert (covered.attempted, covered.graded, covered.errored, covered.not_run) == (4, 3, 1, 0)
     assert metrics.draft_cases == 3
-    assert metrics.items == 4
+    assert (metrics.items, metrics.attempted_items) == (4, 5)
     assert metrics.case_accuracy.successes == 2
-    assert metrics.per_category["known_hallucination"].detection.recall.value == 0.5
+    sufficiency = metrics.per_category["known_hallucination"].binary["evidence_sufficiency"]
+    assert sufficiency.recall.value == 0.5
     assert metrics.per_category["supported_claim"].item_accuracy.value == 1.0
+    assert metrics.per_category["supported_claim"].effective.item_accuracy.value == 2 / 3
     assert metrics.claim_coverage is not None and metrics.claim_coverage.value == 1.0
     assert metrics.run_label_accuracy is not None and metrics.run_label_accuracy.n == 1
     assert metrics.usage.calls == 3
     assert metrics.usage.cost_usd == pytest.approx((300 * 1.0 + 30 * 10.0) / 1_000_000)
+
+
+def test_faithfulness_has_two_named_binary_views_on_a_known_matrix() -> None:
+    views = binary_metrics("faithfulness", [_row("a", "x", PAIRS)])
+    assert list(views) == ["contradiction_detection", "evidence_sufficiency"]
+
+    # contradiction: positive = unsupported only; unverifiable on either side is negative.
+    # tp (unsup,unsup)x2; fn (unsup,sup); fp none; tn the other 6 (incl. (sup,unver),
+    # (unver,unver), (unver,missing)).
+    contradiction = views["contradiction_detection"]
+    assert contradiction.positive == ["unsupported"]
+    assert contradiction.negative == ["supported", "unverifiable"]
+    assert (contradiction.tp, contradiction.fp, contradiction.fn, contradiction.tn) == (2, 0, 1, 6)
+    assert contradiction.precision.value == 1.0
+    assert contradiction.recall.value == pytest.approx(2 / 3)
+    assert contradiction.f1 == pytest.approx(4 / 5)
+    assert contradiction.false_positive_rate.value == 0.0
+    assert contradiction.false_negative_rate.value == pytest.approx(1 / 3)
+    low, high = wilson_interval(2, 3).low, wilson_interval(2, 3).high
+    assert (contradiction.recall.low, contradiction.recall.high) == (low, high)
+    assert (contradiction.false_positive_rate.successes, contradiction.false_positive_rate.n) == (
+        0,
+        6,
+    )
+
+    # sufficiency: positive = unsupported + unverifiable (the old single view).
+    sufficiency = views["evidence_sufficiency"]
+    assert sufficiency.positive == ["unsupported", "unverifiable"]
+    assert sufficiency.negative == ["supported"]
+    assert (sufficiency.tp, sufficiency.fp, sufficiency.fn, sufficiency.tn) == (3, 1, 2, 3)
+    assert sufficiency.precision.value == pytest.approx(3 / 4)
+    assert sufficiency.recall.value == pytest.approx(3 / 5)
+    assert sufficiency.f1 == pytest.approx(6 / 9)
+    assert sufficiency.false_positive_rate.value == pytest.approx(1 / 4)
+    assert sufficiency.false_negative_rate.value == pytest.approx(2 / 5)
+    interval = wilson_interval(1, 4)
+    assert (sufficiency.false_positive_rate.low, sufficiency.false_positive_rate.high) == (
+        interval.low,
+        interval.high,
+    )
+
+
+def test_other_checks_keep_one_violation_view() -> None:
+    for check in ("tool_use", "recovery", "prompt_injection", "role_adherence"):
+        assert [view.name for view in BINARY_VIEWS[check]] == ["violation_detection"]
+    assert BINARY_VIEWS["role_adherence"][0].positive(LABELS["role_adherence"]) == [
+        "out_of_scope_complied"
+    ]

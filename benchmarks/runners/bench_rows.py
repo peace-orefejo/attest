@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from attest import Usage
 
 MISSING = "missing"
 """The prediction for a labelled item attest returned no finding for."""
+ERROR = "error"
+"""The prediction for every item of a case whose evaluation raised."""
+NOT_RUN = "not_run"
+"""The prediction for every item of a case skipped because the call budget ran out."""
+UNGRADED_PREDICTIONS = frozenset({MISSING, ERROR, NOT_RUN})
+"""Predictions that never count as a detection in a binary view."""
+
+CaseStatus = Literal["graded", "errored", "not_run"]
 
 
 class Item(BaseModel):
@@ -38,13 +48,16 @@ class CaseUsage(BaseModel):
 
 
 class CaseRow(BaseModel):
-    """The graded result of one case. `correct` is None when the case errored or didn't run."""
+    """The result of one case. `correct` is None when the case errored or didn't run; such a
+    row still lists its labelled items, predicted `error` or `not_run`, so effective metrics
+    can count them as wrong."""
 
     id: str
     check: str
     category: str
     source: str
     label_status: str
+    status: CaseStatus = "graded"
     items: list[Item] = Field(default_factory=list[Item])
     correct: bool | None = None
     verdict: str | None = None
@@ -56,7 +69,7 @@ class CaseRow(BaseModel):
 
     @property
     def graded(self) -> bool:
-        return self.correct is not None
+        return self.status == "graded"
 
 
 def item(key: str, expected: str, predicted: str) -> Item:

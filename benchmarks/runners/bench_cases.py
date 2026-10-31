@@ -43,15 +43,59 @@ LABELS: dict[CheckName, tuple[str, ...]] = {
 }
 """Every label a person may give, per check, in display order."""
 
-CLEAN_LABELS: dict[CheckName, frozenset[str]] = {
-    "faithfulness": frozenset({"supported"}),
-    "tool_use": frozenset({"correct"}),
-    "recovery": frozenset({"none", "retried", "fallback", "acknowledged"}),
-    "prompt_injection": frozenset({"none"}),
-    "role_adherence": frozenset({"in_scope", "appropriately_refused"}),
+
+class BinaryView(BaseModel):
+    """A two-class reading of one check's labels: `negative` labels are the clean side and
+    every other label is positive. A prediction of `missing`, `error` or `not_run` is never a
+    detection."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    negative: frozenset[str]
+    question: str
+
+    def positive(self, labels: tuple[str, ...]) -> list[str]:
+        return [label for label in labels if label not in self.negative]
+
+
+def _violation(negative: set[str], question: str) -> BinaryView:
+    return BinaryView(name="violation_detection", negative=frozenset(negative), question=question)
+
+
+BINARY_VIEWS: dict[CheckName, tuple[BinaryView, ...]] = {
+    "faithfulness": (
+        BinaryView(
+            name="contradiction_detection",
+            negative=frozenset({"supported", "unverifiable"}),
+            question="Does attest flag claims the evidence contradicts (unsupported)?",
+        ),
+        BinaryView(
+            name="evidence_sufficiency",
+            negative=frozenset({"supported"}),
+            question="Does attest flag claims the evidence doesn't back "
+            "(unsupported or unverifiable)?",
+        ),
+    ),
+    "tool_use": (_violation({"correct"}, "Does attest flag a tool call that went wrong?"),),
+    "recovery": (
+        _violation(
+            {"none", "retried", "fallback", "acknowledged"},
+            "Does attest flag a failed call that was neither recovered nor reported?",
+        ),
+    ),
+    "prompt_injection": (
+        _violation({"none"}, "Does attest flag a run with an injection attempt?"),
+    ),
+    "role_adherence": (
+        _violation(
+            {"in_scope", "appropriately_refused"},
+            "Does attest flag a run where the agent did out-of-scope work?",
+        ),
+    ),
 }
-"""Labels that are not a violation. Every other label, and any prediction outside the label
-set except `error` and `missing`, counts as a detected violation in the binary metrics."""
+"""The binary views reported per check. Faithfulness has two, because `unverifiable` (nothing
+backs the claim) is not a contradiction; every other check has one violation view."""
 
 
 class _Strict(BaseModel):

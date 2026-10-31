@@ -49,6 +49,18 @@ Edge cases:
 - **Hedged claims** ("may arrive Friday") are labelled as the hedged statement: `unverifiable`
   unless the evidence speaks to the possibility.
 
+**How these labels are scored.** The report reads faithfulness labels two ways.
+`contradiction_detection` counts only `unsupported` as positive, so it measures whether attest
+catches claims the evidence contradicts. `evidence_sufficiency` counts `unsupported` and
+`unverifiable` together, so it measures whether attest flags claims the evidence doesn't back;
+it does **not** show that attest detects contradictions. This is why the line between
+`unsupported` and `unverifiable` above matters: labelling an unbacked claim `unsupported`
+inflates the contradiction numbers.
+
+The claims you label are passed to the verifier as they are, through a fixed extractor, so the
+benchmark scores the verifier's judgement and not attest's claim extraction. Write each claim
+the way you want it judged.
+
 `run_label` (optional) is the verdict a person reaches by applying attest's documented default
 policy to the claim labels: `block` if any claim is `unsupported`; `review` if no claim is
 `supported` or `unsupported` (nothing could be checked); otherwise `pass`.

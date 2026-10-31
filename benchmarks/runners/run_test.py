@@ -10,7 +10,7 @@ from pydantic import BaseModel
 import run
 from attest import Attest, Budget
 from bench_cases import CHECKS, SPLITS
-from bench_grade import GradeSettings
+from bench_grade import GRADERS, Graded, GradeSettings
 from bench_load import Datasets, load_datasets
 from bench_report import BenchmarkReport
 from bench_run import run_benchmark
@@ -25,12 +25,19 @@ def test_offline_run_over_seed_dev_set(tmp_path: Path, capsys: pytest.CaptureFix
     assert report.model is None and report.settings.offline
     assert set(report.checks) == {"tool_use", "recovery", "prompt_injection"}
     assert set(report.skipped_checks) == {"faithfulness", "role_adherence"}
-    assert report.complete
+    assert report.all_cases_graded and not report.budget_exhausted
+    assert report.format_version == 2
+    assert not report.publishable
+    assert "offline run: no model was called" in report.not_publishable_because
+    assert any("draft labels" in reason for reason in report.not_publishable_because)
+    assert all(row.status == "graded" for row in report.cases)
+    assert all(m.coverage.coverage.value == 1.0 for m in report.checks.values())
+    assert list(report.checks["prompt_injection"].binary) == ["violation_detection"]
     assert all(row.error is None and row.latency_s is not None for row in report.cases)
     assert all(row.usage.calls == 0 for row in report.cases)
     seeds = load_datasets()
     assert report.dataset_version == seeds.version
-    assert report.checks["tool_use"].cases == len(seeds.split("tool_use", "dev"))
+    assert report.checks["tool_use"].coverage.attempted == len(seeds.split("tool_use", "dev"))
 
     by_id = {row.id: row for row in report.cases}
     assert by_id["tool-prohibited-delete"].items[0].predicted == "disallowed_tool"
@@ -40,6 +47,8 @@ def test_offline_run_over_seed_dev_set(tmp_path: Path, capsys: pytest.CaptureFix
     summary = capsys.readouterr().out
     assert "| tool_use |" in summary
     assert "draft labels" in summary and "Offline run" in summary
+    assert "NOT PUBLISHABLE" in summary and "| 100% 5/5 (" in summary
+    assert "**not** claim extraction" in summary
 
 
 def test_heldout_needs_explicit_flag(capsys: pytest.CaptureFixture[str]) -> None:
@@ -165,7 +174,50 @@ def test_budget_stop_marks_the_rest_not_run(tmp_path: Path) -> None:
         split="dev",
         settings=GradeSettings(),
     )
-    assert not report.complete
+    assert report.budget_exhausted and not report.all_cases_graded
+    assert not report.publishable
+    assert "the call budget ran out" in report.not_publishable_because
     assert report.cases[0].correct is True
     assert all(row.error and row.error.startswith("not run") for row in report.cases[1:])
-    assert report.checks["role_adherence"].errored_cases == 1
+    assert all(row.status == "not_run" for row in report.cases[1:])
+    recovery = next(row for row in report.cases if row.id == "r1")
+    assert [(i.expected, i.predicted, i.correct) for i in recovery.items] == [
+        ("acknowledged", "not_run", False)
+    ]
+    role = report.checks["role_adherence"]
+    assert (role.coverage.attempted, role.coverage.graded, role.coverage.not_run) == (1, 0, 1)
+    assert role.coverage.coverage.value == 0.0
+    assert role.item_accuracy.value is None
+    assert role.effective.item_accuracy.value == 0.0
+    assert role.binary["violation_detection"].effective_recall.n == 0
+
+
+def _explode(*_: object) -> Graded:
+    raise RuntimeError("judge exploded")
+
+
+def test_an_errored_case_keeps_its_items_and_counts_against_effective_accuracy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(GRADERS, "faithfulness", _explode)
+    report = run_benchmark(
+        Attest(client=_FakeClient()),
+        _datasets(tmp_path),
+        checks=["faithfulness", "role_adherence"],
+        split="dev",
+        settings=GradeSettings(),
+    )
+    row = next(row for row in report.cases if row.id == "f1")
+    assert row.status == "errored" and row.correct is None
+    assert row.error is not None and "judge exploded" in row.error
+    assert [(i.expected, i.predicted) for i in row.items] == [
+        ("supported", "error"),
+        ("unverifiable", "error"),
+    ]
+    faith = report.checks["faithfulness"]
+    assert (faith.coverage.errored, faith.coverage.graded) == (1, 0)
+    assert faith.coverage.operational_failure_rate.value == 1.0
+    assert faith.effective.item_accuracy.value == 0.0
+    assert faith.binary["evidence_sufficiency"].effective_recall.value == 0.0
+    assert not report.all_cases_graded and not report.budget_exhausted
+    assert any("faithfulness coverage 0.0%" in r for r in report.not_publishable_because)
