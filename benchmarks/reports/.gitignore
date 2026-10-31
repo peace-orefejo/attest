@@ -1,0 +1,5 @@
+# Ad-hoc run output stays local. Published reports go in published/ and are committed.
+/*
+!/.gitignore
+!/README.md
+!/published/

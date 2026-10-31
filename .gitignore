@@ -25,3 +25,10 @@ build/
 
 # Docs build output
 site/
+
+# Benchmark response cache (--cache-dir)
+.bench-cache/
+.cache/
+
+# Private benchmark datasets (e.g. runs from your own agents); never commit them
+benchmarks/private/

@@ -90,11 +90,11 @@ packages = ["src/attest"]
 exclude = ["**/*_test.py", "**/conftest.py", "**/fixtures"]
 
 [tool.hatch.build.targets.sdist]
-exclude = ["/.github"]
+exclude = ["/.github", "/benchmarks"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["src"]
+pythonpath = ["src", "benchmarks/runners"]
+testpaths = ["src", "benchmarks"]
 python_files = ["*_test.py"]
 markers = [
     "integration: end-to-end tests that make real LLM calls (opt in with ATTEST_INTEGRATION=1)",
@@ -103,7 +103,7 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-src = ["src"]
+src = ["src", "benchmarks/runners"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
@@ -116,7 +116,8 @@ extend-immutable-calls = ["typer.Option", "typer.Argument", "attest.extraction.l
 "src/attest/prompts/*" = ["E501"]
 
 [tool.pyright]
-include = ["src"]
+include = ["src", "benchmarks"]
+extraPaths = ["src", "benchmarks/runners"]
 exclude = ["**/*_test.py", "**/conftest.py", "**/__pycache__"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
