@@ -274,6 +274,13 @@ uv run pytest        # all tests run offline; no API key needed
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the codebase rules, the docs build and how to send a
 change.
 
+## License
+
+Copyright © 2026 Adepeju Orefejo. attest is licensed under the
+[GNU Affero General Public License v3.0](LICENSE): you can use, modify and share it, but any
+version you distribute or run as a network service must be released under the same license,
+with its source. Versions 0.7.0 and earlier were released under the MIT License.
+
 ## Status
 
 Published on PyPI (`pip install agent-attest`) and used in a real LangGraph agent. Four

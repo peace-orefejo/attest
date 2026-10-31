@@ -5,6 +5,10 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+### Changed
+- **License:** attest is now licensed under the GNU Affero General Public License v3.0
+  (`AGPL-3.0-only`). Versions 0.7.0 and earlier remain available under the MIT License.
+
 ### Added
 - Opt-in response caching via `Attest(cache=True)` (or a shared dict), so re-evaluating an
   identical run reuses judge calls without collapsing `vote` self-consistency.

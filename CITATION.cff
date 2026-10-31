@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use attest, please cite it as below."
+title: "attest: evidence-grounded evaluation for AI agents"
+type: software
+authors:
+  - family-names: Orefejo
+    given-names: Adepeju
+license: AGPL-3.0-only
+repository-code: "https://github.com/peace-orefejo/attest"
+url: "https://peace-orefejo.github.io/attest/"
