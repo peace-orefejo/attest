@@ -238,8 +238,10 @@ duplicate claim texts, and a `confirmed` case with fewer than two annotators.
 2. Label it by hand against the [guidelines](annotations/guidelines.md), without running
    attest first. Explain the label in `notes`.
 3. Add it as `label_status: "draft"` with your initials in `annotators`.
-4. A second person labels it independently. When the two agree, set `confirmed` and list both;
-   when they don't, settle it as the guidelines describe.
+4. Two people then label it blind with `runners/annotate.py`: `template` gives each of them
+   blank label files, `agreement` reports agreement and Cohen's kappa, and `merge --write`
+   confirms the cases they agree on or have settled. See
+   [Double labelling](annotations/guidelines.md#double-labelling-and-agreement).
 5. Put new cases in `dev` unless you are deliberately growing held-out. Never move a case from
    held-out to dev after its results have been looked at for tuning; retire it instead.
 6. Run `uv run pytest benchmarks` to validate.
@@ -272,9 +274,13 @@ remember that a provider sees each case while grading it. The response cache
 ```
 benchmarks/
 ├── README.md
-├── annotations/guidelines.md    labelling rules (draft)
+├── annotations/
+│   ├── guidelines.md            labelling rules (draft)
+│   ├── labels/<annotator>/      each annotator's label files, one per case
+│   └── adjudications.jsonl      how each disagreement was settled
 ├── datasets/<check>/{dev,heldout}.jsonl
 ├── private/                     your own cases (git-ignored)
-├── runners/                     case model, loading, grading, metrics, reports, compare
+├── runners/                     case model, loading, grading, metrics, reports, compare,
+│                                annotate (templates, agreement, merge)
 └── reports/                     run output; published reports are committed on purpose
 ```
