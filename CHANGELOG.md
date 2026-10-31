@@ -11,6 +11,15 @@ All notable changes to `agent-attest` are documented here. This project follows
   `metadata["location"]`. Binary and path artifacts are extracted only with
   `Attest(extract_artifacts=True)` (plus `allow_paths=True` for paths); files cut short are
   marked `complete="false"`. Runs without artifacts render their evidence exactly as before.
+- **Breaking:** the tool-use check no longer counts a tool error as handled because any later
+  tool call happened. Only a successful retry of the same tool or a declared fallback
+  (`Trajectory.tool_fallbacks`) recovers it; otherwise one model call reads the final answer
+  (`acknowledged`, `silent` or `claimed_success`), or the error is `unchecked` when no model is
+  available. Verdicts are now `correct`, `disallowed_tool`, `error_silent`,
+  `error_claimed_success` and `incorrect` (tool choice); finding metadata replaces
+  `error_handled` with `recovery` and `recovered_at`. New `ToolCall.is_error` overrides the error
+  guess, and `attest tools --check-answer` / `tool_use(check_answer=True)` read the answer
+  without the tool-choice check.
 
 ## [0.7.0] - 2026-10-31
 
@@ -70,15 +79,6 @@ All notable changes to `agent-attest` are documented here. This project follows
   including "held" versus "compromised" trajectories.
 
 ### Changed
-- **Breaking:** the tool-use check no longer counts a tool error as handled because any later
-  tool call happened. Only a successful retry of the same tool or a declared fallback
-  (`Trajectory.tool_fallbacks`) recovers it; otherwise one model call reads the final answer
-  (`acknowledged`, `silent` or `claimed_success`), or the error is `unchecked` when no model is
-  available. Verdicts are now `correct`, `disallowed_tool`, `error_silent`,
-  `error_claimed_success` and `incorrect` (tool choice); finding metadata replaces
-  `error_handled` with `recovery` and `recovered_at`. New `ToolCall.is_error` overrides the error
-  guess, and `attest tools --check-answer` / `tool_use(check_answer=True)` read the answer
-  without the tool-choice check.
 - Curated model lists and defaults updated. Defaults: `claude-haiku-5-5` (was `claude-haiku-4-5`),
   `gpt-6-luna` (was `gpt-5.6-luna`), `gemini-3.8-flash` (was `gemini-3.6-flash`). Added
   `claude-fable-5-1`, the GPT-6 / GPT-6.1 family and `gemini-4-argon`; dropped retired or
