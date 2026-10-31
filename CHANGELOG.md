@@ -5,6 +5,31 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-31
+
+### Fixed
+- An answer whose claims couldn't be checked against any evidence no longer passes. A
+  faithfulness result with claims but none checkable now gets the `review` disposition, so the
+  report's verdict is `review` instead of `pass` (`VerdictPolicy(on_inconclusive_faithfulness=...)`
+  changes it). Answers with no claims still pass.
+- A custom `verify` function that returns fewer verdicts than claims no longer makes the answer
+  look verified: each claim without a verdict becomes `unverifiable`. Before, a verifier that
+  returned nothing scored 1.0 and passed. `CheckResult.passed` and `Report.passed` are
+  unchanged, so they don't account for `review`: gate on `verdict`. Every CI example in the
+  docs now does.
+
+### Added
+- Faithfulness results record `claims_checked` and `claims_total` (every extracted claim,
+  including any past the claim limit) in `metadata`, so a pass shows how much was checked.
+- `attest run` reports `verdicts`: how many runs got `pass`, `review` and `block`.
+- A Limitations page: what attest assumes (authentic, complete runs), where its checks rely on
+  heuristics, and how to use its results safely.
+
+### Deprecated
+- `ToolUsePolicy(on_invalid_arguments=...)` has no effect, because no check reports invalid
+  arguments; setting it now raises a `DeprecationWarning`. It will be removed in a future minor
+  release.
+
 ## [0.8.0] - 2026-10-31
 
 ### Added

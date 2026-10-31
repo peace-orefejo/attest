@@ -6,6 +6,7 @@ import typer
 
 from ...api import Attest
 from ...llm import Budget
+from ...results import Disposition
 from ...scoring.report import DEFAULT_CHECKS, validate_evaluation_options
 from ..context import require_key
 from ..evaluation import EvaluationSettings, evaluate_all
@@ -73,10 +74,18 @@ def _run_data(outcome: RunOutcome) -> RunData:
         total=outcome.total,
         evaluated=len(outcome.reports),
         passed=sum(item.report.passed for item in outcome.reports),
+        verdicts=_verdict_counts(outcome),
         mean_overall_score=outcome.mean_overall_score,
         usage=outcome.usage,
         budget_exceeded=outcome.stopped,
     )
+
+
+def _verdict_counts(outcome: RunOutcome) -> dict[Disposition, int]:
+    counts: dict[Disposition, int] = {"pass": 0, "review": 0, "block": 0}
+    for item in outcome.reports:
+        counts[item.report.verdict] += 1
+    return counts
 
 
 def _budget(max_calls: int | None, max_tokens: int | None) -> Budget | None:

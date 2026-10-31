@@ -64,6 +64,10 @@ judge's false-positive rate by up to 90%
 attest checks each claim against the real tool outputs instead. Its grading model sees only the
 claim and the evidence, never the agent's reasoning.
 
+attest is an evaluation toolkit, not a guarantee: it trusts that the recorded run is authentic
+and complete, and its accuracy hasn't been measured on a labelled benchmark yet. See
+[Limitations](https://peace-orefejo.github.io/attest/limitations/).
+
 <br>
 
 ## What it checks
@@ -100,7 +104,7 @@ from attest import Attest
 grader = Attest()                      # or Attest(provider="openai" | "gemini")
 report = grader.evaluate(run)
 
-print(report.passed, report.overall_score)
+print(report.verdict)                 # pass, review or block
 ```
 
 In Python a run is a `Trajectory`. [`examples/quickstart.py`](examples/quickstart.py) builds

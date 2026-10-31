@@ -35,7 +35,7 @@ The exit code says whether the command ran, not whether the agent passed.
 
 | Command | `data` |
 |---|---|
-| `run` | `trajectories`: one entry per graded run, each a `task` and its `report`. Then `total` (runs in the file), `evaluated` (runs graded), `passed` (runs whose report passed), `mean_overall_score`, `usage` (calls and tokens), and `budget_exceeded`: why a budget stopped the run, or `null`. |
+| `run` | `trajectories`: one entry per graded run, each a `task` and its `report`. Then `total` (runs in the file), `evaluated` (runs graded), `verdicts` (how many runs got each verdict: `pass`, `review`, `block`), `passed` (runs whose checks all passed; this doesn't account for `review`, so gate on `verdicts`), `mean_overall_score`, `usage` (calls and tokens), and `budget_exceeded`: why a budget stopped the run, or `null`. |
 | `tools`, `injection`, `role` | `trajectories`: one entry per run, each a `task` and its `result` |
 | `review` | A [`ReviewResult`](code-review/outputs.md#reviewresult) |
 | `demo` | `comparisons`: one per run, with `task`, `answer`, the plain LLM judge's verdict (`judge`), attest's faithfulness result (`attest`), and `outcome`: `caught` (attest caught a false claim the judge passed), `both_caught`, `both_passed` or `judge_only` |
@@ -46,7 +46,8 @@ A `report` holds `results` (one per check), `overall_score`, `passed`, `verdict`
 `review` or `block`), `blocking` (the findings that blocked, each a `check`, `verdict` and
 `subject`) and `scores` (each check's score by name). Each result and finding has the fields
 described in [How it works](concepts.md#results-and-findings); a finding in a report also has
-its `disposition`. See [Reports](concepts.md#reports).
+its `disposition`. See [Reports](concepts.md#reports). Gate on `verdict`: `passed` only says
+every check passed, so an inconclusive run can have `passed: true` and `verdict: "review"`.
 
 From Python, `report.model_dump_json()` gives the same JSON as one `report` in `attest run`'s
 output, and a check's `result.model_dump_json()` the same as one `result` from `attest tools`,
@@ -59,11 +60,11 @@ output, and a check's `result.model_dump_json()` the same as one `result` from `
 attest run run.json | jq '.data.trajectories[].report.results[].findings[]
   | select(.severity == "fail") | {subject, reason, evidence}'
 
-# Fail a CI step unless every run passed
-attest run runs.jsonl | jq -e '.ok and .data.passed == .data.total'
+# Fail a CI step unless every run's verdict is pass (review and block both fail it)
+attest run runs.jsonl | jq -e '.ok and .data.verdicts.pass == .data.total'
 
-# Fail a CI step if any run was blocked
-attest run runs.jsonl | jq -e 'all(.data.trajectories[]; .report.verdict != "block")'
+# Fail only on blocks, and let runs that need review through
+attest run runs.jsonl | jq -e '.ok and .data.verdicts.block == 0'
 ```
 
 ## Schemas

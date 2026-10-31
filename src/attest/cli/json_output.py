@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict
 from ..checks.judge_baseline import JudgeVerdict
 from ..code_review import ReviewResult
 from ..llm import Usage
-from ..results import CheckResult
+from ..results import CheckResult, Disposition
 from ..scoring.stats import Proportion
 from .outcomes import TaskReport, TaskResult
 
@@ -33,12 +33,17 @@ P = ParamSpec("P")
 
 
 class RunData(BaseModel):
-    """`attest run`: one report per trajectory, plus totals for the whole file."""
+    """`attest run`: one report per trajectory, plus totals for the whole file.
+
+    Gate on `verdicts`: `passed` counts runs whose checks all passed and doesn't account for
+    `review`.
+    """
 
     trajectories: list[TaskReport]
     total: int
     evaluated: int
     passed: int
+    verdicts: dict[Disposition, int]
     mean_overall_score: float | None
     usage: Usage
     budget_exceeded: str | None = None

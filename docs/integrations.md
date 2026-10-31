@@ -67,14 +67,15 @@ rather than on a single run, so one noisy run can't fail the build:
 ```bash
 set -e
 attest run evals/runs.jsonl > report.json   # exits non-zero on a missing key, bad input or budget stop
-jq -e '.ok' report.json
-passed=$(jq '.data.passed' report.json)
+jq -e '.ok and .data.verdicts.block == 0' report.json
+passed=$(jq '.data.verdicts.pass' report.json)
 graded=$(jq '.data.evaluated' report.json)
 attest stats "$passed" "$graded" | jq -e '.data.low >= 0.8'
 ```
 
 `jq -e` exits non-zero when its result is `false`, so each line fails the step if its check
-fails. Keep `report.json` as a
+fails. The pass rate counts only runs whose verdict is `pass`; runs that need review don't
+count as passing. Keep `report.json` as a
 build artifact: every finding, with its evidence, is in it.
 
 ## AI code review pipelines

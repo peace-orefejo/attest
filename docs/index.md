@@ -5,8 +5,9 @@ description: "attest checks AI agent answers against what their tools actually r
 # attest
 
 **A reality-checker for AI agents.** attest grades an agent's answer against what its tools
-actually returned. It catches made-up facts, misused tools and prompt-injection slips that a
-"does this look good?" grader waves through.
+actually returned. It's built to catch made-up facts, misused tools and prompt-injection slips
+that a "does this look good?" grader waves through. Its accuracy hasn't been measured on a
+labelled benchmark yet; [Limitations](limitations.md) says what it assumes.
 
 attest grades a **run**: a JSON record of one task, with the question, each tool call and what
 it returned, and the agent's final answer.

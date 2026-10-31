@@ -72,6 +72,7 @@ class Report(BaseModel):
     @computed_field
     @property
     def passed(self) -> bool:
+        """Every check passed. Doesn't account for `review`: gate on `verdict` instead."""
         return all(r.passed for r in self.results)
 
     @computed_field

@@ -37,3 +37,18 @@ def faithfulness_summary(supported: int, checkable: int, total: int) -> str:
     if total and not checkable:
         return f"None of the {total} claims could be checked against the evidence."
     return f"{supported}/{checkable} checkable claims grounded."
+
+
+def with_missing_claims(claims: list[str], findings: list[Finding]) -> list[Finding]:
+    """Add an `unverifiable` finding for each claim the verifier returned no verdict for.
+
+    A verifier that drops claims must not make the answer look verified: a missing verdict
+    is inconclusive, never a pass.
+    """
+    missing = len(claims) - len(findings)
+    if missing <= 0:
+        return findings
+    returned = {finding.subject for finding in findings}
+    unanswered = [claim for claim in claims if claim not in returned] + claims
+    reason = "The verifier returned no verdict for this claim."
+    return findings + [unverifiable(claim, reason) for claim in unanswered[:missing]]

@@ -112,6 +112,7 @@ nav:
   - JSON output: json-output.md
   - Models and providers: providers.md
   - Integrations: integrations.md
+  - Limitations: limitations.md
   - Architecture: architecture.md
   - API reference:
       - attest: reference/attest.md

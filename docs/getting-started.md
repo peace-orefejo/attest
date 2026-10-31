@@ -78,7 +78,7 @@ run = Trajectory.model_validate_json(open("run.json").read())
 grader = Attest()
 
 report = grader.evaluate(run)
-print(report.passed, report.overall_score)
+print(report.verdict, report.overall_score)   # verdict: pass, review or block
 for finding in report.by("faithfulness").failures:
     print(finding.subject, "->", finding.reason)
 ```
