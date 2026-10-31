@@ -33,6 +33,11 @@ def _setup_differences(
             f"one report is on a public dataset and the other on a private one "
             f"({old.dataset_visibility} vs {new.dataset_visibility})"
         )
+    elif old.case_id_key != new.case_id_key:
+        reasons.append(
+            "the private case ids were hashed differently (a different ATTEST_BENCH_ID_KEY, "
+            "or a key in only one report), so no case could be matched"
+        )
     if old.split != new.split:
         reasons.append(f"splits differ ({old.split} vs {new.split})")
     before, after = old.settings.model_dump(), new.settings.model_dump()

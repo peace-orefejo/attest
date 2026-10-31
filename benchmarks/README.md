@@ -267,7 +267,9 @@ marked `dataset_visibility: "private"`, and `compare.py` won't compare them with
 This is pseudonymisation, not anonymisation. Categories, labels, predictions, timings and usage
 stay in the report, and anyone who can guess a case id can confirm it by hashing it. Set
 `ATTEST_BENCH_ID_KEY` to a secret kept outside the report to key the hash (HMAC-SHA256); use
-the same key across runs so their rows still match.
+the same key across runs so their rows still match. A private run without the key prints a
+warning. Reports record a fingerprint of the key (never the key), and `compare.py` refuses to
+compare reports whose ids were hashed differently.
 
 The withholding covers the report only. Don't commit or upload the case files, and remember
 that the provider sees each case while grading it. The response cache (`--cache-dir`) quotes

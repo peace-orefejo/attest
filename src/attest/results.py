@@ -31,10 +31,16 @@ class Finding(BaseModel):
 
     @property
     def effective_disposition(self) -> Disposition:
-        """The disposition `evaluate()` assigned, or block for an unassigned fail."""
+        """The disposition `evaluate()` assigned. Unassigned, a fail blocks, a finding nothing
+        checked (`unchecked`, or `metadata["checked"]` false) goes to review, and the rest pass.
+        """
         if self.disposition is not None:
             return self.disposition
-        return "block" if self.severity is Severity.FAIL else "pass"
+        if self.severity is Severity.FAIL:
+            return "block"
+        if self.verdict == "unchecked" or self.metadata.get("checked") is False:
+            return "review"
+        return "pass"
 
 
 class BlockingFinding(BaseModel):

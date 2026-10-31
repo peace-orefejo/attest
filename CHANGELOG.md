@@ -25,7 +25,12 @@ All notable changes to `agent-attest` are documented here. This project follows
   The schemas are published under `schemas/v2/`; the v1 schemas stay where they were.
 - **Breaking:** claims past `max_claims` (40 by default) are reported `unverifiable` with
   `metadata["checked"]` false, so they go to review. A long answer used to pass on its first 40
-  claims while the rest were never checked.
+  claims while the rest were never checked. In `attest review`, which grades each output's
+  claims the same way, an output with more than 40 claims is now dropped as unverified.
+- A finding with no disposition, such as one in a `Report` built by hand without
+  `evaluate()`, goes to review when nothing checked it (`unchecked`, or `metadata["checked"]`
+  false) instead of passing.
+- `max_claims` below 0 raises `ValueError`.
 - No failed or missing evaluation turns into a pass. When claim extraction, verification, the
   role, deep injection, tool-choice or policy judge, or a code review injection confirmation
   fails, the affected findings are inconclusive (`unchecked`, or `unverifiable` with

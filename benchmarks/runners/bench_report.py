@@ -22,6 +22,10 @@ class BenchmarkReport(BaseModel):
     dataset_visibility: Literal["public", "private"] = "public"
     """Private: the cases live outside this repository and the report withholds their contents
     (case ids are hashed, claim texts and error messages are removed)."""
+    case_id_key: str | None = None
+    """For a private report whose case ids were keyed with `ATTEST_BENCH_ID_KEY`, a fingerprint
+    of that key (not the key); None when the ids are plain hashes. Rows only match across
+    reports with the same value."""
     attest_version: str
     prompt_version: str
     provider: str

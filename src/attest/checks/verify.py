@@ -76,6 +76,8 @@ def judge_trajectory(
     reported `unverifiable` with `metadata["checked"]` false and the reason, never as a pass.
     Claims beyond `max_claims` are reported the same way, so a capped answer can't pass.
     """
+    if max_claims < 0:
+        raise ValueError(f"max_claims must be 0 or more, not {max_claims}.")
     extraction = extract_safely(extract, traj.final_answer)
     claims = extraction.claims
     capped = len(claims) > max_claims
@@ -119,7 +121,7 @@ def judge_trajectory(
 def _over_cap_reason(total: int, max_claims: int) -> str:
     return (
         f"Not checked: the answer makes {total} claims and faithfulness checks at most "
-        f"{max_claims}. Raise max_claims to check every claim."
+        f"{max_claims} (max_claims)."
     )
 
 

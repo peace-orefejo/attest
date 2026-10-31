@@ -171,3 +171,11 @@ def test_a_result_below_its_score_floor_has_no_passing_findings(report, policy):
         floor = policy.min_score.get(result.check)
         if floor is not None and result.score is not None and result.score < floor:
             assert all(f.disposition != "pass" for f in result.findings)
+
+
+@given(reports, st.none() | policies)
+def test_passed_always_matches_the_verdict(report, policy):
+    for candidate in (report, apply_verdict_policy(report, policy)):
+        assert candidate.passed == (candidate.verdict == "pass")
+        dumped = candidate.model_dump(mode="json")
+        assert dumped["passed"] == (dumped["verdict"] == "pass")

@@ -31,6 +31,13 @@ def id_key_from_env() -> bytes | None:
     return value.encode() if value else None
 
 
+def key_fingerprint(key: bytes | None) -> str | None:
+    """Identifies a key without revealing it, so reports keyed differently aren't compared."""
+    if key is None:
+        return None
+    return hmac.new(key, b"attest benchmark case-id key", hashlib.sha256).hexdigest()[:12]
+
+
 def private_case_id(case_id: str, key: bytes | None = None) -> str:
     """A stable pseudonym for `case_id`; keyed with HMAC-SHA256 when `key` is given."""
     if key is None:

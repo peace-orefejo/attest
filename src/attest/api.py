@@ -92,7 +92,7 @@ class Attest:
         verify: VerifyFn | None = None,
         enforce_policy: bool | None = None,
     ) -> Report:
-        selected = validate_evaluation_options(checks, answer_kind)
+        selected = validate_evaluation_options(checks, answer_kind, max_claims)
         policy = self._active_policy(enforce_policy)
         needs_llm = _checks_need_llm(
             selected, appropriate=appropriate, deep=deep, extract=extract, verify=verify
