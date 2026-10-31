@@ -7,6 +7,8 @@ description: "What attest assumes, what it can't establish, and how to use its r
 attest evaluates a recorded run against the evidence in that record. It is an evaluation
 toolkit, not a guarantee: its own accuracy hasn't been measured on a labelled benchmark yet, and
 several of its checks rest on assumptions you should know before you rely on a result.
+That accuracy will be measured, per check, by the labelled benchmark in
+[`benchmarks/`](https://github.com/peace-orefejo/attest/tree/main/benchmarks).
 
 ## What attest assumes
 

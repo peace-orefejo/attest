@@ -66,7 +66,8 @@ claim and the evidence, never the agent's reasoning.
 
 attest is an evaluation toolkit, not a guarantee: it trusts that the recorded run is authentic
 and complete, and its accuracy hasn't been measured on a labelled benchmark yet. See
-[Limitations](https://peace-orefejo.github.io/attest/limitations/).
+[Limitations](https://peace-orefejo.github.io/attest/limitations/). The benchmark that will
+measure it, per check, is being built in [`benchmarks/`](benchmarks/).
 
 <br>
 

@@ -32,7 +32,7 @@ CI tests Python 3.11, 3.12 and 3.13 with only the core dependencies, and Python 
 ```bash
 uv run pytest -q
 GITHUB_ACTIONS=true uv run pytest -q        # the CLI forces color under Actions
-uvx ruff check src examples && uvx ruff format --check src examples
+uvx ruff check src examples benchmarks && uvx ruff format --check src examples benchmarks
 uv run pyright                              # strict; can take a few minutes
 uv build && uvx twine check dist/*
 uv run --group docs mkdocs build --strict
