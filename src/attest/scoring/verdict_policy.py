@@ -48,8 +48,9 @@ class VerdictPolicy(BaseModel):
     `on_inconclusive_faithfulness` applies when a faithfulness result has claims but none could
     be checked against the evidence; it defaults to `review`, so an answer attest couldn't
     verify never reads as a pass. `on_injection_warning` applies to injection warnings
-    (`suspicious`, `possible_injection`, `unscanned_content`); `compromised` always blocks. `min_score` maps a check name to the
-    lowest acceptable score: below it, that check's passing findings become `review`.
+    (`suspicious`, `possible_injection`, `unscanned_content`); `compromised` always blocks.
+    `min_score` maps a check name to the lowest acceptable score: below it, that check's
+    passing findings become `review`.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
