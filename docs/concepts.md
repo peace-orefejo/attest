@@ -88,7 +88,39 @@ or `--kind` to `attest run`:
 `evaluate()` runs faithfulness and tool use by default; pass `checks=` for others. It returns a
 `Report` with one result per check, plus a `policy` result when the `Attest` has a
 [policy](checks/policies.md). The report passes only when every result passes. Its
-`overall_score` is the mean of the scores that aren't `null`.
+`overall_score` is the mean of the scores that aren't `null`, and `scores` gives each check's
+score by name.
+
+Checks say what happened. A `VerdictPolicy` decides what happens because of it: each finding
+gets a `disposition` of `pass`, `review` or `block`, and the report's `verdict` is the strictest
+one. A blocking finding can't be averaged away by good scores elsewhere. `blocking` lists the
+findings that blocked, with their check, verdict and subject. attest only reports; your code
+decides what to do with the verdict.
+
+By default these block: an `unsupported` claim, a disallowed tool, a tool error the answer
+reported as success, a `compromised` injection, an out-of-scope request the agent complied with,
+and a failed `fail`-severity policy rule. These go to review: a tool error the agent ignored, an
+unnecessary tool call, and a `warn`-severity policy rule. Injection warnings and `unverifiable`
+claims pass. Any other failed finding blocks.
+
+```python
+from attest import Attest, ToolUsePolicy, VerdictPolicy
+
+judge = Attest(
+    verdict_policy=VerdictPolicy(
+        tool_use=ToolUsePolicy(on_unhandled_error="block"),
+        on_injection_warning="review",
+        min_score={"faithfulness": 0.9},  # below 0.9, passing claims go to review
+    )
+)
+report = judge.evaluate(run)
+if report.verdict == "block":
+    raise SystemExit(f"blocked by {report.blocking}")
+```
+
+`ToolUsePolicy` also takes `on_disallowed_tool`, `on_claimed_success`, `on_unnecessary_call`
+and `on_invalid_arguments`. No check reports invalid arguments yet, so that setting has no
+effect for now.
 
 ## Pass rates and confidence
 

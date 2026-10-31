@@ -5,6 +5,12 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+- Finding dispositions: a `VerdictPolicy` (with `ToolUsePolicy`) gives each finding a
+  `disposition` of `pass`, `review` or `block`, and `Report` gains `verdict` (the strictest
+  disposition), `blocking` and `scores`, so a security failure can't be averaged away. Pass
+  `Attest(verdict_policy=...)` to change the defaults; `passed` and `overall_score` are unchanged.
+
 ### Changed
 - Faithfulness now treats artifacts as evidence: artifact text is shown to the grading model in
   its own escaped `<artifact>` block, and findings record the block their quote came from in

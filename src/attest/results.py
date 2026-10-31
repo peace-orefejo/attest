@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field
 
 from .prompts.version import PROMPT_VERSION
 from .utils.json_types import JsonObject
+
+Disposition = Literal["pass", "review", "block"]
 
 
 class Severity(StrEnum):
@@ -24,6 +27,22 @@ class Finding(BaseModel):
     evidence: str | None = None
     step: int | None = None
     metadata: JsonObject = Field(default_factory=dict)
+    disposition: Disposition | None = None
+
+    @property
+    def effective_disposition(self) -> Disposition:
+        """The disposition `evaluate()` assigned, or block for an unassigned fail."""
+        if self.disposition is not None:
+            return self.disposition
+        return "block" if self.severity is Severity.FAIL else "pass"
+
+
+class BlockingFinding(BaseModel):
+    """A finding whose disposition blocked the report."""
+
+    check: str
+    verdict: str
+    subject: str = ""
 
 
 class CheckResult(BaseModel):
@@ -54,6 +73,30 @@ class Report(BaseModel):
     @property
     def passed(self) -> bool:
         return all(r.passed for r in self.results)
+
+    @computed_field
+    @property
+    def verdict(self) -> Disposition:
+        """The strictest disposition among the findings: pass, review or block."""
+        dispositions = {f.effective_disposition for r in self.results for f in r.findings}
+        if "block" in dispositions:
+            return "block"
+        return "review" if "review" in dispositions else "pass"
+
+    @computed_field
+    @property
+    def blocking(self) -> list[BlockingFinding]:
+        return [
+            BlockingFinding(check=r.check, verdict=f.verdict, subject=f.subject)
+            for r in self.results
+            for f in r.findings
+            if f.effective_disposition == "block"
+        ]
+
+    @computed_field
+    @property
+    def scores(self) -> dict[str, float | None]:
+        return {r.check: r.score for r in self.results}
 
     def by(self, check: str) -> CheckResult | None:
         return next((r for r in self.results if r.check == check), None)

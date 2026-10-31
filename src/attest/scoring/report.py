@@ -19,6 +19,8 @@ from ..checks.verify import (
 )
 from ..results import CheckResult, Report
 from ..trajectory import Trajectory
+from .dispositions import apply_verdict_policy
+from .verdict_policy import VerdictPolicy
 
 DEFAULT_CHECKS = ("faithfulness", "tool_use")
 SUPPORTED_CHECKS = ("faithfulness", "tool_use", "injection", "role")
@@ -55,6 +57,7 @@ def evaluate(
     max_claims: int = MAX_CLAIMS,
     extract: ExtractFn = extract_claims,
     verify: VerifyFn | None = None,
+    verdict_policy: VerdictPolicy | None = None,
 ) -> Report:
     """
     Run the chosen checks and return one Report. `checks` picks any of
@@ -63,6 +66,8 @@ def evaluate(
     from the tool evidence and records the choice in the report metadata.
     Faithfulness/role and injection's `deep` pass need an API key; the tool-use and
     shallow-injection paths do not. `max_claims` caps how many claims faithfulness checks.
+    `verdict_policy` sets each finding's disposition and so the report's `verdict`
+    (default: `VerdictPolicy()`).
     """
     selected = validate_evaluation_options(checks, answer_kind)
     resolved = resolve_answer_kind(traj, answer_kind)
@@ -81,4 +86,5 @@ def evaluate(
         "role": lambda: check_role_adherence(traj),
     }
     results: list[CheckResult] = [runners[c]() for c in selected]
-    return Report(results=results, metadata=resolved.metadata)
+    report = Report(results=results, metadata=resolved.metadata)
+    return apply_verdict_policy(report, verdict_policy)
