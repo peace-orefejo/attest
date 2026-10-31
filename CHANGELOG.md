@@ -5,6 +5,13 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+### Changed
+- Faithfulness now treats artifacts as evidence: artifact text is shown to the grading model in
+  its own escaped `<artifact>` block, and findings record the block their quote came from in
+  `metadata["location"]`. Binary and path artifacts are extracted only with
+  `Attest(extract_artifacts=True)` (plus `allow_paths=True` for paths); files cut short are
+  marked `complete="false"`. Runs without artifacts render their evidence exactly as before.
+
 ## [0.7.0] - 2026-10-31
 
 ### Added
@@ -63,11 +70,6 @@ All notable changes to `agent-attest` are documented here. This project follows
   including "held" versus "compromised" trajectories.
 
 ### Changed
-- Faithfulness now treats artifacts as evidence: artifact text is shown to the grading model in
-  its own escaped `<artifact>` block, and findings record the block their quote came from in
-  `metadata["location"]`. Binary and path artifacts are extracted only with
-  `Attest(extract_artifacts=True)` (plus `allow_paths=True` for paths); files cut short are
-  marked `complete="false"`. Runs without artifacts render their evidence exactly as before.
 - Curated model lists and defaults updated. Defaults: `claude-haiku-5-5` (was `claude-haiku-4-5`),
   `gpt-6-luna` (was `gpt-5.6-luna`), `gemini-3.8-flash` (was `gemini-3.6-flash`). Added
   `claude-fable-5-1`, the GPT-6 / GPT-6.1 family and `gemini-4-argon`; dropped retired or
