@@ -20,8 +20,8 @@ def load_trajectories(path: Path) -> list[Trajectory]:
 
 def _read(path: Path) -> str:
     try:
-        raw = path.read_text().strip()
-    except OSError as exc:
+        raw = path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError) as exc:
         raise typer.BadParameter(f"Could not read trajectory file {path}: {exc}") from exc
     if not raw:
         raise typer.BadParameter(f"Trajectory file {path} is empty.")

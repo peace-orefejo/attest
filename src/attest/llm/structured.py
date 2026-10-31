@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from ..prompts.guard import GUARD
 from .budget import before_call, record_cache_hit, record_completion
 from .client import resolve_client
-from .errors import api_error, is_empty_response
+from .errors import api_error, config_error, is_empty_response, is_transient
 from .protocol import LLMClient
 from .response_cache import cache_key, response_cache
 
@@ -46,7 +46,9 @@ def call(
 
     Thinking models (e.g. Gemini 2.5) can spend their whole output budget reasoning
     and return an empty candidate, which surfaces as a `'NoneType' ... 'parts'` crash.
-    Those are transient, so retry a few times, then fail with a clear message.
+    Those are transient, so retry a few times, then fail with a clear message. A response
+    that isn't an `output` instance (such as None) is retried the same way. Provider HTTP
+    errors and other exceptions are raised at once; `BudgetExceeded` is raised before a call.
 
     `prefix` is shared material (e.g. the evidence) placed first in the user turn so provider
     prompt caches can reuse it. `reuse` says what the caller will resend: "prefix" or the
@@ -69,8 +71,14 @@ def call(
     for _ in range(max(1, attempts)):
         before_call(guarded_system, prefix, user)
         try:
-            result = _create(resolved, output, max_tokens, messages)
+            result: object = _create(resolved, output, max_tokens, messages)
         except Exception as error:
+            misconfigured = config_error(error)
+            if misconfigured is not None:
+                raise misconfigured from None
+            if is_transient(error):
+                last_error = error
+                continue
             hard_error = api_error(error)
             if hard_error is not None and hard_error is not error:
                 raise hard_error from error
@@ -78,9 +86,14 @@ def call(
                 raise
             last_error = error
             continue
+        if not isinstance(result, output):
+            last_error = TypeError(f"Expected {output.__name__}, got {type(result).__name__}.")
+            continue
         if store is not None:
             store[key] = result
         return result
+    if last_error is not None and is_transient(last_error):
+        raise last_error
     raise RuntimeError(_EMPTY_RESPONSE_MESSAGE) from last_error
 
 

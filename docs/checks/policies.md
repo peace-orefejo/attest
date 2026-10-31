@@ -24,6 +24,9 @@ Policies are set in Python. The command line doesn't take a policy.
 | `evidence` | The tool outputs support the claim in `description`. | Yes |
 | `rubric` | The answer meets the standard in `description`. | Yes |
 
+If the model fails on an `evidence` or `rubric` rule, that rule is `unchecked`, a warning with
+the error in `reason`, and the verdict is `review`.
+
 `required_tools` and `required_tool_order` check that calls happened, not that they succeeded.
 Add an `evidence` rule to check what a tool returned. A policy with no `evidence` or `rubric`
 rules runs offline.

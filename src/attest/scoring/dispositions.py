@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from ..results import CheckResult, Disposition, Finding, Report, Severity
+from ..checks.claim_findings import is_unchecked
+from ..results import CheckResult, Disposition, Finding, Report, Severity, claim_coverage
 from .verdict_policy import ToolUsePolicy, VerdictPolicy
 
 _FAITHFULNESS: dict[str, Disposition] = {
@@ -10,7 +11,8 @@ _FAITHFULNESS: dict[str, Disposition] = {
     "unverifiable": "pass",
     "unsupported": "block",
 }
-_ROLE: dict[str, Disposition] = {"out_of_scope_complied": "block"}
+_ROLE: dict[str, Disposition] = {"out_of_scope_complied": "block", "unchecked": "review"}
+UNCHECKED = "unchecked"
 
 
 def apply_verdict_policy(report: Report, policy: VerdictPolicy | None = None) -> Report:
@@ -38,12 +40,12 @@ def disposition_for(check: str, finding: Finding, policy: VerdictPolicy) -> Disp
 
 
 def _dispose_result(result: CheckResult, policy: VerdictPolicy) -> CheckResult:
-    below_floor = _below_min_score(result, policy)
+    below_floor = _below_min_score(result, policy) or _below_min_coverage(result, policy)
     inconclusive = _inconclusive_faithfulness(result)
     findings: list[Finding] = []
     for finding in result.findings:
         disposition = disposition_for(result.check, finding, policy)
-        if inconclusive and finding.verdict == "unverifiable":
+        if _faithfulness_unchecked(result, finding, inconclusive=inconclusive):
             disposition = policy.on_inconclusive_faithfulness
         if below_floor and disposition == "pass":
             disposition = "review"
@@ -51,11 +53,26 @@ def _dispose_result(result: CheckResult, policy: VerdictPolicy) -> CheckResult:
     return result.model_copy(update={"findings": findings})
 
 
+def _faithfulness_unchecked(result: CheckResult, finding: Finding, *, inconclusive: bool) -> bool:
+    """An unverifiable claim in an all-unverifiable result, or one no verifier judged."""
+    if result.check != "faithfulness" or finding.verdict != "unverifiable":
+        return False
+    return inconclusive or is_unchecked(finding)
+
+
 def _inconclusive_faithfulness(result: CheckResult) -> bool:
     """Faithfulness had claims, but not one could be checked against the evidence."""
     if result.check != "faithfulness" or not result.findings:
         return False
     return all(finding.verdict == "unverifiable" for finding in result.findings)
+
+
+def _below_min_coverage(result: CheckResult, policy: VerdictPolicy) -> bool:
+    floor = policy.min_claim_coverage
+    if floor is None or result.check != "faithfulness":
+        return False
+    coverage = claim_coverage(result)
+    return coverage is not None and coverage < floor
 
 
 def _below_min_score(result: CheckResult, policy: VerdictPolicy) -> bool:
@@ -74,6 +91,7 @@ def _tool_use(finding: Finding, policy: ToolUsePolicy) -> Disposition | None:
         "inappropriate": policy.on_unnecessary_call,
         "unnecessary_call": policy.on_unnecessary_call,
         "invalid_arguments": policy.on_invalid_arguments,
+        UNCHECKED: "review",
     }
     return by_verdict.get(finding.verdict)
 
@@ -91,6 +109,8 @@ def _legacy_incorrect(finding: Finding, policy: ToolUsePolicy) -> Disposition:
 def _injection(finding: Finding, policy: VerdictPolicy) -> Disposition:
     if finding.verdict == "compromised":
         return "block"
+    if finding.verdict == UNCHECKED:
+        return "review"
     if finding.severity is Severity.WARN:
         return policy.on_injection_warning
     return _by_severity(finding, warn="pass")

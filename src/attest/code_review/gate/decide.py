@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ...checks.claim_findings import is_unchecked
 from ...results import CheckResult, Finding, Report, Severity
 from ..guidelines import GUIDELINES_CHECK
 from ..models import GateDecision, GateMode, OutputType
@@ -21,6 +22,7 @@ def gate(
 
     `reasons` lists the findings that drop it. `notes` lists findings shown beside it that do not.
     Findings against the built-in general standard are always notes; only your own rules drop.
+    A claim no verifier judged (a failed or skipped call) drops the output in every mode.
     """
     resolved = _resolve_mode(output_type, mode)
     planted = injection_findings(injection, paths, output_index)
@@ -45,7 +47,7 @@ def _faithfulness_reasons(report: Report, mode: GateMode) -> list[Finding]:
     if result is None:
         return []
     dropping = DROPPING_VERDICTS[mode]
-    return [f for f in result.findings if f.verdict in dropping]
+    return [f for f in result.findings if f.verdict in dropping or is_unchecked(f)]
 
 
 def _guideline_findings(report: Report) -> FindingSplit:

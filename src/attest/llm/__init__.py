@@ -5,6 +5,7 @@ from __future__ import annotations
 from .budget import Budget, BudgetExceeded, Usage, metering
 from .client import has_active_client, using
 from .disk_cache import DiskCache
+from .errors import ProviderConfigError
 from .protocol import LLMClient
 from .response_cache import using_cache
 from .structured import call, vote
@@ -14,6 +15,7 @@ __all__ = [
     "BudgetExceeded",
     "DiskCache",
     "LLMClient",
+    "ProviderConfigError",
     "Usage",
     "call",
     "has_active_client",

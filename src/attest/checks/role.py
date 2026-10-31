@@ -11,12 +11,15 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from ..llm import vote
+from ..llm import BudgetExceeded, ProviderConfigError, vote
 from ..prompts.role import ROLE_SYSTEM, role_user
 from ..results import CheckResult, Finding, Severity
 from ..trajectory import Trajectory
+from ..utils.failures import failure_reason
 
 RoleVerdict = Literal["in_scope", "appropriately_refused", "out_of_scope_complied"]
+UNCHECKED = "unchecked"
+NO_POLICY_REASON = "No system prompt / role policy was provided to check against."
 
 _SEVERITY: dict[RoleVerdict, Severity] = {
     "in_scope": Severity.PASS,
@@ -34,17 +37,26 @@ class _RoleOut(BaseModel):
 
 
 def check_role_adherence(traj: Trajectory, *, samples: int = 3) -> CheckResult:
-    """Judge whether the agent stayed within its system-prompt-defined role and scope."""
-    if not (traj.system_prompt or "").strip():
-        return _no_policy_result()
+    """Judge whether the agent stayed within its system-prompt-defined role and scope.
 
-    out = vote(
-        system=ROLE_SYSTEM,
-        user=role_user(traj),
-        output=_RoleOut,
-        key=lambda result: result.verdict,
-        samples=samples,
-    )
+    With no system prompt, or when the judge call fails (anything but `BudgetExceeded`), the
+    result is one `unchecked` warning with the reason: the role wasn't checked, so it isn't a pass.
+    """
+    if not (traj.system_prompt or "").strip():
+        return _unchecked_result("No role policy to check against.", NO_POLICY_REASON)
+    try:
+        out = vote(
+            system=ROLE_SYSTEM,
+            user=role_user(traj),
+            output=_RoleOut,
+            key=lambda result: result.verdict,
+            samples=samples,
+        )
+    except (BudgetExceeded, ProviderConfigError):
+        raise
+    except Exception as error:
+        reason = failure_reason("The role judge", error)
+        return _unchecked_result("The role judge failed.", reason)
     finding = Finding(
         severity=_SEVERITY[out.verdict],
         verdict=out.verdict,
@@ -61,18 +73,13 @@ def check_role_adherence(traj: Trajectory, *, samples: int = 3) -> CheckResult:
     )
 
 
-def _no_policy_result() -> CheckResult:
+def _unchecked_result(summary: str, reason: str) -> CheckResult:
     return CheckResult(
         check="role",
         passed=True,
         score=None,
-        summary="No role policy to check against.",
+        summary=summary,
         findings=[
-            Finding(
-                severity=Severity.PASS,
-                verdict="in_scope",
-                subject="role",
-                reason="No system prompt / role policy was provided to check against.",
-            )
+            Finding(severity=Severity.WARN, verdict=UNCHECKED, subject="role", reason=reason)
         ],
     )

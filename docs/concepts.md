@@ -121,7 +121,9 @@ if report.verdict == "block":
 ```
 
 `ToolUsePolicy` also takes `on_disallowed_tool`, `on_claimed_success` and `on_unnecessary_call`.
-`VerdictPolicy` also takes `on_inconclusive_faithfulness` (default `review`).
+`VerdictPolicy` also takes `on_inconclusive_faithfulness` (default `review`) and
+`min_claim_coverage`, the lowest share of claims faithfulness must check before a run can pass
+(off by default).
 
 ## Pass rates and confidence
 

@@ -46,11 +46,16 @@ class VerdictPolicy(BaseModel):
     report's verdict is the strictest disposition among its findings.
 
     `on_inconclusive_faithfulness` applies when a faithfulness result has claims but none could
-    be checked against the evidence; it defaults to `review`, so an answer attest couldn't
-    verify never reads as a pass. `on_injection_warning` applies to injection warnings
-    (`suspicious`, `possible_injection`, `unscanned_content`); `compromised` always blocks.
+    be checked against the evidence, and to every claim whose check failed or got no verdict
+    (`checked` false), even beside supported claims. It defaults to `review`, so an answer
+    attest couldn't verify never reads as a pass. `on_injection_warning` applies to injection
+    warnings (`suspicious`, `possible_injection`, `unscanned_content`); `compromised` always
+    blocks.
     `min_score` maps a check name to the lowest acceptable score: below it, that check's
-    passing findings become `review`.
+    passing findings become `review`. `min_claim_coverage` is the lowest acceptable share of an
+    answer's claims that faithfulness could check against the evidence (`claims_checked /
+    claims_total`); below it, faithfulness's passing findings become `review`. It is separate
+    from the score and off by default.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -59,3 +64,4 @@ class VerdictPolicy(BaseModel):
     on_inconclusive_faithfulness: Disposition = "review"
     on_injection_warning: Disposition = "pass"
     min_score: dict[str, Threshold] = Field(default_factory=dict[str, Threshold])
+    min_claim_coverage: Threshold | None = None

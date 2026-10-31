@@ -99,5 +99,24 @@ class Report(BaseModel):
     def scores(self) -> dict[str, float | None]:
         return {r.check: r.score for r in self.results}
 
+    @computed_field
+    @property
+    def claim_coverage(self) -> float | None:
+        """Share of the answer's claims faithfulness checked against the evidence.
+
+        None when faithfulness didn't run or the answer made no claims. Kept separate from the
+        faithfulness score: 1 claim checked out of 40 can still score 1.0.
+        """
+        faithfulness = self.by("faithfulness")
+        return claim_coverage(faithfulness) if faithfulness is not None else None
+
     def by(self, check: str) -> CheckResult | None:
         return next((r for r in self.results if r.check == check), None)
+
+
+def claim_coverage(result: CheckResult) -> float | None:
+    """Share of a faithfulness result's claims checked against the evidence, or None."""
+    checked, total = result.metadata.get("claims_checked"), result.metadata.get("claims_total")
+    if not isinstance(checked, int) or not isinstance(total, int) or total == 0:
+        return None
+    return checked / total

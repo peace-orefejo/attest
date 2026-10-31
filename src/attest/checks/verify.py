@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from pydantic import BaseModel
 
-from ..llm import BudgetExceeded, call
+from ..llm import BudgetExceeded, ProviderConfigError, call
 from ..prompts.faithfulness import (
     batch_system,
     claims_user,
@@ -16,15 +14,18 @@ from ..prompts.faithfulness import (
 )
 from ..results import CheckResult, Finding
 from ..trajectory import Trajectory
+from ..utils.failures import failure_reason
 from .artifact_evidence import ArtifactExtraction, current_extraction, gather_evidence
 from .claim_findings import (
     NO_EVIDENCE_REASON,
     ClaimVerdict,
     faithfulness_summary,
+    is_unchecked,
+    unchecked,
     unverifiable,
     verdict_finding,
-    with_missing_claims,
 )
+from .claim_steps import ExtractFn, VerifyFn, extract_safely, verify_safely
 from .profiles import get_profile
 from .provenance import with_locations
 
@@ -61,10 +62,6 @@ class _BatchOut(BaseModel):
     verdicts: list[_ClaimVerdict]
 
 
-ExtractFn = Callable[[str], list[str]]
-VerifyFn = Callable[[list[str], str], list[Finding]]
-
-
 def judge_trajectory(
     traj: Trajectory,
     extract: ExtractFn,
@@ -73,18 +70,29 @@ def judge_trajectory(
     max_claims: int = MAX_CLAIMS,
     artifacts: ArtifactExtraction | None = None,
 ) -> CheckResult:
-    """Grade the answer's claims; `artifacts` overrides the active artifact extraction."""
-    claims = extract(traj.final_answer)
+    """Grade the answer's claims; `artifacts` overrides the active artifact extraction.
+
+    If `extract` or `verify` raises (anything but `BudgetExceeded`), the claims it covered are
+    reported `unverifiable` with `metadata["checked"]` false and the reason, never as a pass.
+    """
+    extraction = extract_safely(extract, traj.final_answer)
+    claims = extraction.claims
     capped = len(claims) > max_claims
     evidence = gather_evidence(traj, artifacts or current_extraction())
     checked = claims[:max_claims]
-    verdicts = with_missing_claims(checked, verify(checked, evidence.text))
+    verdicts = (
+        [extraction.failure]
+        if extraction.failure is not None
+        else verify_safely(verify, checked, evidence.text)
+    )
     findings = with_locations(verdicts, evidence.blocks)
     supported = sum(finding.verdict == "supported" for finding in findings)
     unsupported = sum(finding.verdict == "unsupported" for finding in findings)
     checkable = supported + unsupported
     unscorable = bool(findings) and not checkable
     summary = faithfulness_summary(supported, checkable, len(findings))
+    if extraction.failure is not None:
+        summary = "The answer's claims could not be extracted, so none were checked."
     if capped:
         summary += f" (checked the first {max_claims} claims)"
     return CheckResult(
@@ -97,6 +105,7 @@ def judge_trajectory(
             **evidence.metadata(),
             "claims_checked": checkable,
             "claims_total": len(claims),
+            "claims_unchecked": sum(is_unchecked(finding) for finding in findings),
         },
     )
 
@@ -152,12 +161,18 @@ def verify_claims(
 def _verify_batch(
     batch: list[str], evidence: str, system: str, *, shared: bool = False
 ) -> list[Finding]:
-    verdicts = _batch_verdicts(batch, evidence, system, shared=shared)
+    try:
+        verdicts = _batch_verdicts(batch, evidence, system, shared=shared)
+    except (BudgetExceeded, ProviderConfigError):
+        raise
+    except Exception as error:
+        reason = failure_reason("The verification call", error)
+        return [unchecked(claim, reason) for claim in batch]
     findings: list[Finding] = []
     for number, claim in enumerate(batch, start=1):
         verdict = verdicts.get(number)
         if verdict is None:
-            findings.append(unverifiable(claim, "No verdict was returned for this claim."))
+            findings.append(unchecked(claim, "No verdict was returned for this claim."))
             continue
         findings.append(
             verdict_finding(claim, verdict.verdict, verdict.reason, verdict.evidence_quote)
@@ -168,17 +183,12 @@ def _verify_batch(
 def _batch_verdicts(
     batch: list[str], evidence: str, system: str, *, shared: bool
 ) -> dict[int, _ClaimVerdict]:
-    try:
-        out = call(
-            system=system,
-            prefix=evidence_prefix(evidence),
-            user=claims_user(batch),
-            output=_BatchOut,
-            max_tokens=8192,
-            reuse="prefix" if shared else None,
-        )
-    except BudgetExceeded:
-        raise
-    except Exception:
-        return {}
+    out = call(
+        system=system,
+        prefix=evidence_prefix(evidence),
+        user=claims_user(batch),
+        output=_BatchOut,
+        max_tokens=8192,
+        reuse="prefix" if shared else None,
+    )
     return {verdict.claim: verdict for verdict in out.verdicts}
