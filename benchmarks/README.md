@@ -239,8 +239,9 @@ duplicate claim texts, and a `confirmed` case with fewer than two annotators.
    attest first. Explain the label in `notes`.
 3. Add it as `label_status: "draft"` with your initials in `annotators`.
 4. Two people then label it blind with `runners/annotate.py`: `template` gives each of them
-   blank label files, `agreement` reports agreement and Cohen's kappa, and `merge --write`
-   confirms the cases they agree on or have settled. See
+   blank label files, `agreement` reports agreement and Cohen's kappa, `settle` records how a
+   disagreement was settled, and `merge --write` confirms the cases they agree on or have
+   settled. See
    [Double labelling](annotations/guidelines.md#double-labelling-and-agreement).
 5. Put new cases in `dev` unless you are deliberately growing held-out. Never move a case from
    held-out to dev after its results have been looked at for tuning; retire it instead.
@@ -281,6 +282,6 @@ benchmarks/
 ├── datasets/<check>/{dev,heldout}.jsonl
 ├── private/                     your own cases (git-ignored)
 ├── runners/                     case model, loading, grading, metrics, reports, compare,
-│                                annotate (templates, agreement, merge)
+│                                annotate (templates, agreement, settle, merge)
 └── reports/                     run output; published reports are committed on purpose
 ```

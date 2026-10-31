@@ -1,13 +1,16 @@
-"""One annotator's labels for benchmark cases, kept apart from the case files so labelling is blind.
+"""One annotator's labels for benchmark cases, kept in their own files apart from the case files.
 
-Labels live in `<labels>/<annotator>/<case id>.json`, one pretty-printed file per case. The
-`trajectory` in each file is a copy for reading; `run_sha256` ties the labels to that exact run,
-so labels given before a run was edited are never confirmed for the edited run.
+Labels live in `<labels>/<annotator>/<case id>.json`, one pretty-printed file per case. Keeping
+them apart makes blind labelling possible, but blindness is a procedure the annotators follow
+(see annotations/guidelines.md), not something these files enforce. The `trajectory` in each
+file is a copy for reading; `run_sha256` ties the labels to that exact run, so labels given
+before a run was edited are never confirmed for the edited run.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from pathlib import Path
 from typing import Any, Literal
@@ -77,8 +80,13 @@ Annotations = dict[str, dict[str, Annotation]]
 
 
 def run_sha256(case: Case) -> str:
-    """Fingerprint of the run an annotator reads, so labels can't outlive an edit to it."""
-    return hashlib.sha256(case.trajectory.model_dump_json().encode()).hexdigest()
+    """Fingerprint of the run an annotator reads, so labels can't outlive an edit to it.
+
+    Canonical: key order and explicitly written default values don't change it.
+    """
+    data = case.trajectory.model_dump(mode="json", exclude_defaults=True)
+    canonical = json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def label_items(expected: Expected) -> dict[ItemKey, str]:

@@ -7,12 +7,13 @@ from pathlib import Path
 import pytest
 
 import annotate
+from bench_adjudications import Adjudication, load_adjudications
 from bench_agreement import agreement, cohen_kappa
-from bench_annotations import AnnotationError
+from bench_annotations import AnnotationError, run_sha256
 from bench_cases import Case, CheckName
 from bench_label_files import load_annotations
 from bench_load import DATASETS_DIR, load_datasets
-from bench_merge import Adjudication, merge
+from bench_merge import merge
 from bench_write import write_cases
 
 
@@ -158,6 +159,7 @@ def test_agreement_merge_and_write(datasets: Path, tmp_path: Path) -> None:
         how="discussion",
         decided_by=["po", "vk"],
         reason="the output does carry an instruction",
+        run_sha256=run_sha256(cases[disputed]),
     )
     outcome = merge(annotations, cases, [settle])
     confirmed = outcome.confirmed[disputed]
@@ -188,6 +190,7 @@ def test_invalid_adjudicated_label_is_reported(datasets: Path, tmp_path: Path) -
         decided_by=["po"],
         reason="r",
         ruling="2026-11-01 injection labels",
+        run_sha256=run_sha256(cases[case_id]),
     )
     outcome = merge(load_annotations(labels, cases).annotations, cases, [bad])
     assert "isn't valid" in outcome.unresolved[case_id][0]
@@ -217,6 +220,9 @@ def test_cli_agreement_and_dry_run_merge(
     assert annotate.main([*argv, "agreement", "po", "nobody"]) == 2
 
 
+_IDS = set(_cases(DATASETS_DIR))
+
+
 def _settle(case_id: str, label: str, **overrides: object) -> Adjudication:
     fields: dict[str, object] = {
         "case_id": case_id,
@@ -226,6 +232,7 @@ def _settle(case_id: str, label: str, **overrides: object) -> Adjudication:
         "how": "discussion",
         "decided_by": ["po", "vk"],
         "reason": "r",
+        "run_sha256": run_sha256(_cases(DATASETS_DIR)[case_id]) if case_id in _IDS else "0" * 64,
     }
     fields.update(overrides)
     return Adjudication.model_validate(fields)
@@ -239,6 +246,7 @@ def test_adjudications_are_validated(datasets: Path, tmp_path: Path) -> None:
         _template(datasets, labels, name, "prompt_injection")
         _fill(labels, name, case_id, {"label": label})
     annotations = load_annotations(labels, cases).annotations
+    everyone = ["po", "vk", "zz"]
 
     with pytest.raises(ValueError, match="matches no item"):
         merge(annotations, cases, [_settle(case_id, "none", subject="runn")])
@@ -249,8 +257,10 @@ def test_adjudications_are_validated(datasets: Path, tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="rulings-log entry"):
         _settle(case_id, "payload", how="owner_ruling")
 
-    outcome = merge(annotations, cases, [_settle(case_id, "payload")])
+    outcome = merge(annotations, cases, [_settle(case_id, "payload", decided_by=everyone)])
     assert "only an owner ruling can" in outcome.unresolved[case_id][0]
+    agreeing = merge(annotations, cases, [_settle(case_id, "none", decided_by=["po"])])
+    assert "settled by discussion" not in agreeing.confirmed[case_id].notes
     ruling = _settle(case_id, "payload", how="owner_ruling", decided_by=["owner"], ruling="r1")
     confirmed = merge(annotations, cases, [ruling]).confirmed[case_id]
     assert confirmed.expected.model_dump()["label"] == "payload"
@@ -270,6 +280,8 @@ def test_a_discussion_must_be_between_the_case_annotators(datasets: Path, tmp_pa
         "qq didn't label this case" in merge(annotations, cases, [outsider]).unresolved[case_id][0]
     )
     assert case_id in merge(annotations, cases, [_settle(case_id, "none")]).confirmed
+    partial = _settle(case_id, "none", decided_by=["po"])
+    assert "without vk" in merge(annotations, cases, [partial]).unresolved[case_id][0]
 
 
 def test_three_annotators_with_one_dissent_stay_unresolved(datasets: Path, tmp_path: Path) -> None:
@@ -331,3 +343,168 @@ def test_annotator_names_and_pairs_are_checked(
     with pytest.raises(SystemExit):
         annotate.main([*argv, "agreement", "po", "po"])
     assert "two different annotators" in capsys.readouterr().err
+
+
+def _edit_run(datasets: Path, check: str, case_id: str, **changes: object) -> None:
+    path = datasets / check / "dev.jsonl"
+    lines = path.read_text().splitlines()
+    for index, line in enumerate(lines):
+        case = json.loads(line)
+        if case["id"] == case_id:
+            case["trajectory"].update(changes)
+            lines[index] = json.dumps(case)
+    path.write_text("\n".join(lines) + "\n")
+
+
+def test_an_adjudication_goes_stale_when_its_run_changes(
+    datasets: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    labels = tmp_path / "labels"
+    log = tmp_path / "adjudications.jsonl"
+    argv = ["--datasets", str(datasets), "--labels", str(labels)]
+    case_id = "inj-clean-output"
+
+    def label_disagreeing() -> None:
+        for name, label in (("po", "none"), ("vk", "payload")):
+            _template(datasets, labels, name, "prompt_injection")
+            _fill(labels, name, case_id, {"label": label})
+
+    label_disagreeing()
+    settle = [*argv, "settle", case_id, "label", "run", "none", "--how", "discussion"]
+    assert (
+        annotate.main(
+            [*settle, "--by", "po", "vk", "--reason", "data only", "--adjudications", str(log)]
+        )
+        == 0
+    )
+    [entry] = load_adjudications(log)
+    assert entry.run_sha256 == run_sha256(_cases(datasets)[case_id])
+    assert annotate.main([*argv, "merge", "--adjudications", str(log)]) == 0
+    assert f"confirmed      {case_id}" in capsys.readouterr().out
+
+    _edit_run(datasets, "prompt_injection", case_id, final_answer="Something else.")
+    for name in ("po", "vk"):
+        (labels / name / f"{case_id}.json").unlink()
+    label_disagreeing()
+    capsys.readouterr()
+    assert annotate.main([*argv, "merge", "--write", "--adjudications", str(log)]) == 0
+    out = capsys.readouterr()
+    assert f"not confirmed  {case_id}" in out.out and "unsettled" in out.out
+    assert f"confirmed      {case_id}" not in out.out
+    assert f"stale adjudication of {case_id} label 'run'" in out.err
+    cases = _cases(datasets)
+    assert cases[case_id].label_status == "draft"
+    outcome = merge(load_annotations(labels, cases).annotations, cases, load_adjudications(log))
+    assert outcome.stale_adjudications == [entry] and case_id in outcome.unresolved
+
+    # settling again on the new run is not a duplicate of the stale entry
+    assert (
+        annotate.main(
+            [*settle, "--by", "po", "vk", "--reason", "still data", "--adjudications", str(log)]
+        )
+        == 0
+    )
+    assert (
+        case_id
+        in merge(
+            load_annotations(labels, cases).annotations, cases, load_adjudications(log)
+        ).confirmed
+    )
+
+
+def test_settle_validates_the_entry(
+    datasets: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    log = tmp_path / "adjudications.jsonl"
+    argv = ["--datasets", str(datasets), "--labels", str(tmp_path / "labels"), "settle"]
+    tail = ["--by", "po", "vk", "--reason", "r", "--adjudications", str(log)]
+    for bad in (
+        ["no-such-case", "label", "run", "none", "--how", "discussion"],
+        ["inj-clean-output", "label", "step 1", "none", "--how", "discussion"],
+        ["inj-clean-output", "label", "run", "none", "--how", "owner_ruling"],
+    ):
+        assert annotate.main([*argv, *bad, *tail]) == 2
+    assert not log.exists()
+    good = ["inj-clean-output", "label", "run", "none", "--how", "owner_ruling", "--ruling", "r1"]
+    assert annotate.main([*argv, *good, *tail]) == 0
+    assert annotate.main([*argv, *good, *tail]) == 2
+    assert "settled more than once" in capsys.readouterr().err
+    [entry] = load_adjudications(log)
+    assert (entry.how, entry.ruling, entry.decided_by) == ("owner_ruling", "r1", ["po", "vk"])
+
+
+def test_run_sha256_is_canonical(datasets: Path) -> None:
+    case_id = "inj-clean-output"
+    before = run_sha256(_cases(datasets)[case_id])
+    path = datasets / "prompt_injection" / "dev.jsonl"
+    original = path.read_text()
+    lines = original.splitlines()
+    for index, line in enumerate(lines):
+        case = json.loads(line)
+        if case["id"] == case_id:
+            trajectory = case["trajectory"]
+            for step in trajectory["steps"]:
+                step["tool_call"] = dict(reversed(step["tool_call"].items()))
+                step["tool_call"].setdefault("artifacts", [])
+                step["tool_call"].setdefault("is_error", None)
+            trajectory.setdefault("tool_fallbacks", {})
+            trajectory.setdefault("system_prompt", None)
+            case["trajectory"] = dict(reversed(trajectory.items()))
+            lines[index] = json.dumps(case)
+    path.write_text("\n".join(lines) + "\n")
+    assert run_sha256(_cases(datasets)[case_id]) == before
+    path.write_text(original)
+    _edit_run(datasets, "prompt_injection", case_id, task="A different task.")
+    assert run_sha256(_cases(datasets)[case_id]) != before
+
+
+def test_private_template_follows_symlinks_into_the_repo(
+    datasets: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    labels = tmp_path / "labels"
+    labels.mkdir()
+    inside = annotate.PRIVATE_DIR.parent / "annotations" / "symlink-test-target"
+    (labels / "po").symlink_to(inside, target_is_directory=True)
+    argv = ["--datasets", str(datasets), "--labels", str(labels), "template"]
+    assert annotate.main([*argv, "po", "--check", "prompt_injection"]) == 2
+    assert "inside this repository" in capsys.readouterr().err
+    assert not inside.exists()
+
+    target = annotate.PRIVATE_DIR.parent / "annotations" / "symlink-test-file.json"
+    (labels / "vk").mkdir()
+    (labels / "vk" / "inj-clean-output.json").symlink_to(target)
+    assert annotate.main([*argv, "vk", "--check", "prompt_injection"]) == 2
+    assert not target.exists()
+
+
+def test_template_flags_files_whose_items_changed(
+    datasets: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    labels = tmp_path / "labels"
+    case_id = _dev_ids(datasets, "faithfulness")[0]
+    _template(datasets, labels, "po", "faithfulness")
+    _template(datasets, labels, "vk", "faithfulness")
+    data = json.loads((labels / "vk" / f"{case_id}.json").read_text())
+    _fill(
+        labels,
+        "vk",
+        case_id,
+        {"claims": [{**c, "label": "supported"} for c in data["labels"]["claims"]]},
+    )
+    capsys.readouterr()
+    _template(datasets, labels, "po", "faithfulness")
+    _template(datasets, labels, "vk", "faithfulness")
+    assert "stale:" not in capsys.readouterr().out
+
+    path = datasets / "faithfulness" / "dev.jsonl"
+    lines = path.read_text().splitlines()
+    for index, line in enumerate(lines):
+        case = json.loads(line)
+        if case["id"] == case_id:
+            case["expected"]["claims"][0]["text"] += " (reworded)"
+            lines[index] = json.dumps(case)
+    path.write_text("\n".join(lines) + "\n")
+    for name in ("po", "vk"):
+        _template(datasets, labels, name, "faithfulness")
+        out = capsys.readouterr().out
+        assert f"stale: {labels / name / case_id}.json: the items to label changed" in out

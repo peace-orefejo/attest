@@ -2,57 +2,21 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ValidationError
 
-from bench_annotations import Annotation, Annotations, Dimension, ItemKey, label_items
+from bench_adjudications import Adjudication, Settled, index_adjudications
+from bench_annotations import Annotation, Annotations, ItemKey, label_items
 from bench_cases import Case, FaithfulnessExpected
-
-ADJUDICATIONS_FILE = Path(__file__).resolve().parent.parent / "annotations" / "adjudications.jsonl"
-
-
-class Adjudication(BaseModel):
-    """How one disagreement was settled. Never by looking at what attest said."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    case_id: str
-    dimension: Dimension
-    subject: str
-    label: str
-    how: Literal["discussion", "owner_ruling"]
-    decided_by: list[str] = Field(min_length=1)
-    reason: str = Field(min_length=1)
-    ruling: str | None = None
-    """For an owner ruling, the rulings-log entry it follows. Required for owner rulings."""
-
-    @model_validator(mode="after")
-    def _ruling_named(self) -> Adjudication:
-        if self.how == "owner_ruling" and not (self.ruling or "").strip():
-            raise ValueError("an owner ruling must name its rulings-log entry in `ruling`")
-        return self
 
 
 class MergeOutcome(BaseModel):
     confirmed: dict[str, Case]
     unresolved: dict[str, list[str]]
     """Case id -> why it can't be confirmed yet."""
-
-
-def load_adjudications(path: Path) -> list[Adjudication]:
-    if not path.is_file():
-        return []
-    entries: list[Adjudication] = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        if not line.strip():
-            continue
-        try:
-            entries.append(Adjudication.model_validate_json(line))
-        except ValidationError as exc:
-            raise ValueError(f"{path}:{number}: invalid adjudication\n{exc}") from exc
-    return entries
+    stale_adjudications: list[Adjudication]
+    """Log entries settled on an older version of their run; ignored. Settle the case again."""
 
 
 def merge(
@@ -60,9 +24,11 @@ def merge(
 ) -> MergeOutcome:
     """Confirm every case at least two annotators labelled and whose disagreements are settled.
 
-    Raises ValueError if an adjudication names no current item or two settle the same item.
+    Adjudications settled on an older version of a run are never applied; they are returned in
+    `stale_adjudications`. Raises ValueError if an adjudication names no current item or two
+    current ones settle the same item.
     """
-    settled = _index_adjudications(adjudications, cases)
+    indexed = index_adjudications(adjudications, cases)
     by_case: dict[str, dict[str, Annotation]] = {}
     for annotator, labelled in annotations.items():
         for case_id, annotation in labelled.items():
@@ -70,18 +36,20 @@ def merge(
     confirmed: dict[str, Case] = {}
     unresolved: dict[str, list[str]] = {}
     for case_id in sorted(by_case):
-        result = _merge_case(cases[case_id], by_case[case_id], settled)
+        result = _merge_case(cases[case_id], by_case[case_id], indexed.settled)
         if isinstance(result, Case):
             confirmed[case_id] = result
         else:
             unresolved[case_id] = result
-    return MergeOutcome(confirmed=confirmed, unresolved=unresolved)
+    return MergeOutcome(
+        confirmed=confirmed, unresolved=unresolved, stale_adjudications=indexed.stale
+    )
 
 
 def _merge_case(
     case: Case,
     labelled: dict[str, Annotation],
-    settled: dict[tuple[str, ItemKey], Adjudication],
+    settled: Settled,
 ) -> Case | list[str]:
     if len(labelled) < 2:
         return [f"only {', '.join(labelled)} has labelled it; it needs two annotators"]
@@ -95,7 +63,10 @@ def _merge_case(
     for key in label_items(case.expected):
         given = {name: labels[key] for name, labels in items.items()}
         adjudication = settled.get((case.id, key))
-        unanimous = len(set(given.values())) == 1
+        agreed = set(given.values())
+        unanimous = len(agreed) == 1
+        if adjudication is not None and unanimous and adjudication.label in agreed:
+            adjudication = None
         if adjudication is not None:
             problem = _adjudication_problem(adjudication, labelled, unanimous=unanimous)
             if problem is not None:
@@ -124,24 +95,6 @@ def _merge_case(
     )
 
 
-def _index_adjudications(
-    adjudications: list[Adjudication], cases: dict[str, Case]
-) -> dict[tuple[str, ItemKey], Adjudication]:
-    settled: dict[tuple[str, ItemKey], Adjudication] = {}
-    errors: list[str] = []
-    for x in adjudications:
-        key: ItemKey = (x.dimension, x.subject)
-        case = cases.get(x.case_id)
-        if case is None or key not in label_items(case.expected):
-            errors.append(f"{x.case_id} {x.dimension} {x.subject!r} matches no item of any case")
-        elif (x.case_id, key) in settled:
-            errors.append(f"{x.case_id} {x.dimension} {x.subject!r} is settled more than once")
-        settled[(x.case_id, key)] = x
-    if errors:
-        raise ValueError("invalid adjudications:\n  " + "\n  ".join(errors))
-    return settled
-
-
 def _adjudication_problem(
     x: Adjudication, labelled: dict[str, Annotation], *, unanimous: bool
 ) -> str | None:
@@ -152,6 +105,9 @@ def _adjudication_problem(
         outsiders = sorted(set(x.decided_by) - set(labelled))
         if outsiders:
             return f"{what} is a discussion but {', '.join(outsiders)} didn't label this case"
+        absent = sorted(set(labelled) - set(x.decided_by))
+        if absent:
+            return f"{what} is a discussion without {', '.join(absent)}, who labelled this case"
     return None
 
 
