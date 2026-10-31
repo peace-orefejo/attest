@@ -6,19 +6,9 @@
 pip install agent-attest
 ```
 
-The base install grades with Anthropic models. Add extras for other providers or for scanning
-embedded files:
-
-```bash
-pip install "agent-attest[openai]"   # OpenAI
-pip install "agent-attest[gemini]"   # Gemini
-pip install "agent-attest[files]"    # PDF, XML, image OCR, metadata and QR extraction
-pip install "agent-attest[all]"      # everything
-```
-
-Image OCR also needs the `tesseract` executable (`brew install tesseract` or
-`apt install tesseract-ocr`). Without it, attest still scans image metadata and QR codes and
-reports OCR as incomplete coverage.
+It grades with Anthropic models by default. For OpenAI or Gemini, see
+[Models and providers](providers.md). To scan PDFs and images for injection, install
+`"agent-attest[files]"`; image OCR also needs `tesseract`.
 
 ## Set a key
 
@@ -66,13 +56,11 @@ A file ending in `.jsonl` holds one run per line.
 ## Grade it
 
 ```bash
-attest run run.json
+attest run run.json > report.json
 ```
 
-![attest run output](assets/terminal/attest-run.svg){ .terminal }
-
-The answer's claim that Paris is larger is flagged as unsupported, and the reason quotes the two
-tool outputs that contradict it.
+The claim that Paris is larger comes back as an `unsupported` finding, with the tool output that
+contradicts it in `evidence`. [JSON output](json-output.md) describes every field.
 
 ## From Python
 
@@ -88,8 +76,7 @@ for finding in report.by("faithfulness").failures:
     print(finding.subject, "->", finding.reason)
 ```
 
-`Attest()` creates an API client only when a check needs one. Configure it once and evaluate as
-many runs as you like. Single checks have their own methods:
+Single checks have their own methods:
 
 ```python
 judge.tool_use(run)                # offline
@@ -97,28 +84,7 @@ judge.injection(run, deep=True)    # deep mode checks whether the agent acted on
 judge.role_adherence(run)
 ```
 
-## Results are objects
-
-Every check returns Pydantic models: `Report`, `CheckResult` and `Finding`, and `ReviewResult`
-in [code review mode](code-review/index.md). Store them, send them, or compare them like any
-other data:
-
-```python
-report.model_dump()        # a dict
-report.model_dump_json()   # a JSON string
-```
-
-For a readable view, pass any of them to `attest.show` (coloured, for the terminal) or
-`attest.render` (plain text, for logs and files):
-
-```python
-from attest import render, show
-
-show(report)
-text = render(report, title="Paris vs Berlin", width=100)
-```
-
-Both take a `Report`, `CheckResult`, `ReviewResult` or `GateDecision`, and use the same layout
-as the [command line](cli.md#output).
+Results are Pydantic models, so `report.model_dump_json()` gives the same JSON the command line
+prints.
 
 Next, read [How it works](concepts.md) to see what each verdict means.

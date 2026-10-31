@@ -57,8 +57,6 @@ The whole change. `review()` scans it for injection, and attest's own reviewer w
 the kept outputs from the ones `review()` checked, which is how you get attest's own review when
 `written` is `True`. Passing a list of a different length raises `ValueError`.
 
-`kept` and `dropped` are included in `model_dump()` and `model_dump_json()`. The outputs
-themselves are not.
 
 ## OutputDecision
 
@@ -79,24 +77,7 @@ themselves are not.
 
 ## GateDecision
 
-`gate()` decides for one output. `review()` calls it for you; call it yourself in a custom
-pipeline.
-
-```python
-GateDecision(
-    keep=False,
-    mode="lenient",
-    reasons=[
-        Finding(
-            verdict="unsupported",
-            subject="The loop in cart_total uses range(len(items) + 1) and reads past the end of items.",
-            reason="The code shows 'for item in items:', which iterates directly over items.",
-            evidence="for item in items:",
-        )
-    ],
-    notes=[],
-)
-```
+`gate()` decides for one output. `review()` calls it for you.
 
 | Field | Meaning |
 |---|---|

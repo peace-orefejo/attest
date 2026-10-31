@@ -47,19 +47,7 @@ trajectory = Trajectory(
 def main() -> None:
     judge = Attest()
     report = judge.evaluate(trajectory)
-
-    overall = report.overall_score
-    print(f"overall score : {'—' if overall is None else f'{overall:.0%}'}")
-    print(f"passed        : {report.passed}")
-    print()
-
-    for r in report.results:
-        score = f"{r.score:.0%}" if r.score is not None else "—"
-        print(f"{r.check} ({score}): {r.summary}")
-        for f in r.findings:
-            print(f"  [{f.severity.value.upper():>4}] {f.verdict}: {f.subject}")
-            if f.reason:
-                print(f"         {f.reason}")
+    print(report.model_dump_json(indent=2))
 
 
 if __name__ == "__main__":

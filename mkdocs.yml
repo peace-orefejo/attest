@@ -92,7 +92,6 @@ validation:
 
 exclude_docs: |
   scripts/
-  assets/terminal/*.txt
 
 nav:
   - Home: index.md
@@ -111,6 +110,7 @@ nav:
       - Outputs and decisions: code-review/outputs.md
       - Injection in diffs: code-review/injection.md
   - Command line: cli.md
+  - JSON output: json-output.md
   - Models and providers: providers.md
   - Integrations: integrations.md
   - Architecture: architecture.md
@@ -119,7 +119,3 @@ nav:
       - attest.code_review: reference/code-review.md
   - Contributing: contributing.md
   - Changelog: changelog.md
-  - Design notes:
-      - Code review mode: design/code-review-mode.md
-      - Injection roadmap: design/injection-roadmap.md
-      - Async batches and cost: design/async-cost.md

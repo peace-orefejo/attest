@@ -4,19 +4,31 @@
 actually returned. It catches made-up facts, misused tools and prompt-injection slips that a
 "does this look good?" grader waves through.
 
-![attest run output showing a false claim flagged with the evidence that contradicts it](assets/terminal/attest-run.svg){ .terminal }
-
 ```bash
 pip install agent-attest      # the command and the import are both `attest`
-attest run your-run.json
+attest run your-run.json      # prints JSON
+```
+
+Every command prints [JSON](json-output.md). Here the agent said Paris is larger than Berlin,
+and attest quotes the tool output that shows it isn't:
+
+```json
+{
+  "severity": "fail",
+  "verdict": "unsupported",
+  "subject": "Paris is larger than Berlin",
+  "reason": "The evidence shows Berlin has a population of 3,677,000 while Paris has 2,103,000, meaning Berlin is larger than Paris, not the other way around.",
+  "evidence": "Paris population (city proper): 2,103,000",
+  "step": null,
+  "metadata": {}
+}
 ```
 
 ## Why
 
-Most agent evals ask another model whether the answer is good. A confident, well-written answer
-can pass that check even when a detail inside it is wrong, because the grader reacts to the
-story instead of checking the facts. Rewriting an agent's reasoning while leaving its actions
-unchanged can raise an LLM judge's false-positive rate by as much as 90%
+Most agent evals ask another model whether the answer is good. A confident answer can pass that
+even when a detail inside it is wrong; rewriting an agent's reasoning alone can raise an LLM
+judge's false-positive rate by up to 90%
 ([Khalifa et al., 2026](https://arxiv.org/abs/2601.14691)).
 
 attest never trusts what the agent says it did. Every tool call produced a real output, and
@@ -43,11 +55,10 @@ attest can also check the outputs of an AI code reviewer: flagged issues, diff s
 summaries and answers to questions about a change. Each one is checked against the diff, and a
 gate decides whether to keep or drop it. See [Code review mode](code-review/index.md).
 
-![Code review gate keeping a real issue and dropping a false one](assets/terminal/code-review-gate.svg){ .terminal }
-
 ## Next steps
 
 - [Getting started](getting-started.md): install, set a key and grade your first run.
 - [How it works](concepts.md): runs, claims, verdicts and scores.
 - [Command line](cli.md): every command and flag.
+- [JSON output](json-output.md): the shape of every command's output, with JSON Schemas.
 - [Contributing](contributing.md): set up a dev environment and send a change.

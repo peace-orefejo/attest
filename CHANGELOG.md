@@ -22,8 +22,8 @@ All notable changes to `agent-attest` are documented here. This project follows
   prompt so Gemini and OpenAI implicit caches reuse it, with explicit `cache_control`
   breakpoints on Anthropic only when the prefix will be resent. `Usage` reports
   `cached_input_tokens` and `cache_write_tokens`.
-- `attest run --max-calls/--max-tokens/--cache-dir`, with a usage line (or `usage` in `--json`);
-  exits with code 2 when the budget stops a run.
+- `attest run --max-calls/--max-tokens/--cache-dir`, with `usage` in the output; exits with
+  code 3 when the budget stops a run.
 - Opt-in real-LLM integration tests behind the `integration` marker and `ATTEST_INTEGRATION=1`.
 - `Attest.review(pr, outputs)` and `attest.code_review.review(...)` check and gate every output of
   a code review in one call. The result, `ReviewResult`, has one `OutputDecision` per output
@@ -45,15 +45,20 @@ All notable changes to `agent-attest` are documented here. This project follows
 - `attest review FILE` reads `{"pr": ..., "outputs": [...]}` and prints one decision per output.
   Leave out `outputs` to have attest write the review. `--guidelines/-g PATH` (repeatable) passes
   review rules, `--no-follow` skips the rule check, and `--mode TYPE=MODE` overrides a gate mode.
-- `attest.render(result)` and `attest.show(result)` turn any `Report`, `CheckResult`,
-  `ReviewResult` or `GateDecision` into a structured view: a status line, a summary table, and
-  aligned findings with reasons and evidence.
-- `--json` on `stats`, `models` and `demo`, so every command can emit JSON.
+- `attest schema [COMMAND]` prints the JSON Schema of a command's output. The schemas are also
+  published at `https://peace-orefejo.github.io/attest/schemas/v1/`.
 - `answer_kind` accepts `"code"` and `"auto"`. `"auto"` picks the grading standard from the run
   and records the choice in the report metadata.
 - Two new default injection detectors: hidden Unicode (bidi controls, zero-width and tag
   characters) and encoded payloads (base64 and hex that decode to instructions).
 ### Changed
+- **Breaking:** every CLI command prints JSON, and only JSON. The text view and the `--json`
+  flag are gone. Each command prints one envelope, `{"schema_version": "1", "command": ...,
+  "ok": true, "data": ...}`, and a command that can't run prints `"ok": false` with an
+  `error` (`code`, `message`) on stdout instead of text on stderr. Exit codes: 0 ran, 1 missing
+  API key, 2 invalid input, 3 stopped by a budget. `data` changes shape from 0.7.0's `--json`:
+  `tools`, `injection` and `role` wrap their list in `trajectories`, `demo` in `comparisons`,
+  and `run` adds `total`, `evaluated` and `passed`. `rich` is no longer a dependency.
 - Faithfulness and tool-choice prompts put the shared evidence before the per-call text;
   `PROMPT_VERSION` is now `2026.10.29`.
 - `vote` stops sampling once a verdict holds a strict majority (2 of 3 agreeing skips the third

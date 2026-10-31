@@ -2,7 +2,6 @@
 
 import contextlib
 import json
-import re
 import subprocess
 import sys
 
@@ -13,16 +12,15 @@ from attest.cli import app
 runner = CliRunner(env={"COLUMNS": "200", "TERMINAL_WIDTH": "200"})
 
 
-def _flat(output: str) -> str:
-    """Collapse whitespace so assertions survive Rich's error-panel wrapping.
+def _payload(result) -> dict:
+    return json.loads(result.stdout)
 
-    Click renders usage errors inside a bordered panel sized to the terminal,
-    so a long temporary path can push a message onto two lines and split a
-    phrase across them. Matching on flattened text keeps these assertions
-    about the message rather than about how wide the runner's terminal is.
-    """
-    plain = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", output)
-    return re.sub(r"\s+", " ", plain.replace("│", " "))
+
+def _error(result) -> str:
+    payload = _payload(result)
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "invalid_input"
+    return payload["error"]["message"]
 
 
 def _trajectory() -> dict:
@@ -42,17 +40,21 @@ def _trajectory() -> dict:
     }
 
 
-def test_tools_json_is_machine_readable(tmp_path):
+def test_tools_prints_the_json_envelope(tmp_path):
     path = tmp_path / "trajectory.json"
     path.write_text(json.dumps(_trajectory()))
 
-    result = runner.invoke(app, ["tools", str(path), "--json"])
+    result = runner.invoke(app, ["tools", str(path)])
 
     assert result.exit_code == 0
-    payload = json.loads(result.stdout)
-    assert payload[0]["task"] == "search"
-    assert payload[0]["result"]["check"] == "tool_use"
-    assert payload[0]["result"]["passed"] is True
+    payload = _payload(result)
+    assert payload["schema_version"] == "1"
+    assert payload["command"] == "tools"
+    assert payload["ok"] is True
+    entry = payload["data"]["trajectories"][0]
+    assert entry["task"] == "search"
+    assert entry["result"]["check"] == "tool_use"
+    assert entry["result"]["passed"] is True
 
 
 def test_jsonl_error_identifies_line(tmp_path):
@@ -62,8 +64,8 @@ def test_jsonl_error_identifies_line(tmp_path):
     result = runner.invoke(app, ["tools", str(path)])
 
     assert result.exit_code == 2
-    assert "line 2" in _flat(result.output)
-    assert "Invalid trajectory" in _flat(result.output)
+    assert "line 2" in _error(result)
+    assert "Invalid trajectory" in _error(result)
 
 
 def test_empty_trajectory_file_has_friendly_error(tmp_path):
@@ -73,7 +75,7 @@ def test_empty_trajectory_file_has_friendly_error(tmp_path):
     result = runner.invoke(app, ["tools", str(path)])
 
     assert result.exit_code == 2
-    assert "is empty" in _flat(result.output)
+    assert "is empty" in _error(result)
 
 
 def test_injection_accepts_custom_pattern_file(tmp_path):
@@ -97,11 +99,10 @@ def test_injection_accepts_custom_pattern_file(tmp_path):
         )
     )
 
-    result = runner.invoke(app, ["injection", str(path), "--patterns", str(patterns), "--json"])
+    result = runner.invoke(app, ["injection", str(path), "--patterns", str(patterns)])
 
     assert result.exit_code == 0
-    payload = json.loads(result.stdout)
-    finding = payload[0]["result"]["findings"][0]
+    finding = _payload(result)["data"]["trajectories"][0]["result"]["findings"][0]
     assert finding["metadata"]["pattern"] == "purple-elephant"
     assert finding["metadata"]["category"] == "tool_redirection"
     assert finding["metadata"]["pattern_severity"] == "medium"
@@ -116,7 +117,7 @@ def test_injection_rejects_invalid_pattern_file(tmp_path):
     result = runner.invoke(app, ["injection", str(path), "--patterns", str(patterns)])
 
     assert result.exit_code == 2
-    assert "Invalid regex pattern 'broken'" in _flat(result.output)
+    assert "Invalid regex pattern 'broken'" in _error(result)
 
 
 def test_injection_patterns_only_replaces_builtins(tmp_path):
@@ -130,11 +131,11 @@ def test_injection_patterns_only_replaces_builtins(tmp_path):
     )
 
     result = runner.invoke(
-        app, ["injection", str(path), "--patterns", str(patterns), "--patterns-only", "--json"]
+        app, ["injection", str(path), "--patterns", str(patterns), "--patterns-only"]
     )
 
     assert result.exit_code == 0
-    assert json.loads(result.stdout)[0]["result"]["findings"] == []
+    assert _payload(result)["data"]["trajectories"][0]["result"]["findings"] == []
 
 
 def test_injection_patterns_only_requires_pattern_file(tmp_path):
@@ -142,7 +143,7 @@ def test_injection_patterns_only_requires_pattern_file(tmp_path):
     path.write_text(json.dumps(_trajectory()))
     result = runner.invoke(app, ["injection", str(path), "--patterns-only"])
     assert result.exit_code == 2
-    assert "requires --patterns" in _flat(result.output)
+    assert "requires --patterns" in _error(result)
 
 
 def test_injection_rejects_unknown_pattern_severity(tmp_path):
@@ -154,34 +155,24 @@ def test_injection_rejects_unknown_pattern_severity(tmp_path):
     )
     result = runner.invoke(app, ["injection", str(path), "--patterns", str(patterns)])
     assert result.exit_code == 2
-    assert "severity must be low, medium, or high" in _flat(result.output)
-
-
-def test_tools_human_view_has_a_status_and_findings(tmp_path):
-    path = tmp_path / "trajectory.json"
-    path.write_text(json.dumps(_trajectory()))
-    result = runner.invoke(app, ["tools", str(path)])
-    assert result.exit_code == 0
-    assert result.stdout.startswith("PASS  search")
-    assert "✓  " in result.stdout
-    assert all(line == line.rstrip() for line in result.stdout.splitlines())
+    assert "severity must be low, medium, or high" in _error(result)
 
 
 def test_stats_json():
-    result = runner.invoke(app, ["stats", "17", "20", "--json"])
+    result = runner.invoke(app, ["stats", "17", "20"])
     assert result.exit_code == 0
-    payload = json.loads(result.stdout)
-    assert payload["rate"] == 0.85
-    assert payload["n"] == 20
+    data = _payload(result)["data"]
+    assert data["rate"] == 0.85
+    assert data["n"] == 20
 
 
 def test_models_json(monkeypatch):
     module = sys.modules["attest.cli.commands.models"]
     monkeypatch.setattr(module, "resolve_key", lambda provider: None)
     monkeypatch.setattr(module, "list_models", lambda provider: ["m1", "m2"])
-    result = runner.invoke(app, ["models", "anthropic", "--json"])
+    result = runner.invoke(app, ["models", "anthropic"])
     assert result.exit_code == 0
-    assert json.loads(result.stdout) == {
+    assert _payload(result)["data"] == {
         "provider": "anthropic",
         "source": "curated",
         "models": ["m1", "m2"],
@@ -191,7 +182,7 @@ def test_models_json(monkeypatch):
 def test_run_help_lists_every_answer_kind():
     result = runner.invoke(app, ["run", "--help"])
     assert result.exit_code == 0
-    text = _flat(result.output)
+    text = " ".join(result.output.replace("│", " ").split())
     for kind in ("'factual'", "'plan'", "'code'", "'auto'"):
         assert kind in text
 
@@ -201,7 +192,7 @@ def test_run_rejects_an_unknown_answer_kind(tmp_path):
     path.write_text(json.dumps(_trajectory()))
     result = runner.invoke(app, ["run", str(path), "--kind", "poetry"])
     assert result.exit_code == 2
-    assert "Unknown answer kind 'poetry'" in _flat(result.output)
+    assert "Unknown answer kind 'poetry'" in _error(result)
 
 
 def _offline_judges(monkeypatch, *, judge_passed: bool, grounded: bool) -> None:
@@ -238,43 +229,83 @@ def test_demo_json_names_the_outcome(tmp_path, monkeypatch):
     _offline_judges(monkeypatch, judge_passed=True, grounded=False)
     path = tmp_path / "trajectory.json"
     path.write_text(json.dumps(_trajectory()))
-    result = runner.invoke(app, ["demo", str(path), "--json"])
-    assert result.exit_code == 0, result.output
-    payload = json.loads(result.stdout)
-    assert payload[0]["outcome"] == "caught"
-    assert payload[0]["judge"]["passed"] is True
-    assert payload[0]["attest"]["passed"] is False
-
-
-def test_demo_human_view_compares_both_judges(tmp_path, monkeypatch):
-    _offline_judges(monkeypatch, judge_passed=True, grounded=False)
-    path = tmp_path / "trajectory.json"
-    path.write_text(json.dumps(_trajectory()))
     result = runner.invoke(app, ["demo", str(path)])
     assert result.exit_code == 0, result.output
-    assert result.stdout.startswith("TASK  search")
-    assert "✗  unsupported  found it" in result.stdout
-    assert "attest caught a false claim the LLM judge waved through." in result.stdout
+    comparison = _payload(result)["data"]["comparisons"][0]
+    assert comparison["outcome"] == "caught"
+    assert comparison["judge"]["passed"] is True
+    assert comparison["attest"]["passed"] is False
 
 
-def test_run_human_view_streams_reports_and_a_footer(tmp_path, monkeypatch):
-    from attest import Attest
+def _fake_evaluate(monkeypatch, *, stop_after: int | None = None):
+    from attest import Attest, BudgetExceeded
     from attest.results import CheckResult, Report
 
+    calls: list[int] = []
+
     def fake(self, traj, **kwargs):
+        if stop_after is not None and len(calls) >= stop_after:
+            raise BudgetExceeded("max_calls=1 reached")
+        calls.append(1)
         return Report(results=[CheckResult(check="tool_use", passed=True, score=1.0, summary="ok")])
 
     monkeypatch.setattr(Attest, "evaluate", fake)
     monkeypatch.setattr("attest.cli.context.resolve_key", lambda provider: "sk-test")
+
+
+def _two_trajectories(tmp_path) -> str:
     path = tmp_path / "trajectories.jsonl"
     line = json.dumps(_trajectory())
     path.write_text(f"{line}\n{line}\n")
-    result = runner.invoke(app, ["run", str(path), "--checks", "tool_use"])
+    return str(path)
+
+
+def test_run_prints_one_report_per_trajectory_and_totals(tmp_path, monkeypatch):
+    _fake_evaluate(monkeypatch)
+    result = runner.invoke(app, ["run", _two_trajectories(tmp_path), "--checks", "tool_use"])
     assert result.exit_code == 0, result.output
-    assert result.stdout.startswith("PASS  search")
-    assert result.stdout.count("PASS  search") == 2
-    assert "2/2 passed · mean overall 100%" in result.stdout
-    assert "Usage: 0 calls" in result.stdout
+    data = _payload(result)["data"]
+    assert [item["task"] for item in data["trajectories"]] == ["search", "search"]
+    assert data["trajectories"][0]["report"]["passed"] is True
+    assert (data["total"], data["evaluated"], data["passed"]) == (2, 2, 2)
+    assert data["mean_overall_score"] == 1.0
+    assert data["usage"]["calls"] == 0
+    assert data["budget_exceeded"] is None
+
+
+def test_run_stopped_by_the_budget_still_prints_json(tmp_path, monkeypatch):
+    _fake_evaluate(monkeypatch, stop_after=1)
+    result = runner.invoke(app, ["run", _two_trajectories(tmp_path), "--checks", "tool_use"])
+    assert result.exit_code == 3
+    data = _payload(result)["data"]
+    assert (data["total"], data["evaluated"]) == (2, 1)
+    assert data["budget_exceeded"] == "max_calls=1 reached"
+
+
+def test_a_missing_api_key_is_a_json_error(tmp_path, monkeypatch):
+    monkeypatch.setattr("attest.cli.context.resolve_key", lambda provider: None)
+    path = tmp_path / "trajectory.json"
+    path.write_text(json.dumps(_trajectory()))
+    result = runner.invoke(app, ["role", str(path)])
+    assert result.exit_code == 1
+    payload = _payload(result)
+    assert payload["command"] == "role"
+    assert payload["error"]["code"] == "missing_api_key"
+
+
+def test_schema_prints_the_json_schema_of_a_command():
+    result = runner.invoke(app, ["schema", "run"])
+    assert result.exit_code == 0
+    schema = _payload(result)
+    assert schema["$id"].endswith("/schemas/v1/run.json")
+    assert schema["properties"]["command"]["const"] == "run"
+    assert set(schema["required"]) == {"schema_version", "command", "ok", "data"}
+
+
+def test_schema_rejects_an_unknown_command():
+    result = runner.invoke(app, ["schema", "bogus"])
+    assert result.exit_code == 2
+    assert "Expected one of" in _error(result)
 
 
 def test_python_dash_m_runs_the_cli():
@@ -289,7 +320,17 @@ def test_python_dash_m_runs_the_cli():
         [sys.executable, "-m", "attest.cli", "--help"], capture_output=True, text=True, env=env
     )
     assert completed.returncode == 0
-    for command in ("run", "tools", "injection", "role", "review", "demo", "stats", "models"):
+    for command in (
+        "run",
+        "tools",
+        "injection",
+        "role",
+        "review",
+        "demo",
+        "stats",
+        "models",
+        "schema",
+    ):
         assert command in completed.stdout
 
 
@@ -346,13 +387,11 @@ def _fake_review(monkeypatch, seen: dict):
 def test_review_json_lists_a_decision_per_output(tmp_path, monkeypatch):
     seen: dict = {}
     _fake_review(monkeypatch, seen)
-    result = runner.invoke(
-        app, ["review", _review_file(tmp_path), "--json", "--mode", "issue=strict"]
-    )
+    result = runner.invoke(app, ["review", _review_file(tmp_path), "--mode", "issue=strict"])
     assert result.exit_code == 0, result.output
-    payload = json.loads(result.stdout)
-    assert payload["kept"] == [0]
-    assert payload["decisions"][0]["output_type"] == "issue"
+    data = _payload(result)["data"]
+    assert data["kept"] == [0]
+    assert data["decisions"][0]["output_type"] == "issue"
     assert seen["modes"] == {"issue": "strict"}
     assert seen["outputs"][0].text == "x is set to 1."
     assert seen["guidelines"].builtin
@@ -366,7 +405,7 @@ def test_review_passes_guideline_files_and_writes_when_outputs_are_missing(tmp_p
     rules.write_text("- No raw SQL.\n")
     path = tmp_path / "pr.json"
     path.write_text(json.dumps({"pr": {"diffs": {"a.py": "+x = 1\n"}}}))
-    result = runner.invoke(app, ["review", str(path), "-g", str(rules), "--no-follow", "--json"])
+    result = runner.invoke(app, ["review", str(path), "-g", str(rules), "--no-follow"])
     assert result.exit_code == 0, result.output
     assert seen["outputs"] is None
     assert seen["guidelines"].name == "REVIEW.md"
@@ -378,21 +417,13 @@ def test_review_rejects_an_unreadable_guidelines_file(tmp_path):
         app, ["review", _review_file(tmp_path), "-g", str(tmp_path / "missing.md")]
     )
     assert result.exit_code == 2
-    assert "Could not read guidelines file" in _flat(result.output)
-
-
-def test_review_human_view_is_a_table(tmp_path, monkeypatch):
-    _fake_review(monkeypatch, {})
-    result = runner.invoke(app, ["review", _review_file(tmp_path)])
-    assert result.exit_code == 0, result.output
-    assert result.stdout.startswith("KEEP  Code review")
-    assert "x is set to 1." in result.stdout
+    assert "Could not read guidelines file" in _error(result)
 
 
 def test_review_rejects_a_bad_mode(tmp_path):
     result = runner.invoke(app, ["review", _review_file(tmp_path), "--mode", "issue=loose"])
     assert result.exit_code == 2
-    assert "Expected TYPE=MODE" in _flat(result.output)
+    assert "Expected TYPE=MODE" in _error(result)
 
 
 def test_review_reports_where_the_file_is_invalid(tmp_path):
@@ -400,7 +431,7 @@ def test_review_reports_where_the_file_is_invalid(tmp_path):
     path.write_text(json.dumps({"pr": {}, "outputs": [{"output_type": "bug", "text": "x"}]}))
     result = runner.invoke(app, ["review", str(path)])
     assert result.exit_code == 2
-    assert "outputs.0.output_type" in _flat(result.output)
+    assert "outputs.0.output_type" in _error(result)
 
 
 def test_review_of_a_pr_without_diffs_is_a_usage_error(tmp_path, monkeypatch):
@@ -415,4 +446,4 @@ def test_review_of_a_pr_without_diffs_is_a_usage_error(tmp_path, monkeypatch):
     path.write_text(json.dumps({"pr": {}}))
     result = runner.invoke(app, ["review", str(path)])
     assert result.exit_code == 2
-    assert "no diffs to review" in _flat(result.output)
+    assert "no diffs to review" in _error(result)

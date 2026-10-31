@@ -1,0 +1,403 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://peace-orefejo.github.io/attest/schemas/v1/review.json",
+  "$defs": {
+    "CheckResult": {
+      "properties": {
+        "check": {
+          "title": "Check",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        },
+        "summary": {
+          "default": "",
+          "title": "Summary",
+          "type": "string"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "prompt_version": {
+          "default": "2026.10.30",
+          "title": "Prompt Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check",
+        "passed"
+      ],
+      "title": "CheckResult",
+      "type": "object"
+    },
+    "Finding": {
+      "properties": {
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "verdict": {
+          "title": "Verdict",
+          "type": "string"
+        },
+        "subject": {
+          "default": "",
+          "title": "Subject",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "severity",
+        "verdict"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "Guideline": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "section": {
+          "default": "",
+          "title": "Section",
+          "type": "string"
+        },
+        "source": {
+          "default": "",
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "title": "Guideline",
+      "type": "object"
+    },
+    "Omission": {
+      "description": "A file whose diff was summarized, cut or left out of the evidence, and why.",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "summarized",
+            "generated",
+            "truncated",
+            "budget",
+            "out_of_scope"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "changed_lines": {
+          "default": 0,
+          "title": "Changed Lines",
+          "type": "integer"
+        },
+        "omitted_hunks": {
+          "default": 0,
+          "title": "Omitted Hunks",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "reason"
+      ],
+      "title": "Omission",
+      "type": "object"
+    },
+    "OutputDecision": {
+      "properties": {
+        "index": {
+          "title": "Index",
+          "type": "integer"
+        },
+        "output_type": {
+          "enum": [
+            "issue",
+            "diff_summary",
+            "group_summary",
+            "canvas_answer"
+          ],
+          "title": "Output Type",
+          "type": "string"
+        },
+        "text": {
+          "default": "",
+          "title": "Text",
+          "type": "string"
+        },
+        "question": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Question"
+        },
+        "paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Paths",
+          "type": "array"
+        },
+        "keep": {
+          "title": "Keep",
+          "type": "boolean"
+        },
+        "mode": {
+          "enum": [
+            "lenient",
+            "strict"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        },
+        "summary": {
+          "default": "",
+          "title": "Summary",
+          "type": "string"
+        },
+        "reasons": {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "notes": {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "title": "Notes",
+          "type": "array"
+        },
+        "omissions": {
+          "items": {
+            "$ref": "#/$defs/Omission"
+          },
+          "title": "Omissions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "index",
+        "output_type",
+        "keep",
+        "mode"
+      ],
+      "title": "OutputDecision",
+      "type": "object"
+    },
+    "ReviewGuidelines": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/Guideline"
+          },
+          "title": "Rules",
+          "type": "array"
+        },
+        "builtin": {
+          "default": false,
+          "title": "Builtin",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ReviewGuidelines",
+      "type": "object"
+    },
+    "ReviewResult": {
+      "properties": {
+        "decisions": {
+          "items": {
+            "$ref": "#/$defs/OutputDecision"
+          },
+          "title": "Decisions",
+          "type": "array"
+        },
+        "injection": {
+          "$ref": "#/$defs/CheckResult"
+        },
+        "guidelines": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewGuidelines"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "written": {
+          "default": false,
+          "title": "Written",
+          "type": "boolean"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "kept": {
+          "items": {
+            "type": "integer"
+          },
+          "readOnly": true,
+          "title": "Kept",
+          "type": "array"
+        },
+        "dropped": {
+          "items": {
+            "type": "integer"
+          },
+          "readOnly": true,
+          "title": "Dropped",
+          "type": "array"
+        }
+      },
+      "required": [
+        "decisions",
+        "injection",
+        "kept",
+        "dropped"
+      ],
+      "title": "ReviewResult",
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "pass",
+        "warn",
+        "fail"
+      ],
+      "title": "Severity",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "command": {
+      "const": "review",
+      "title": "Command",
+      "type": "string"
+    },
+    "ok": {
+      "const": true,
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "data": {
+      "$ref": "#/$defs/ReviewResult"
+    }
+  },
+  "required": [
+    "schema_version",
+    "command",
+    "ok",
+    "data"
+  ],
+  "title": "attest review",
+  "type": "object"
+}

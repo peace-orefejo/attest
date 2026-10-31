@@ -40,14 +40,19 @@ the evidence the run contains. `examples/quickstart.py` is a complete, runnable 
 
 ## In CI
 
-Run attest over a JSONL file of recorded runs and fail the build when a check fails:
+Run attest over a JSONL file of recorded runs, then gate on the pass rate's confidence interval
+rather than on a single run, so one noisy run can't fail the build:
 
 ```bash
-attest run evals/runs.jsonl --json > report.json
+attest run evals/runs.jsonl > report.json
+jq -e '.ok' report.json
+passed=$(jq '.data.passed' report.json)
+graded=$(jq '.data.evaluated' report.json)
+attest stats "$passed" "$graded" | jq -e '.data.low >= 0.8'
 ```
 
-Gate on pass rates with their confidence intervals, not on a single run, so one noisy run can't
-fail the build.
+`jq -e` exits non-zero when its result is `false`, which fails the step. Keep `report.json` as a
+build artifact: every finding, with its evidence, is in it.
 
 ## AI code review pipelines
 

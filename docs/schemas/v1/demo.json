@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://peace-orefejo.github.io/attest/schemas/v1/demo.json",
+  "$defs": {
+    "CheckResult": {
+      "properties": {
+        "check": {
+          "title": "Check",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        },
+        "summary": {
+          "default": "",
+          "title": "Summary",
+          "type": "string"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "prompt_version": {
+          "default": "2026.10.30",
+          "title": "Prompt Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check",
+        "passed"
+      ],
+      "title": "CheckResult",
+      "type": "object"
+    },
+    "DemoComparison": {
+      "properties": {
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "answer": {
+          "title": "Answer",
+          "type": "string"
+        },
+        "judge": {
+          "$ref": "#/$defs/JudgeVerdict"
+        },
+        "attest": {
+          "$ref": "#/$defs/CheckResult"
+        },
+        "outcome": {
+          "enum": [
+            "caught",
+            "both_caught",
+            "both_passed",
+            "judge_only"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task",
+        "answer",
+        "judge",
+        "attest",
+        "outcome"
+      ],
+      "title": "DemoComparison",
+      "type": "object"
+    },
+    "DemoData": {
+      "description": "`attest demo`: the naive LLM judge and attest side by side, per trajectory.",
+      "properties": {
+        "comparisons": {
+          "items": {
+            "$ref": "#/$defs/DemoComparison"
+          },
+          "title": "Comparisons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "comparisons"
+      ],
+      "title": "DemoData",
+      "type": "object"
+    },
+    "Finding": {
+      "properties": {
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "verdict": {
+          "title": "Verdict",
+          "type": "string"
+        },
+        "subject": {
+          "default": "",
+          "title": "Subject",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "severity",
+        "verdict"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "JudgeVerdict": {
+      "description": "Whether the agent's final answer is good, with a reason.",
+      "properties": {
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "passed"
+      ],
+      "title": "JudgeVerdict",
+      "type": "object"
+    },
+    "Severity": {
+      "enum": [
+        "pass",
+        "warn",
+        "fail"
+      ],
+      "title": "Severity",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "command": {
+      "const": "demo",
+      "title": "Command",
+      "type": "string"
+    },
+    "ok": {
+      "const": true,
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "data": {
+      "$ref": "#/$defs/DemoData"
+    }
+  },
+  "required": [
+    "schema_version",
+    "command",
+    "ok",
+    "data"
+  ],
+  "title": "attest demo",
+  "type": "object"
+}

@@ -5,16 +5,13 @@ from pathlib import Path
 
 from ..results import CheckResult
 from ..trajectory import Trajectory
+from .json_output import CheckData, emit
 from .loading import load_trajectories
 from .outcomes import TaskResult
-from .rendering import emit_json, render_task_results
 
 CheckFn = Callable[[Trajectory], CheckResult]
 
 
-def run_single_check(path: Path, check: CheckFn, *, json_output: bool) -> None:
+def run_single_check(command: str, path: Path, check: CheckFn) -> None:
     results = [TaskResult(task=traj.task, result=check(traj)) for traj in load_trajectories(path)]
-    if json_output:
-        emit_json([item.to_json() for item in results])
-        return
-    render_task_results(results)
+    emit(command, CheckData(trajectories=results))

@@ -185,13 +185,13 @@ def test_cli_run_stops_at_the_call_budget(tmp_path, monkeypatch):
     line = _traj().model_dump_json()
     path.write_text(f"{line}\n{line}\n")
 
-    result = CliRunner().invoke(app, ["run", str(path), "--json", "--max-calls", "3"])
+    result = CliRunner().invoke(app, ["run", str(path), "--max-calls", "3"])
 
-    assert result.exit_code == 2
-    payload = json.loads(result.stdout)
-    assert len(payload["trajectories"]) == 1
-    assert payload["usage"]["calls"] == 3
-    assert "Call budget" in payload["budget_exceeded"]
+    assert result.exit_code == 3
+    data = json.loads(result.stdout)["data"]
+    assert len(data["trajectories"]) == 1
+    assert data["usage"]["calls"] == 3
+    assert "Call budget" in data["budget_exceeded"]
 
 
 class _Capturing(_MeteredClient):

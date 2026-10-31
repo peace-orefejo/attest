@@ -17,21 +17,9 @@ A run (`Trajectory`) records one task from start to finish:
 
 ## Evidence
 
-Tool outputs are the only evidence attest trusts. `Trajectory.evidence()` puts each tool call in
-its own block, and those blocks are all the judge sees beside the claim it's checking:
-
-```text
-<tool_output index="0" name="get_population" arguments="{&quot;city&quot;: &quot;Paris&quot;}">
-Paris population (city proper): 2,103,000
-</tool_output>
-```
-
-Any `<tool_output` or `</tool_output` text inside an output is escaped, so a web page, file or
-diff can't close its own block or pass itself off as another tool's result. The judge is told
-that only an opening tag says where a block came from.
-
-The agent's `thought` text is never shown to the judge. A run whose reasoning argues
-persuasively for a wrong answer gets the same verdict as a run with no reasoning at all.
+Tool outputs are the only evidence attest trusts. Each one goes to the judge in its own escaped
+block, so a web page or file can't pass itself off as another tool's result. The agent's
+`thought` text is never shown to the judge.
 
 ## Claims and verdicts
 
@@ -58,20 +46,11 @@ What counts as "supported" depends on what the answer is. Pass `answer_kind` to 
 | `code` | Outputs of an AI code reviewer. | The diff and source must support the claim, read with the language's semantics. See [Code review mode](code-review/index.md). |
 | `auto` | Mixed workloads. | Picks `factual` or `code` from the shape of the evidence. |
 
-Each kind has its own prompts. Changing one kind's prompts can't change another's grading, and
-tests pin each prompt by hash.
-
 ## Reports
 
-`Attest.evaluate` returns a `Report`:
-
-- `results` holds one `CheckResult` per check, each with `passed`, `score`, `summary` and `findings`.
-- `passed` is true only when every check passed.
-- `overall_score` is the mean of the checks that produce a score, or `None` when none does.
-- `by("faithfulness")` returns one check's result.
-
-Every result records the `prompt_version` it was graded with, so scores from different
-versions are never silently compared.
+`Attest.evaluate` returns a `Report` with one result per check. It passes only when every check
+passes, and `overall_score` is the mean of the checks that score. Each result records the
+`prompt_version` it was graded with.
 
 ## Scores and error bars
 

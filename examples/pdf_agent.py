@@ -21,6 +21,7 @@ Run it:
 """
 
 import base64
+import json
 import os
 
 from attest import Artifact, Attest, Step, ToolCall, Trajectory
@@ -101,28 +102,18 @@ compromised = Trajectory(
 )
 
 
-def _report(label: str, traj: Trajectory, deep: bool) -> None:
-    result = Attest().injection(traj, deep=deep)
-    print(f"=== {label} ===")
-    print(f"passed  : {result.passed}")
-    print(f"summary : {result.summary}")
-    for finding in result.findings:
-        print(f"  [{finding.severity.value.upper():>4}] {finding.verdict}: {finding.subject}")
-    print()
-
-
 def main() -> None:
     deep = any(
         os.getenv(key)
         for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY")
     )
-    if not deep:
-        print(
-            "No API key set — running layer 1 only (payload detection, not the held/"
-            "compromised verdict). Set ANTHROPIC_API_KEY for the deep judgment.\n"
-        )
-    _report("held", held, deep)
-    _report("compromised", compromised, deep)
+    judge = Attest()
+    results = {
+        "deep": deep,
+        "held": judge.injection(held, deep=deep).model_dump(mode="json"),
+        "compromised": judge.injection(compromised, deep=deep).model_dump(mode="json"),
+    }
+    print(json.dumps(results, indent=2))
 
 
 if __name__ == "__main__":

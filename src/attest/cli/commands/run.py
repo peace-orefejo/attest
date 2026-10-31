@@ -9,11 +9,13 @@ from ...llm import Budget
 from ...scoring.report import DEFAULT_CHECKS, validate_evaluation_options
 from ..context import require_key
 from ..evaluation import EvaluationSettings, evaluate_all
+from ..json_output import EXIT_BUDGET_EXCEEDED, RunData, emit, json_command
 from ..loading import load_trajectories
-from ..options import JSON_OPTION, KIND_OPTION, MODEL_OPTION, PROVIDER_OPTION
-from ..rendering import ReportPrinter, emit_json, render_run_summary
+from ..options import KIND_OPTION, MODEL_OPTION, PROVIDER_OPTION
+from ..outcomes import RunOutcome
 
 
+@json_command("run")
 def run(
     path: Path,
     checks: str = typer.Option(
@@ -27,7 +29,6 @@ def run(
     kind: str = KIND_OPTION,
     provider: str = PROVIDER_OPTION,
     model: str | None = MODEL_OPTION,
-    json_output: bool = JSON_OPTION,
     max_calls: int | None = typer.Option(
         None, "--max-calls", help="Stop before exceeding this many judge calls."
     ),
@@ -50,15 +51,11 @@ def run(
         cache=cache_dir or False,
     )
     settings = EvaluationSettings(checks=selected, appropriate=appropriate, kind=kind)
-    on_report = None if json_output else ReportPrinter()
-    outcome = evaluate_all(judge, trajectories, settings, on_report=on_report)
+    outcome = evaluate_all(judge, trajectories, settings)
 
-    if json_output:
-        emit_json(outcome.to_json())
-    else:
-        render_run_summary(outcome)
+    emit("run", _run_data(outcome))
     if outcome.stopped:
-        raise typer.Exit(code=2)
+        raise typer.Exit(code=EXIT_BUDGET_EXCEEDED)
 
 
 def _selected_checks(checks: str, kind: str) -> list[str]:
@@ -68,6 +65,18 @@ def _selected_checks(checks: str, kind: str) -> list[str]:
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
     return selected
+
+
+def _run_data(outcome: RunOutcome) -> RunData:
+    return RunData(
+        trajectories=outcome.reports,
+        total=outcome.total,
+        evaluated=len(outcome.reports),
+        passed=sum(item.report.passed for item in outcome.reports),
+        mean_overall_score=outcome.mean_overall_score,
+        usage=outcome.usage,
+        budget_exceeded=outcome.stopped,
+    )
 
 
 def _budget(max_calls: int | None, max_tokens: int | None) -> Budget | None:
