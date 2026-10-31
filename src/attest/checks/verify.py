@@ -90,7 +90,11 @@ def judge_trajectory(
         score=None if unscorable else (supported / checkable if checkable else 1.0),
         summary=summary,
         findings=findings,
-        metadata=evidence.metadata(),
+        metadata={
+            **evidence.metadata(),
+            "claims_checked": checkable,
+            "claims_total": len(findings),
+        },
     )
 
 

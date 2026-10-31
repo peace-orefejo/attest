@@ -28,6 +28,14 @@ result = report.by("faithfulness")
 
 The score is `supported / (supported + unsupported)`. Unverifiable claims don't count against
 the score, but they appear as warnings. The check passes only when nothing is unsupported.
+`metadata` counts the claims checked against the evidence (`claims_checked`) and in total
+(`claims_total`).
+
+**Inconclusive is not a pass.** When the answer has claims but none of them can be checked
+(for example, the run recorded no relevant evidence), there's no score and the report's verdict
+is `review`, not `pass`. Change it with
+`VerdictPolicy(on_inconclusive_faithfulness=...)`. An answer that makes no claims at all
+passes.
 
 ## Files as evidence
 

@@ -5,6 +5,25 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-31
+
+### Fixed
+- An answer whose claims couldn't be checked against any evidence no longer passes. A
+  faithfulness result with claims but none checkable now gets the `review` disposition, so the
+  report's verdict is `review` instead of `pass` (`VerdictPolicy(on_inconclusive_faithfulness=...)`
+  changes it). Answers with no claims still pass. `CheckResult.passed` is unchanged.
+
+### Added
+- Faithfulness results record `claims_checked` and `claims_total` in `metadata`, so a pass
+  shows how much was actually checked.
+- A Limitations page: what attest assumes (authentic, complete runs), where its checks rely on
+  heuristics, and how to use its results safely.
+
+### Deprecated
+- `ToolUsePolicy(on_invalid_arguments=...)` has no effect, because no check reports invalid
+  arguments; setting it now raises a `DeprecationWarning`. It will be removed in a future minor
+  release.
+
 ## [0.8.0] - 2026-10-31
 
 ### Added

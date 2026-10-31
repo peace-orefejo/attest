@@ -201,3 +201,43 @@ def test_attest_disposes_project_policy_findings():
     report = Attest(policy=rules).evaluate(traj, checks=["tool_use"])
     assert report.by("policy").findings[0].disposition == "review"
     assert report.verdict == "review"
+
+
+def test_inconclusive_faithfulness_is_review_not_pass():
+    report = _report(("faithfulness", [_finding("unverifiable", WARN)], None))
+    disposed = apply_verdict_policy(report)
+    assert disposed.verdict == "review"
+    assert disposed.results[0].findings[0].disposition == "review"
+
+
+def test_one_checked_claim_keeps_other_unverifiable_claims_passing():
+    report = _report(
+        (
+            "faithfulness",
+            [_finding("supported", PASS), _finding("unverifiable", WARN)],
+            1.0,
+        )
+    )
+    assert apply_verdict_policy(report).verdict == "pass"
+
+
+def test_inconclusive_faithfulness_disposition_is_configurable():
+    report = _report(("faithfulness", [_finding("unverifiable", WARN)], None))
+    policy = VerdictPolicy(on_inconclusive_faithfulness="block")
+    assert apply_verdict_policy(report, policy).verdict == "block"
+
+
+def test_an_answer_with_no_claims_is_not_inconclusive():
+    report = _report(("faithfulness", [], 1.0))
+    assert apply_verdict_policy(report).verdict == "pass"
+
+
+def test_on_invalid_arguments_is_deprecated():
+    with pytest.warns(DeprecationWarning, match="no effect"):
+        ToolUsePolicy(on_invalid_arguments="block")
+
+
+def test_the_default_tool_use_policy_raises_no_warning(recwarn):
+    ToolUsePolicy()
+    VerdictPolicy()
+    assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]

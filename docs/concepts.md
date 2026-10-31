@@ -100,8 +100,9 @@ decides what to do with the verdict.
 By default these block: an `unsupported` claim, a disallowed tool, a tool error the answer
 reported as success, a `compromised` injection, an out-of-scope request the agent complied with,
 and a failed `fail`-severity policy rule. These go to review: a tool error the agent ignored, an
-unnecessary tool call, and a `warn`-severity policy rule. Injection warnings and `unverifiable`
-claims pass. Any other failed finding blocks.
+unnecessary tool call, a `warn`-severity policy rule, and a faithfulness result where no claim
+could be checked against the evidence. Injection warnings pass, and so do `unverifiable` claims
+when at least one other claim was checked. Any other failed finding blocks.
 
 ```python
 from attest import Attest, ToolUsePolicy, VerdictPolicy
@@ -118,9 +119,8 @@ if report.verdict == "block":
     raise SystemExit(f"blocked by {report.blocking}")
 ```
 
-`ToolUsePolicy` also takes `on_disallowed_tool`, `on_claimed_success`, `on_unnecessary_call`
-and `on_invalid_arguments`. No check reports invalid arguments yet, so that setting has no
-effect for now.
+`ToolUsePolicy` also takes `on_disallowed_tool`, `on_claimed_success` and `on_unnecessary_call`.
+`VerdictPolicy` also takes `on_inconclusive_faithfulness` (default `review`).
 
 ## Pass rates and confidence
 
@@ -142,4 +142,5 @@ difference_is_real(41, 50, 35, 50)   # False: the gap is within noise
 
 attest is read-only. It never runs your tools, calls your agent, or needs credentials for
 anything except the grading model. It can only check what the run recorded, so a tool output
-that is missing from the run can't be used as evidence.
+that is missing from the run can't be used as evidence. [Limitations](limitations.md) lists what
+attest assumes and where its checks rely on heuristics.

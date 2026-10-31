@@ -258,7 +258,7 @@ def test_a_claim_supported_only_by_a_text_artifact_reaches_the_verifier(monkeypa
     assert first.metadata["location"] == "steps[0].tool_call.artifacts[0]"
     assert second.metadata["location"] == "steps[1].tool_call.output"
     assert "location" not in third.metadata
-    assert result.metadata == {}
+    assert result.metadata == {"claims_checked": 2, "claims_total": 3}
 
 
 def test_findings_without_a_quote_get_no_location():
@@ -267,3 +267,15 @@ def test_findings_without_a_quote_get_no_location():
 
     result = judge_trajectory(_refund_run(), lambda _: ["c"], fake_verify)
     assert result.findings[0].metadata == {}
+
+
+def test_coverage_counts_checked_and_total_claims():
+    def verify(claims, evidence):
+        return [
+            Finding(severity=Severity.PASS, verdict="supported", subject=claims[0]),
+            Finding(severity=Severity.WARN, verdict="unverifiable", subject=claims[1]),
+        ]
+
+    result = judge_trajectory(_example(), lambda a: ["c1", "c2"], verify)
+    assert result.metadata["claims_checked"] == 1
+    assert result.metadata["claims_total"] == 2

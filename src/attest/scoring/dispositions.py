@@ -39,13 +39,23 @@ def disposition_for(check: str, finding: Finding, policy: VerdictPolicy) -> Disp
 
 def _dispose_result(result: CheckResult, policy: VerdictPolicy) -> CheckResult:
     below_floor = _below_min_score(result, policy)
+    inconclusive = _inconclusive_faithfulness(result)
     findings: list[Finding] = []
     for finding in result.findings:
         disposition = disposition_for(result.check, finding, policy)
+        if inconclusive and finding.verdict == "unverifiable":
+            disposition = policy.on_inconclusive_faithfulness
         if below_floor and disposition == "pass":
             disposition = "review"
         findings.append(finding.model_copy(update={"disposition": disposition}))
     return result.model_copy(update={"findings": findings})
+
+
+def _inconclusive_faithfulness(result: CheckResult) -> bool:
+    """Faithfulness had claims, but not one could be checked against the evidence."""
+    if result.check != "faithfulness" or not result.findings:
+        return False
+    return all(finding.verdict == "unverifiable" for finding in result.findings)
 
 
 def _below_min_score(result: CheckResult, policy: VerdictPolicy) -> bool:
@@ -63,7 +73,7 @@ def _tool_use(finding: Finding, policy: ToolUsePolicy) -> Disposition | None:
         "error_claimed_success": policy.on_claimed_success,
         "inappropriate": policy.on_unnecessary_call,
         "unnecessary_call": policy.on_unnecessary_call,
-        "invalid_arguments": policy.on_invalid_arguments,
+        "invalid_arguments": policy.on_invalid_arguments or "review",
     }
     return by_verdict.get(finding.verdict)
 
