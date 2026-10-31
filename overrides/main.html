@@ -11,11 +11,13 @@
 {% block extrahead %}
   {% if page.is_homepage %}
     {% set title = config.site_name ~ ": evidence-grounded evaluation for AI agents" %}
+  {% elif page.meta and page.meta.title %}
+    {% set title = page.meta.title ~ " - " ~ config.site_name %}
   {% else %}
     {% set title = (page.title | striptags) ~ " - " ~ config.site_name %}
   {% endif %}
   {% set description = page.meta.description if page.meta and page.meta.description else config.site_description %}
-  {% set image = config.site_url ~ "assets/brand/attest-social.png" %}
+  {% set image = config.site_url ~ "assets/brand/attest-card.png" %}
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="{{ config.site_name }}">
   <meta property="og:title" content="{{ title }}">
