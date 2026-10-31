@@ -5,10 +5,6 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
-### Changed
-- **License:** attest is now licensed under the GNU Affero General Public License v3.0
-  (`AGPL-3.0-only`). Versions 0.7.0 and earlier remain available under the MIT License.
-
 ### Added
 - Opt-in response caching via `Attest(cache=True)` (or a shared dict), so re-evaluating an
   identical run reuses judge calls without collapsing `vote` self-consistency.
@@ -52,6 +48,8 @@ All notable changes to `agent-attest` are documented here. This project follows
 - Two new default injection detectors: hidden Unicode (bidi controls, zero-width and tag
   characters) and encoded payloads (base64 and hex that decode to instructions).
 ### Changed
+- **License:** attest is now licensed under the GNU Affero General Public License v3.0
+  (`AGPL-3.0-only`). Versions 0.7.0 and earlier remain available under the MIT License.
 - **Breaking:** every CLI command prints JSON, and only JSON. The text view and the `--json`
   flag are gone. Each command prints one envelope, `{"schema_version": "1", "command": ...,
   "ok": true, "data": ...}`, and a command that can't run prints `"ok": false` with an
