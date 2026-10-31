@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..results import CheckResult, Disposition, Finding, Report, Severity
+from ..results import CheckResult, Disposition, Finding, Report, Severity, claim_coverage
 from .verdict_policy import ToolUsePolicy, VerdictPolicy
 
 _FAITHFULNESS: dict[str, Disposition] = {
@@ -38,7 +38,7 @@ def disposition_for(check: str, finding: Finding, policy: VerdictPolicy) -> Disp
 
 
 def _dispose_result(result: CheckResult, policy: VerdictPolicy) -> CheckResult:
-    below_floor = _below_min_score(result, policy)
+    below_floor = _below_min_score(result, policy) or _below_min_coverage(result, policy)
     inconclusive = _inconclusive_faithfulness(result)
     findings: list[Finding] = []
     for finding in result.findings:
@@ -56,6 +56,14 @@ def _inconclusive_faithfulness(result: CheckResult) -> bool:
     if result.check != "faithfulness" or not result.findings:
         return False
     return all(finding.verdict == "unverifiable" for finding in result.findings)
+
+
+def _below_min_coverage(result: CheckResult, policy: VerdictPolicy) -> bool:
+    floor = policy.min_claim_coverage
+    if floor is None or result.check != "faithfulness":
+        return False
+    coverage = claim_coverage(result)
+    return coverage is not None and coverage < floor
 
 
 def _below_min_score(result: CheckResult, policy: VerdictPolicy) -> bool:
