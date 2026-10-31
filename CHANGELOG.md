@@ -47,6 +47,7 @@ All notable changes to `agent-attest` are documented here. This project follows
   and records the choice in the report metadata.
 - Two new default injection detectors: hidden Unicode (bidi controls, zero-width and tag
   characters) and encoded payloads (base64 and hex that decode to instructions).
+
 ### Changed
 - **License:** attest is now licensed under the GNU Affero General Public License v3.0
   (`AGPL-3.0-only`). Versions 0.7.0 and earlier remain available under the MIT License.
