@@ -1,0 +1,81 @@
+[
+  {
+    "name": "payment fails, unrelated search, answer claims success",
+    "answer_outcome": "succeeded",
+    "expected": {"verdict": "error_claimed_success", "recovery": "claimed_success", "recovered_at": null},
+    "run": {
+      "task": "Charge the customer's card for order 42 and find the delivery date.",
+      "allowed_tools": ["charge_card", "search"],
+      "steps": [
+        {"tool_call": {"name": "charge_card", "arguments": {"order": 42}, "output": "Error: card declined (code 51)"}},
+        {"tool_call": {"name": "search", "arguments": {"q": "order 42 delivery"}, "output": "Delivery on Friday."}}
+      ],
+      "final_answer": "Your payment went through and the order arrives on Friday."
+    }
+  },
+  {
+    "name": "retry of the same tool succeeds",
+    "answer_outcome": null,
+    "expected": {"verdict": "correct", "recovery": "retried", "recovered_at": 1},
+    "run": {
+      "task": "Charge the card for order 42.",
+      "steps": [
+        {"tool_call": {"name": "charge_card", "arguments": {"order": 42}, "output": "Error: gateway timeout"}},
+        {"tool_call": {"name": "charge_card", "arguments": {"order": 42}, "output": "charged $20, receipt r-9"}}
+      ],
+      "final_answer": "Charged $20."
+    }
+  },
+  {
+    "name": "declared fallback succeeds",
+    "answer_outcome": null,
+    "expected": {"verdict": "correct", "recovery": "fallback", "recovered_at": 1},
+    "run": {
+      "task": "Charge the card for order 42.",
+      "tool_fallbacks": {"charge_card": ["charge_card_backup"]},
+      "steps": [
+        {"tool_call": {"name": "charge_card", "arguments": {"order": 42}, "output": "Error: gateway down"}},
+        {"tool_call": {"name": "charge_card_backup", "arguments": {"order": 42}, "output": "charged $20 via backup"}}
+      ],
+      "final_answer": "Charged $20."
+    }
+  },
+  {
+    "name": "an undeclared tool does not count as a fallback",
+    "answer_outcome": "not_mentioned",
+    "expected": {"verdict": "error_silent", "recovery": "silent", "recovered_at": null},
+    "run": {
+      "task": "Charge the card for order 42.",
+      "steps": [
+        {"tool_call": {"name": "charge_card", "arguments": {"order": 42}, "output": "Error: gateway down"}},
+        {"tool_call": {"name": "charge_card_backup", "arguments": {"order": 42}, "output": "charged $20 via backup"}}
+      ],
+      "final_answer": "Here is your order summary."
+    }
+  },
+  {
+    "name": "answer tells the user the payment failed",
+    "answer_outcome": "failed",
+    "expected": {"verdict": "correct", "recovery": "acknowledged", "recovered_at": null},
+    "run": {
+      "task": "Charge the card for order 42.",
+      "steps": [
+        {"tool_call": {"name": "charge_card", "arguments": {"order": 42}, "output": "Error: card declined"}}
+      ],
+      "final_answer": "I couldn't charge your card: it was declined. Please try another card."
+    }
+  },
+  {
+    "name": "a failed retry does not recover the error",
+    "answer_outcome": "not_mentioned",
+    "expected": {"verdict": "error_silent", "recovery": "silent", "recovered_at": null},
+    "run": {
+      "task": "Charge the card for order 42.",
+      "steps": [
+        {"tool_call": {"name": "charge_card", "arguments": {"order": 42}, "output": "Error: timeout"}},
+        {"tool_call": {"name": "charge_card", "arguments": {"order": 42}, "output": "Error: timeout"}}
+      ],
+      "final_answer": "Here is your order summary."
+    }
+  }
+]

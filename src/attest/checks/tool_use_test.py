@@ -1,5 +1,6 @@
 """Tool-use correctness — deterministic checks offline, `appropriate` mocks `call`."""
 
+import attest.checks.tool_recovery as tr
 import attest.checks.tool_use as tu
 from attest.checks.tool_use import check_tool_use
 from attest.trajectory import Step, ToolCall, Trajectory
@@ -31,7 +32,7 @@ def test_all_allowed_no_errors_is_correct():
     assert "Sequence: search -> summarize" in result.summary
 
 
-def test_disallowed_tool_is_incorrect():
+def test_disallowed_tool_fails():
     result = check_tool_use(
         _traj(
             ("search", {}, "ok"),
@@ -40,27 +41,29 @@ def test_disallowed_tool_is_incorrect():
         )
     )
     bad = next(f for f in result.findings if f.subject == "delete_everything")
-    assert bad.verdict == "incorrect"
+    assert bad.verdict == "disallowed_tool"
     assert bad.metadata["allowed"] is False
     assert "not in the agent's allowed tools" in bad.reason
     assert not result.passed
 
 
-def test_unhandled_error_is_incorrect():
+def test_error_followed_by_an_unrelated_call_is_not_handled():
     result = check_tool_use(
         _traj(
-            ("search", {}, "ok"),
             ("fetch", {}, "Error: connection refused"),
+            ("search", {}, "ok"),
             allowed=["search", "fetch"],
         )
     )
-    err = next(f for f in result.findings if f.subject == "fetch")
-    assert err.verdict == "incorrect"
-    assert err.metadata["error_handled"] is False
-    assert "error" in err.reason.lower()
+    err = result.findings[0]
+    assert err.verdict == "error_silent"
+    assert err.metadata["recovery"] == "unchecked"
+    assert err.metadata["recovered_at"] is None
+    assert err.evidence == "Error: connection refused"
+    assert not result.passed
 
 
-def test_handled_error_is_correct():
+def test_retried_error_is_correct():
     result = check_tool_use(
         _traj(
             ("fetch", {}, "Error: timeout"),
@@ -69,8 +72,17 @@ def test_handled_error_is_correct():
         )
     )
     first = result.findings[0]
-    assert first.metadata["error_handled"] is True
+    assert first.metadata["recovery"] == "retried"
+    assert first.metadata["recovered_at"] == 1
     assert first.verdict == "correct"
+    assert result.passed
+
+
+def test_disallowed_tool_takes_precedence_over_its_error():
+    result = check_tool_use(_traj(("rm", {}, "Error: denied"), allowed=["search"]))
+    finding = result.findings[0]
+    assert finding.verdict == "disallowed_tool"
+    assert finding.metadata["recovery"] == "unchecked"
 
 
 def test_no_allowed_list_means_cannot_disallow():
@@ -100,6 +112,13 @@ def test_appropriate_check_can_fail(monkeypatch):
     assert f.metadata["appropriate"] is False
     assert f.verdict == "incorrect"
     assert "wrong tool" in f.reason
+
+
+def test_appropriate_also_asks_about_unrecovered_errors(monkeypatch):
+    monkeypatch.setattr(tu, "call", lambda **k: tu._AppropriatenessOut(appropriate=True))
+    monkeypatch.setattr(tr, "call", lambda **k: tr._AnswerReport(outcome="succeeded"))
+    result = check_tool_use(_traj(("pay", {}, "Error: declined")), appropriate=True)
+    assert result.findings[0].verdict == "error_claimed_success"
 
 
 def test_fast_mode_skips_llm(monkeypatch):

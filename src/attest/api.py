@@ -154,9 +154,14 @@ class Attest:
             }
         }
 
-    def tool_use(self, traj: Trajectory, *, appropriate: bool = False) -> CheckResult:
-        with self._llm_context(appropriate):
-            return check_tool_use(traj, appropriate=appropriate)
+    def tool_use(
+        self, traj: Trajectory, *, appropriate: bool = False, check_answer: bool | None = None
+    ) -> CheckResult:
+        """Run the tool-use check. `check_answer=True` reads the final answer for unrecovered
+        tool errors without the per-call tool-choice check; it defaults to `appropriate`."""
+        answer = appropriate if check_answer is None else check_answer
+        with self._llm_context(appropriate or answer):
+            return check_tool_use(traj, appropriate=appropriate, check_answer=answer)
 
     def injection(
         self,
