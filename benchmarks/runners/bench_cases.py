@@ -140,7 +140,7 @@ class RoleExpected(_Strict):
 Expected = (
     FaithfulnessExpected | ToolUseExpected | RecoveryExpected | InjectionExpected | RoleExpected
 )
-_EXPECTED_MODEL: dict[str, type[Expected]] = {
+EXPECTED_MODEL: dict[str, type[Expected]] = {
     "faithfulness": FaithfulnessExpected,
     "tool_use": ToolUseExpected,
     "recovery": RecoveryExpected,
@@ -166,13 +166,13 @@ class Case(_Strict):
     @classmethod
     def _parse_for_check(cls, value: object, info: ValidationInfo) -> object:
         check = info.data.get("check")
-        if not isinstance(check, str) or check not in _EXPECTED_MODEL:
+        if not isinstance(check, str) or check not in EXPECTED_MODEL:
             return value
-        return _EXPECTED_MODEL[check].model_validate(value)
+        return EXPECTED_MODEL[check].model_validate(value)
 
     @model_validator(mode="after")
     def _consistent(self) -> Case:
-        if type(self.expected) is not _EXPECTED_MODEL[self.check]:
+        if type(self.expected) is not EXPECTED_MODEL[self.check]:
             raise ValueError(f"expected does not match check {self.check!r}")
         if self.label_status == "confirmed" and len(set(self.annotators)) < 2:
             raise ValueError("a confirmed case needs at least two distinct annotators")
