@@ -6,6 +6,8 @@ All notable changes to `agent-attest` are documented here. This project follows
 ## [Unreleased]
 
 ### Added
+- `from_haystack_messages` converts a Haystack 2.x `Agent` run (`ChatMessage` objects or their
+  `to_dict()` form) into a `Trajectory`, pairing each tool call with its result.
 - Opt-in response caching via `Attest(cache=True)` (or a shared dict), so re-evaluating an
   identical run reuses judge calls without collapsing `vote` self-consistency.
 - Spend controls: `Attest(budget=Budget(max_calls=..., max_tokens=...))` fails closed with
