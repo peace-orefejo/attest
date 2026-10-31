@@ -49,6 +49,10 @@ All notable changes to `agent-attest` are documented here. This project follows
   characters) and encoded payloads (base64 and hex that decode to instructions).
 
 ### Changed
+- Curated model lists and defaults updated. Defaults: `claude-haiku-5-5` (was `claude-haiku-4-5`),
+  `gpt-6-luna` (was `gpt-5.6-luna`), `gemini-3.8-flash` (was `gemini-3.6-flash`). Added
+  `claude-fable-5-1`, the GPT-6 / GPT-6.1 family and `gemini-4-argon`; dropped retired or
+  superseded models such as `gemini-2.5-pro`. Any model id can still be passed with `model=`.
 - **License:** attest is now licensed under the GNU Affero General Public License v3.0
   (`AGPL-3.0-only`). Versions 0.7.0 and earlier remain available under the MIT License.
 - **Breaking:** every CLI command prints JSON, and only JSON. The text view and the `--json`

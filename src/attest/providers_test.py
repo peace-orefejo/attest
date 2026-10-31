@@ -25,7 +25,7 @@ from attest.providers import (
 
 def test_registry_basics():
     assert set(providers()) == {"anthropic", "openai", "gemini"}
-    assert default_model("anthropic") == "claude-haiku-4-5"
+    assert default_model("anthropic") == "claude-haiku-5-5"
     for prov in providers():
         assert curated_models(prov)
 
@@ -203,7 +203,9 @@ def test_anthropic_client_keeps_temperature_for_models_that_accept_it():
     assert fake.kwargs["extra_body"] == {"temperature": 0}
 
 
-@pytest.mark.parametrize("model", ["claude-opus-4-8", "claude-opus-5", "claude-haiku-5-5"])
+@pytest.mark.parametrize(
+    "model", ["claude-opus-4-8", "claude-opus-5", "claude-haiku-5-5", "claude-fable-5-1"]
+)
 def test_anthropic_client_drops_temperature_for_newer_models(model):
     client, fake = _anthropic_client(model, _Parsed(VerdictOut(verdict="supported")))
     client.create(response_model=VerdictOut, messages=_messages(), max_tokens=64, temperature=0)

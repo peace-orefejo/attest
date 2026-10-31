@@ -10,7 +10,7 @@ attest grades with Anthropic, OpenAI or Gemini models. Pick one when you create 
 from attest import Attest
 
 Attest()                                        # Anthropic, default model
-Attest(provider="openai", model="gpt-5.6-luna")
+Attest(provider="openai", model="gpt-6.1-terra")
 Attest(provider="gemini")
 Attest.models("openai")                         # models you can use
 ```
