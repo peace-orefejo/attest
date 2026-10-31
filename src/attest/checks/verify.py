@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Literal
 
 from pydantic import BaseModel
 
@@ -15,20 +14,18 @@ from ..prompts.faithfulness import (
     extract_user,
     verify_user,
 )
-from ..results import CheckResult, Finding, Severity
+from ..results import CheckResult, Finding
 from ..trajectory import Trajectory
 from .artifact_evidence import ArtifactExtraction, current_extraction, gather_evidence
+from .claim_findings import (
+    NO_EVIDENCE_REASON,
+    ClaimVerdict,
+    faithfulness_summary,
+    unverifiable,
+    verdict_finding,
+)
 from .profiles import get_profile
 from .provenance import with_locations
-
-ClaimVerdict = Literal["supported", "unsupported", "unverifiable"]
-
-_SEVERITY: dict[ClaimVerdict, Severity] = {
-    "supported": Severity.PASS,
-    "unsupported": Severity.FAIL,
-    "unverifiable": Severity.WARN,
-}
-_NO_EVIDENCE_REASON = "No tool-output evidence was recorded."
 
 MAX_CLAIMS = 40
 BATCH_SIZE = 15
@@ -84,7 +81,7 @@ def judge_trajectory(
     unsupported = sum(finding.verdict == "unsupported" for finding in findings)
     checkable = supported + unsupported
     unscorable = bool(findings) and not checkable
-    summary = _faithfulness_summary(supported, checkable, len(findings))
+    summary = faithfulness_summary(supported, checkable, len(findings))
     if capped:
         summary += f" (checked the first {max_claims} claims)"
     return CheckResult(
@@ -95,12 +92,6 @@ def judge_trajectory(
         findings=findings,
         metadata=evidence.metadata(),
     )
-
-
-def _faithfulness_summary(supported: int, checkable: int, total: int) -> str:
-    if total and not checkable:
-        return f"None of the {total} claims could be checked against the evidence."
-    return f"{supported}/{checkable} checkable claims grounded."
 
 
 def extract_claims(
@@ -121,13 +112,13 @@ def grounded_verifier(claim: str, evidence: str, *, answer_kind: str = "factual"
     """Decide whether `evidence` entails one `claim`. Sees no agent reasoning."""
     system = get_profile(answer_kind).verify_prompt
     if not evidence.strip():
-        return _unverifiable(claim, _NO_EVIDENCE_REASON)
+        return unverifiable(claim, NO_EVIDENCE_REASON)
     out = call(
         system=system,
         user=verify_user(claim, evidence),
         output=VerdictOut,
     )
-    return _verdict_finding(claim, out.verdict, out.reason, out.evidence_quote)
+    return verdict_finding(claim, out.verdict, out.reason, out.evidence_quote)
 
 
 def verify_claims(
@@ -142,7 +133,7 @@ def verify_claims(
     if not claims:
         return []
     if not evidence.strip():
-        return [_unverifiable(claim, _NO_EVIDENCE_REASON) for claim in claims]
+        return [unverifiable(claim, NO_EVIDENCE_REASON) for claim in claims]
     shared = len(claims) > batch_size
     findings: list[Finding] = []
     for start in range(0, len(claims), batch_size):
@@ -159,10 +150,10 @@ def _verify_batch(
     for number, claim in enumerate(batch, start=1):
         verdict = verdicts.get(number)
         if verdict is None:
-            findings.append(_unverifiable(claim, "No verdict was returned for this claim."))
+            findings.append(unverifiable(claim, "No verdict was returned for this claim."))
             continue
         findings.append(
-            _verdict_finding(claim, verdict.verdict, verdict.reason, verdict.evidence_quote)
+            verdict_finding(claim, verdict.verdict, verdict.reason, verdict.evidence_quote)
         )
     return findings
 
@@ -184,19 +175,3 @@ def _batch_verdicts(
     except Exception:
         return {}
     return {verdict.claim: verdict for verdict in out.verdicts}
-
-
-def _verdict_finding(
-    claim: str, verdict: ClaimVerdict, reason: str, evidence_quote: str | None
-) -> Finding:
-    return Finding(
-        severity=_SEVERITY[verdict],
-        verdict=verdict,
-        subject=claim,
-        reason=reason,
-        evidence=evidence_quote or None,
-    )
-
-
-def _unverifiable(claim: str, reason: str) -> Finding:
-    return Finding(severity=Severity.WARN, verdict="unverifiable", subject=claim, reason=reason)

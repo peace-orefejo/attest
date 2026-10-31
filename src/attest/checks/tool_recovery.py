@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from ..llm import call
+from ..llm import BudgetExceeded, call
 from ..prompts.tool_errors import ERROR_ANSWER_SYSTEM, error_answer_prefix, error_answer_user
 from ..trajectory import ToolCall, Trajectory
 
@@ -59,7 +59,12 @@ def review_recovery(
         return recovered
     if not check_answer:
         return RecoveryReview(recovery="unchecked")
-    report = _ask_answer(traj, step, tool_call)
+    try:
+        report = _ask_answer(traj, step, tool_call)
+    except BudgetExceeded:
+        raise
+    except Exception as exc:
+        return RecoveryReview(recovery="unchecked", reason=f"The answer check failed: {exc}")
     return RecoveryReview(recovery=_ANSWER_RECOVERY[report.outcome], reason=report.reason)
 
 

@@ -22,7 +22,14 @@ from .extraction import ExtractionLimits
 from .llm import Budget, DiskCache, LLMClient, Usage, metering, using, using_cache
 from .llm.response_cache import ResponseStore
 from .policy import EvaluationPolicy, PolicyInput, check_policy, load_policy
-from .providers import DEFAULT_PROVIDER, build_client, default_model, list_models, providers
+from .providers import (
+    DEFAULT_PROVIDER,
+    build_client,
+    default_model,
+    list_models,
+    providers,
+    resolve_key,
+)
 from .results import CheckResult, Report
 from .scoring.dispositions import apply_verdict_policy
 from .scoring.report import DEFAULT_CHECKS, evaluate, validate_evaluation_options
@@ -90,6 +97,7 @@ class Attest:
         needs_llm = _checks_need_llm(
             selected, appropriate=appropriate, deep=deep, extract=extract, verify=verify
         ) or (policy is not None and policy.needs_llm)
+        needs_llm = needs_llm or ("tool_use" in selected and self._has_credentials())
         before = self.usage.model_copy()
         with self._llm_context(needs_llm), extracting_artifacts(self.artifact_extraction):
             report = evaluate(
@@ -229,6 +237,9 @@ class Attest:
         if not required:
             return contextlib.nullcontext()
         return self._scoped_llm(self._resolved_client())
+
+    def _has_credentials(self) -> bool:
+        return self._client is not None or resolve_key(self.provider, self._key) is not None
 
     def _resolved_client(self) -> LLMClient:
         if self._client is None:
