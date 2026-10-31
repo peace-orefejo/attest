@@ -29,6 +29,9 @@ Grade an agent's answer against what its tools actually returned.
 
 ## Quick start
 
+attest grades a **run**: a JSON record of one task, with the question, each tool call and what
+it returned, and the agent's final answer ([example](examples/trajectory.json)).
+
 ```bash
 pip install agent-attest
 export ANTHROPIC_API_KEY=sk-ant-...
@@ -58,8 +61,8 @@ even when a detail inside it is wrong; rewriting an agent's reasoning alone can 
 judge's false-positive rate by up to 90%
 ([Khalifa et al., 2026](https://arxiv.org/abs/2601.14691)).
 
-attest checks each claim against the real tool outputs instead, and the judge never sees the
-agent's reasoning.
+attest checks each claim against the real tool outputs instead. Its grading model sees only the
+claim and the evidence, never the agent's reasoning.
 
 <br>
 
@@ -71,9 +74,10 @@ agent's reasoning.
 | **Tool use** | Were the tools allowed, and were their errors handled? | — |
 | **Prompt injection** | Did tool outputs carry hidden instructions, and were they obeyed? | `--deep` only |
 | **Role adherence** | Did the agent stay inside its system prompt's job? | ✓ |
-| **Policies** | Did the run follow your project's own rules? | semantic rules only |
+| **Policies** (Python only) | Did the run follow your project's own rules? | `evidence` and `rubric` rules only |
 
-Pass rates come with 95% confidence intervals, so you can tell a real improvement from noise.
+`attest stats` turns a pass count into a rate with a 95% confidence interval, so you can tell a
+real improvement from noise.
 
 <br>
 
@@ -93,21 +97,20 @@ attest review review.json    # check an AI code reviewer's outputs
 ```python
 from attest import Attest
 
-judge = Attest()                      # or Attest(provider="openai" | "gemini")
-report = judge.evaluate(run)
+grader = Attest()                      # or Attest(provider="openai" | "gemini")
+report = grader.evaluate(run)
 
 print(report.passed, report.overall_score)
 ```
 
-A run is one recorded task: the question, each tool call with its output, and the final answer.
-See [`examples/quickstart.py`](examples/quickstart.py), or convert a LangGraph run with
-`from_langgraph_messages`.
+In Python a run is a `Trajectory`. [`examples/quickstart.py`](examples/quickstart.py) builds
+one by hand, and `from_langgraph_messages` converts a LangGraph run.
 
 **Code review**
 
 ```python
 result = Attest().review(pr, outputs, guidelines="REVIEW.md")
-post = result.filter(outputs)         # the outputs the diff backs up
+post = result.filter(outputs)         # the outputs worth showing
 ```
 
 <br>

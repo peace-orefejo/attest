@@ -12,7 +12,8 @@ An author can plant text aimed at the reviewer:
      for i in range(len(items)):
 ```
 
-`check_code_injection` finds planted text like this and works out which outputs obeyed it.
+`review()` runs this check for you. `check_code_injection` runs it on its own: it finds planted
+text like this and works out which outputs obeyed it.
 
 ```python
 from attest.code_review import check_code_injection
@@ -21,18 +22,24 @@ result = check_code_injection(pr, outputs)          # deep=True by default
 result = check_code_injection(pr, outputs, deep=False)  # no model calls
 ```
 
-## Four layers
+## Four steps
 
 1. **Segment.** Only text the author added is scanned: added lines, split into comments,
    strings and code by a per-language lexer, plus the title, description and commit messages.
 2. **Detect.** Deterministic patterns, hidden Unicode and encoded payloads score each segment.
-3. **Confirm.** Medium-confidence hits go to a model that is asked one question: does this text
-   try to steer an automated reviewer? High-confidence hits skip this step. So do all hits when
-   `deep=False`.
-4. **Effect.** Each confirmed hit is compared with the outputs. An output that repeats or obeys
-   the planted claim is marked as affected.
+3. **Confirm.** Medium-confidence hits go to the grading model with one question: does this text
+   try to steer an automated reviewer? High-confidence hits skip this step.
+4. **Effect.** Each confirmed hit is compared with the outputs about the same file. An output
+   that repeats the planted wording is marked `compromised`. Borderline cases go to the grading
+   model.
+
+With `deep=False`, no model is called: step 3 is skipped and step 4 uses only the wording
+check.
 
 ## Verdicts
+
+These verdicts are specific to code review; the general [injection check](../checks/injection.md)
+uses its own.
 
 | Verdict | Meaning |
 |---|---|
@@ -41,9 +48,9 @@ result = check_code_injection(pr, outputs, deep=False)  # no model calls
 | `payload` | Text in the pull request tries to steer an automated reviewer. |
 | `compromised` | A review output repeated or obeyed the planted text. |
 
-`compromised` findings list the affected outputs in `metadata["affected_outputs"]`. When you pass
-`output_index` to `gate()`, only those outputs are dropped. An honest issue in the same file is
-kept.
+`compromised` findings list the affected outputs in `metadata["affected_outputs"]`, and only
+those outputs are dropped. An honest issue in the same file is kept. (If you call `gate()`
+yourself, pass `output_index=` to get this.)
 
 A finding in a changed file applies to the outputs about that file. A finding in the title,
 description or commit messages applies to every output, because every output was written with

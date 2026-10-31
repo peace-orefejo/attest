@@ -9,6 +9,8 @@ description: "Reference for attest's code review types: ReviewOutput, PullReques
 One thing the reviewer produced, with the evidence it was based on.
 
 ```python
+from attest.code_review import FileRead, ReviewOutput
+
 ReviewOutput(
     output_type="issue",
     text="cart_total reads past the end of items.",
@@ -23,15 +25,15 @@ ReviewOutput(
 | `output_type` | `issue`, `diff_summary`, `group_summary` or `canvas_answer`. |
 | `text` | What the reviewer said. |
 | `diffs` | Unified diff for each file the output talks about, keyed by path. |
-| `changed_files` | Every file the pull request touched. Lets attest catch "this PR also changes X". Leave it as `None` if you don't know the full list. |
-| `reads` | Extra source the reviewer looked at, as `read_file` or `grep` results. |
+| `changed_files` | The whole pull request's list of changed files, not just this output's. Lets attest catch a wrong "this PR also changes X". Usually left out: `review()` copies it from the pull request. |
+| `reads` | Other code the reviewer looked at. Each `FileRead` has a `tool` (`read_file`, the default, or `grep`), its `arguments` and its `output`. |
 | `question` | The question, for a `canvas_answer`. |
 | `group_name` | The group's name, for a `group_summary`. |
 
 If `diffs` is empty or `changed_files` is `None`, `review()` fills them from the pull request.
 
-`paths()` lists every file the output's evidence covers. `review()` passes it to `gate()` so
-injection findings in unrelated files don't affect this output.
+`paths()` lists every file the output's evidence covers, so injection findings in unrelated
+files don't affect it.
 
 ## PullRequest
 
@@ -81,7 +83,8 @@ the kept outputs from the ones `review()` checked, which is how you get attest's
 
 ## GateDecision
 
-`gate()` decides for one output. `review()` calls it for you.
+You only see this type if you call `gate()` yourself. `OutputDecision` above is the same
+decision plus the output's identity and scores.
 
 | Field | Meaning |
 |---|---|
@@ -90,7 +93,7 @@ the kept outputs from the ones `review()` checked, which is how you get attest's
 | `reasons` | What dropped the output: each failing claim, each broken rule of yours, and each injection finding that blocks it. Empty when kept. |
 | `notes` | Findings shown alongside the output that did not drop it: a guideline it missed (`misses_guideline`), a `suspicious` hit in its files, or a `compromised` finding in its files that affected a different output. |
 
-What drops an output:
+## What drops an output
 
 | Source | Lenient | Strict |
 |---|---|---|

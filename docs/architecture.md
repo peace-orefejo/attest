@@ -4,6 +4,8 @@ description: "How the attest codebase is organised: entry points, feature packag
 
 # Architecture
 
+For contributors: how the codebase is organised and where to make a change.
+
 ![attest package layers](assets/diagrams/architecture.svg){ .diagram }
 
 attest is split into layers. Imports only point down: entry points use the features, and

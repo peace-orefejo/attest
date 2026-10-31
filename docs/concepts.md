@@ -4,11 +4,16 @@ description: "How attest grades AI agents: runs, evidence from tool outputs, ato
 
 # How it works
 
+attest takes a **run**, a record of what an agent did, and treats its tool outputs as the only
+evidence. Each **check** compares part of the run against that evidence and returns a
+**result** made of **findings**. `evaluate()` collects the results into a **report**.
+
 ![How attest checks an answer](assets/diagrams/how-it-works.svg){ .diagram }
 
 ## Runs
 
-A run (`Trajectory`) records one task from start to finish:
+A run records one task from start to finish. In Python it is a `Trajectory`; on the command
+line it is one JSON object (a `.jsonl` file holds one per line).
 
 | Field | Meaning |
 |---|---|
@@ -19,50 +24,70 @@ A run (`Trajectory`) records one task from start to finish:
 | `artifacts` | Files or images the agent received, such as a PDF or a screenshot. |
 | `final_answer` | What the agent told the user. |
 
-## Evidence
+## Evidence and the grading model
 
-Tool outputs are the only evidence attest trusts. Each one goes to the judge in its own escaped
-block, so a web page or file can't pass itself off as another tool's result. The agent's
-`thought` text is never shown to the judge.
+Tool outputs are the only evidence attest trusts. Checks that need judgment, such as
+faithfulness, ask a language model (the **grading model**) one narrow question: does this
+evidence support this claim?
+
+That is the difference from a plain "LLM judge", which reads the whole run and decides whether
+the answer looks good. The grading model sees each tool output in its own escaped block and
+never sees the agent's `thought` text, so confident reasoning can't talk it into a pass.
+
+## Results and findings
+
+Every check returns a result with the same fields:
+
+| Field | Meaning |
+|---|---|
+| `check` | The check's name: `faithfulness`, `tool_use`, `injection`, `role` or `policy`. |
+| `passed` | Whether the check passed. |
+| `score` | Between 0 and 1, or `null` for checks that don't score (role, injection). |
+| `summary` | One line for people. |
+| `findings` | One per claim, tool call or payload. |
+
+Each finding has a `severity` of `pass`, `warn` or `fail`, and a `verdict` that depends on the
+check, such as `unsupported` or `suspicious`. It names what it is about (`subject`), explains
+itself (`reason`), and quotes the deciding tool output (`evidence`). `step` is the step index
+when the finding is about one step.
 
 ## Claims and verdicts
 
-The faithfulness check splits the final answer into atomic claims, then judges each claim
-against the evidence:
+The faithfulness check splits the final answer into atomic claims and checks each one:
 
-| Verdict | Meaning | Severity |
+| Verdict | Means | Severity |
 |---|---|---|
-| `supported` | The evidence entails the claim. | PASS |
-| `unsupported` | The evidence contradicts the claim. | FAIL |
-| `unverifiable` | The evidence doesn't mention it either way. | WARN |
-
-Each finding carries the claim (`subject`), a `reason`, and the exact span of evidence that
-decided it (`evidence`).
+| `supported` | The evidence backs the claim. | `pass` |
+| `unsupported` | The evidence contradicts the claim. | `fail` |
+| `unverifiable` | The evidence doesn't say either way. | `warn` |
 
 ## Answer kinds
 
-What counts as "supported" depends on what the answer is. Pass `answer_kind` to pick the standard:
+What counts as "supported" depends on what the answer is. Pass `answer_kind=` to `evaluate()`,
+or `--kind` to `attest run`:
 
 | Kind | Use for | Standard |
 |---|---|---|
-| `factual` | Reports of facts the tools returned. | The evidence must entail the claim. |
+| `factual` (default) | Reports of facts the tools returned. | The evidence must back the claim. |
 | `plan` | Plans and recommendations. | The claim must match the plan in the evidence. Nothing has to have run yet. |
 | `code` | Outputs of an AI code reviewer. | The diff and source must support the claim, read with the language's semantics. See [Code review mode](code-review/index.md). |
-| `auto` | Mixed workloads. | Picks `factual` or `code` from the shape of the evidence. |
+| `auto` | Mixed workloads. | Picks `factual` or `code` from the evidence. |
 
 ## Reports
 
-`Attest.evaluate` returns a `Report` with one result per check. It passes only when every check
-passes, and `overall_score` is the mean of the checks that score. Each result records the
-`prompt_version` it was graded with.
+`evaluate()` runs faithfulness and tool use by default; pass `checks=` for others. It returns a
+`Report` with one result per check, plus a `policy` result when the `Attest` has a
+[policy](checks/policies.md). The report passes only when every result passes. Its
+`overall_score` is the mean of the scores that aren't `null`.
 
-## Scores and error bars
+## Pass rates and confidence
 
-A pass rate from 20 runs is noisy. attest reports rates with a Wilson 95% confidence interval:
+A pass rate from 20 runs is noisy. `attest stats` turns a pass count into a rate with a Wilson
+95% confidence interval:
 
 ```bash
-attest stats 41 50
-# 82% (95% CI 69%–90%, n=50)
+attest stats 41 50 | jq '.data'
+# {"rate": 0.82, "low": 0.69, "high": 0.90, "n": 50}   (values rounded here)
 ```
 
 ```python
@@ -74,5 +99,5 @@ difference_is_real(41, 50, 35, 50)   # False: the gap is within noise
 ## What attest doesn't do
 
 attest is read-only. It never runs your tools, calls your agent, or needs credentials for
-anything except the grading model. It judges what was recorded, so a run that leaves out a tool
-output can't be checked against it.
+anything except the grading model. It can only check what the run recorded, so a tool output
+that is missing from the run can't be used as evidence.
