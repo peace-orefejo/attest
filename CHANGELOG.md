@@ -5,6 +5,8 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-31
+
 ### Added
 - `from_haystack_messages` converts a Haystack 2.x `Agent` run (`ChatMessage` objects or their
   `to_dict()` form) into a `Trajectory`, pairing each tool call with its result.
