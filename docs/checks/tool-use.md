@@ -88,11 +88,11 @@ the error output and the final answer. The call runs when a model is available:
 
 - `attest tools --appropriate` or `attest tools --check-answer`.
 - `grader.tool_use(run, appropriate=True)` or `grader.tool_use(run, check_answer=True)`.
-- `attest run` and `grader.evaluate(run)` when another check, such as faithfulness, already uses
-  the model, or with `--appropriate`.
+- `attest run` and `grader.evaluate(run)` whenever an API key is set.
 - `check_tool_use(run)` inside `with attest.llm.using(client):`.
 
 Without one, attest stays offline and reports the error as `unchecked`, which fails the call.
+If the model call itself fails, the error is also `unchecked`, with the reason.
 
 ```bash
 attest tools run.json --check-answer

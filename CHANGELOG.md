@@ -5,6 +5,8 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-31
+
 ### Added
 - Finding dispositions: a `VerdictPolicy` (with `ToolUsePolicy`) gives each finding a
   `disposition` of `pass`, `review` or `block`, and `Report` gains `verdict` (the strictest
@@ -12,6 +14,11 @@ All notable changes to `agent-attest` are documented here. This project follows
   `Attest(verdict_policy=...)` to change the defaults; `passed` and `overall_score` are unchanged.
 
 ### Changed
+- `attest run` and `Attest.evaluate` ask whether the final answer admits an unrecovered tool
+  error whenever tool use is checked and a model key is available, instead of only with
+  `--appropriate`. Without a key the error stays `unchecked`, as before. A failed answer check
+  is reported as `unchecked` with its reason rather than stopping the run.
+- `PROMPT_VERSION` is now `2026.10.31` (artifact evidence blocks, the tool-error answer question).
 - Faithfulness now treats artifacts as evidence: artifact text is shown to the grading model in
   its own escaped `<artifact>` block, and findings record the block their quote came from in
   `metadata["location"]`. Binary and path artifacts are extracted only with

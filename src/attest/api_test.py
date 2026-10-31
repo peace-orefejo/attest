@@ -152,3 +152,26 @@ def test_attest_review_grades_with_faithfulness_in_code_mode(monkeypatch):
     result = judge.review(pr, [ReviewOutput(output_type="issue", text="a")], deep=False)
     assert calls == [{"checks": ("faithfulness",), "answer_kind": "code"}]
     assert result.kept == [0]
+
+
+def test_evaluate_asks_about_unrecovered_errors_when_a_model_is_available(monkeypatch):
+    sentinel = object()
+    seen = {}
+
+    def spy(**kwargs):
+        seen["client"] = _resolve_client()
+        return tr._AnswerReport(outcome="succeeded")
+
+    monkeypatch.setattr(tr, "call", spy)
+    report = Attest(client=sentinel).evaluate(_traj(output="Error: declined"), checks=("tool_use",))
+    assert seen["client"] is sentinel
+    assert report.results[0].findings[0].verdict == "error_claimed_success"
+    assert report.verdict == "block"
+
+
+def test_evaluate_tool_use_without_a_key_stays_offline(monkeypatch):
+    monkeypatch.setattr("attest.api.resolve_key", lambda provider, key=None: None)
+    judge = Attest()
+    report = judge.evaluate(_traj(output="Error: declined"), checks=("tool_use",))
+    assert report.results[0].findings[0].metadata["recovery"] == "unchecked"
+    assert judge._client is None

@@ -146,3 +146,29 @@ def test_an_errored_retry_is_not_a_recovery_but_a_later_success_is(monkeypatch):
     )
     recovered = [f.metadata["recovered_at"] for f in check_tool_use(traj).findings]
     assert recovered == [2, 2, None]
+
+
+def test_a_failed_answer_check_reports_unchecked(monkeypatch):
+    def broken(**kwargs):
+        raise RuntimeError("provider down")
+
+    monkeypatch.setattr(tr, "call", broken)
+    call = ToolCall(name="charge_card", arguments={}, output="Error: declined")
+    traj = Trajectory(task="pay", steps=[Step(tool_call=call)], final_answer="Paid.")
+    review = review_recovery(traj, 0, call, check_answer=True)
+    assert review is not None
+    assert review.recovery == "unchecked"
+    assert "provider down" in review.reason
+
+
+def test_a_budget_stop_during_the_answer_check_is_not_swallowed(monkeypatch):
+    from attest.llm import BudgetExceeded
+
+    def over(**kwargs):
+        raise BudgetExceeded("max_calls reached")
+
+    monkeypatch.setattr(tr, "call", over)
+    call = ToolCall(name="charge_card", arguments={}, output="Error: declined")
+    traj = Trajectory(task="pay", steps=[Step(tool_call=call)], final_answer="Paid.")
+    with pytest.raises(BudgetExceeded):
+        review_recovery(traj, 0, call, check_answer=True)
