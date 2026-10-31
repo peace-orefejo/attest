@@ -156,15 +156,22 @@ Edge cases:
 
 ## Double labelling and agreement
 
-`benchmarks/runners/annotate.py` keeps each annotator's labels in their own files, so neither
-sees the other's labels, the case file's draft labels or attest's output.
+`benchmarks/runners/annotate.py` keeps each annotator's labels in their own files. Blind
+labelling is a procedure you follow, not something the tool enforces: the draft labels sit in
+the case files, other annotators' folders sit next to yours, and an annotator is just a folder
+name. Until your own labels for a batch are done, don't open the case files, anyone else's
+label folder, or attest's output. Commit a batch's label folders only once every annotator has
+finished it, and reviewers should check that each folder belongs to a different person.
 
 1. **Get blank label files.** `annotate.py template <you> --check <check>` writes one file per
    dev case to `annotations/labels/<you>/<case id>.json` (add `--split heldout` for held-out).
-   Each holds the run to read and the labels left blank. Open only your own folder.
+   Each holds the run to read, the labels left blank, and `run_sha256`, which ties your labels
+   to that exact run: if the run is edited later, your file is reported as stale and skipped,
+   and `template` tells you which files to delete and regenerate. Open only your own folder.
 2. **Fill them in.** Give every label, a `confidence` (`high`, `medium` or `low`), a one- or
    two-sentence `rationale`, and set `ambiguous: true` if a careful person could reasonably
-   label it either way. Files with a blank left are skipped as unfinished.
+   label it either way. Files with a blank left are skipped as unfinished. Don't add a
+   faithfulness `run_label`: merge derives it from the claim labels.
 3. **Measure agreement.** `annotate.py agreement <you> <them>` reports, per check and kind of
    label, the share of items with identical labels and Cohen's kappa, and lists every
    disagreement. Record each batch's numbers in the [rulings log](#rulings-log). Kappa below
@@ -175,8 +182,9 @@ sees the other's labels, the case file's draft labels or attest's output.
    `label_status: "confirmed"` and the annotators, and replaces `notes` with both rationales
    and any settlement. Cases marked ambiguous are never confirmed.
 
-For a private dataset, pass `--datasets <folder>` and `--labels <folder>` and keep both out of
-this repository: the label files copy the runs.
+For a private dataset, the label files and the adjudication log copy or quote the runs, so
+`annotate.py` refuses to put them inside this repository. Pass `--labels` (and, for `merge`,
+`--adjudications`) outside it or under `benchmarks/private/`.
 
 ## Settling disagreements
 
@@ -189,12 +197,16 @@ Each settlement is one line of `annotations/adjudications.jsonl`:
 
 `dimension` and `subject` name the item as `agreement` lists it: `claim` and the claim text,
 `verdict` or `recovery` and `step N`, or `label` and `run`. Keep each entry on one line.
+`merge` refuses the whole log if an entry names no current item or two entries settle the same
+item.
 
 1. The two annotators discuss the case against these guidelines. If they agree after
-   discussion, record it with `"how": "discussion"`.
+   discussion, record it with `"how": "discussion"`; `decided_by` lists only annotators who
+   labelled the case.
 2. If they still disagree, the owner decides, adds a ruling to the log below, and records it
    with `"how": "owner_ruling"` and `"ruling"` naming the log entry, so the same question is
-   decided the same way next time.
+   decided the same way next time. Only an owner ruling can override a label every annotator
+   agreed on.
 3. If the case is genuinely ambiguous, drop it, or rewrite the run so it isn't. Ambiguous cases
    measure annotator disagreement, not attest.
 4. Never settle a disagreement by checking what attest said.
