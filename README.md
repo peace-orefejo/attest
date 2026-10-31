@@ -104,7 +104,8 @@ print(report.passed, report.overall_score)
 ```
 
 In Python a run is a `Trajectory`. [`examples/quickstart.py`](examples/quickstart.py) builds
-one by hand, and `from_langgraph_messages` converts a LangGraph run.
+one by hand, and `from_langgraph_messages` and
+`from_haystack_messages` convert LangGraph and Haystack runs.
 
 **Code review**
 
@@ -142,4 +143,4 @@ Tests run offline with no API key. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Copyright © 2026 Adepeju Orefejo. Licensed under the [GNU AGPL v3.0](LICENSE): you can use,
 modify and share attest, but any version you distribute or run as a network service must be
-released under the same license, with its source. Versions 0.7.0 and earlier were MIT.
+released under the same license, with its source. Versions 0.6.0 and earlier were MIT.

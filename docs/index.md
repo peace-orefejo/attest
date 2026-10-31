@@ -69,4 +69,4 @@ kept or dropped before people see it. See [Code review mode](code-review/index.m
 - [How it works](concepts.md): runs, evidence, findings, verdicts and reports.
 - The checks, starting with [Faithfulness](checks/faithfulness.md).
 - [Command line](cli.md) and [JSON output](json-output.md).
-- [Integrations](integrations.md): LangGraph, your own logs, and CI.
+- [Integrations](integrations.md): LangGraph, Haystack, your own logs, and CI.

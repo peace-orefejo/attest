@@ -5,7 +5,11 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-31
+
 ### Added
+- `from_haystack_messages` converts a Haystack 2.x `Agent` run (`ChatMessage` objects or their
+  `to_dict()` form) into a `Trajectory`, pairing each tool call with its result.
 - Opt-in response caching via `Attest(cache=True)` (or a shared dict), so re-evaluating an
   identical run reuses judge calls without collapsing `vote` self-consistency.
 - Spend controls: `Attest(budget=Budget(max_calls=..., max_tokens=...))` fails closed with
@@ -47,6 +51,16 @@ All notable changes to `agent-attest` are documented here. This project follows
   and records the choice in the report metadata.
 - Two new default injection detectors: hidden Unicode (bidi controls, zero-width and tag
   characters) and encoded payloads (base64 and hex that decode to instructions).
+- Instance-bound evaluation policies with YAML/JSON loading, deterministic text/tool rules,
+  evidence-grounded and rubric rules, automatic enforcement, and stable policy identity hashes.
+- Bounded extraction of JSON, CSV, XML, HTML, PDF, image OCR, image metadata, and QR content for
+  prompt-injection scanning through the optional `files` dependency bundle.
+- `--extract-files/--no-extract-files` and `--allow-paths` flags on the `injection` command, and
+  matching `extract_files`, `allow_paths`, and `extraction_limits` options on `Attest.injection`.
+- Total detection cap (`ExtractionLimits.max_detections`) that bounds custom detector output and
+  terminates unbounded or infinite detector iterables, emitting `unscanned_content`.
+- `examples/pdf_agent.py` end-to-end demo evaluating a PDF-reading agent for injection resistance,
+  including "held" versus "compromised" trajectories.
 
 ### Changed
 - Faithfulness now treats artifacts as evidence: artifact text is shown to the grading model in
@@ -59,12 +73,12 @@ All notable changes to `agent-attest` are documented here. This project follows
   `claude-fable-5-1`, the GPT-6 / GPT-6.1 family and `gemini-4-argon`; dropped retired or
   superseded models such as `gemini-2.5-pro`. Any model id can still be passed with `model=`.
 - **License:** attest is now licensed under the GNU Affero General Public License v3.0
-  (`AGPL-3.0-only`). Versions 0.7.0 and earlier remain available under the MIT License.
+  (`AGPL-3.0-only`). Versions 0.6.0 and earlier remain available under the MIT License.
 - **Breaking:** every CLI command prints JSON, and only JSON. The text view and the `--json`
   flag are gone. Each command prints one envelope, `{"schema_version": "1", "command": ...,
   "ok": true, "data": ...}`, and a command that can't run prints `"ok": false` with an
   `error` (`code`, `message`) on stdout instead of text on stderr. Exit codes: 0 ran, 1 missing
-  API key, 2 invalid input, 3 stopped by a budget. `data` changes shape from 0.7.0's `--json`:
+  API key, 2 invalid input, 3 stopped by a budget. `data` changes shape from 0.6.0's `--json`:
   `tools`, `injection` and `role` wrap their list in `trajectories`, `demo` in `comparisons`,
   and `run` adds `total`, `evaluated` and `passed`. `rich` is no longer a dependency.
 - Faithfulness and tool-choice prompts put the shared evidence before the per-call text;
@@ -114,6 +128,11 @@ All notable changes to `agent-attest` are documented here. This project follows
 - Dependency bounds: `anthropic>=0.77,<2` and `instructor>=1.15.3,<2`.
 - Added `claude-opus-5-5`, `claude-sonnet-5-5`, and `claude-haiku-5-5` to the curated Anthropic
   model list.
+- Refreshed the provider model registry: Anthropic Claude 5 family, OpenAI GPT-5.6, and Gemini 3.x
+  defaults and curated model lists.
+- Disabled-extraction warnings are capped per artifact and summarized with an omitted count, so a
+  large binary-artifact trajectory can no longer emit unbounded findings.
+
 ### Fixed
 - `attest demo` no longer crashes when the grounding score is unavailable.
 - Hard provider errors (auth, billing, bad request) are no longer retried as "empty responses":
@@ -139,28 +158,6 @@ All notable changes to `agent-attest` are documented here. This project follows
   shell, Ruby, PHP, Java and Rust lexers recognise comment and string forms they used to miss.
 - Scans that could take quadratic time on crafted input (hex runs, Python docstrings, unclosed
   HTML comments in review rules) are now linear.
-
-## [0.7.0] - 2026-08-13
-
-### Added
-- Instance-bound evaluation policies with YAML/JSON loading, deterministic text/tool rules,
-  evidence-grounded and rubric rules, automatic enforcement, and stable policy identity hashes.
-- Bounded extraction of JSON, CSV, XML, HTML, PDF, image OCR, image metadata, and QR content for
-  prompt-injection scanning through the optional `files` dependency bundle.
-- `--extract-files/--no-extract-files` and `--allow-paths` flags on the `injection` command, and
-  matching `extract_files`, `allow_paths`, and `extraction_limits` options on `Attest.injection`.
-- Total detection cap (`ExtractionLimits.max_detections`) that bounds custom detector output and
-  terminates unbounded or infinite detector iterables, emitting `unscanned_content`.
-- `examples/pdf_agent.py` end-to-end demo evaluating a PDF-reading agent for injection resistance,
-  including "held" versus "compromised" trajectories.
-
-### Changed
-- Refreshed the provider model registry: Anthropic Claude 5 family, OpenAI GPT-5.6, and Gemini 3.x
-  defaults and curated model lists.
-- Disabled-extraction warnings are capped per artifact and summarized with an omitted count, so a
-  large binary-artifact trajectory can no longer emit unbounded findings.
-
-### Fixed
 - `policy.py` no longer uses Python 3.12-only f-string syntax, restoring the declared 3.11 floor.
 - Resolved static type errors across the injection, extraction, policy, API, and provider modules.
 
