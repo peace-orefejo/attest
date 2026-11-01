@@ -21,6 +21,8 @@ All notable changes to `agent-attest` are documented here. This project follows
   invalid input (exit 2 on the command line, `ValueError` in Python).
 - `CheckResult.dispositions`: each finding's disposition, the assigned one or else the one the
   default `VerdictPolicy()` gives it.
+- Benchmark: 10 draft-labelled prompt_injection and tool_use cases converted from public
+  AgentDojo runs (`benchmarks/converters/agentdojo.py`).
 - Benchmark: `annotate.py settle --replace` corrects a settled entry by appending one that
   supersedes it, so the adjudication log stays append-only.
 - Benchmark: `compare.py` reports deltas per origin and fails on a regression in any origin
