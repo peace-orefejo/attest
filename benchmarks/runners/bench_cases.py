@@ -16,8 +16,14 @@ CHECKS: tuple[CheckName, ...] = (
     "prompt_injection",
     "role_adherence",
 )
-Split = Literal["dev", "heldout"]
-SPLITS: tuple[Split, ...] = ("dev", "heldout")
+Split = Literal["dev", "validation", "heldout"]
+SPLITS: tuple[Split, ...] = ("dev", "validation", "heldout")
+"""`dev` is for tuning, `validation` for checking a change before a release, `heldout` for a
+release or a published result only."""
+SEED_ORIGIN = "attest-seed"
+"""The origin of the synthetic seed cases in `datasets/<check>/<split>.jsonl`."""
+ORIGIN_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"
+TASK_FAMILY_PATTERN = r"^[a-z0-9][a-z0-9_./-]*$"
 
 ClaimLabel = Literal["supported", "unsupported", "unverifiable"]
 RunLabel = Literal["pass", "review", "block"]
@@ -156,6 +162,12 @@ class Case(_Strict):
     check: CheckName
     category: str = Field(pattern=r"^[a-z0-9_]+$")
     source: Literal["synthetic", "real", "community"]
+    origin: str = Field(pattern=ORIGIN_PATTERN)
+    """The dataset the run came from: `attest-seed`, or an external one such as `tau-bench`."""
+    task_family: str = Field(pattern=TASK_FAMILY_PATTERN)
+    """The group of related runs that must stay in one split (the loader enforces it)."""
+    origin_ref: str | None = Field(default=None, min_length=1)
+    """Where in the upstream source the run came from, such as `trajectories.json#17`."""
     label_status: Literal["draft", "confirmed"]
     annotators: list[str] = Field(default_factory=list[str])
     trajectory: Trajectory

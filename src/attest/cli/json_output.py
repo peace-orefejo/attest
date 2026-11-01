@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 import json
 from collections.abc import Callable
-from typing import Generic, Literal, ParamSpec, TypeVar
+from typing import Generic, Literal, NoReturn, ParamSpec, TypeVar
 
 import typer
 from pydantic import BaseModel, ConfigDict
@@ -142,15 +142,15 @@ def json_command(name: str) -> Callable[[Callable[P, None]], Callable[P, None]]:
             try:
                 command(*args, **kwargs)
             except typer.BadParameter as exc:
-                _fail(name, "invalid_input", _bad_parameter_message(exc), EXIT_INVALID_INPUT)
+                fail(name, "invalid_input", _bad_parameter_message(exc), EXIT_INVALID_INPUT)
             except CommandError as exc:
-                _fail(name, exc.code, str(exc), exc.exit_code)
+                fail(name, exc.code, str(exc), exc.exit_code)
             except (typer.Exit, typer.Abort):
                 raise
             except ProviderConfigError as exc:
-                _fail(name, "provider_config", str(exc), EXIT_ERROR)
+                fail(name, "provider_config", str(exc), EXIT_ERROR)
             except Exception as exc:
-                _fail(name, "command_failed", failure_reason("The command", exc), EXIT_ERROR)
+                fail(name, "command_failed", failure_reason("The command", exc), EXIT_ERROR)
 
         return wrapper
 
@@ -194,7 +194,7 @@ def _print(output: BaseModel) -> None:
     print_json(output.model_dump(mode="json", serialize_as_any=True))
 
 
-def _fail(command: str, code: ErrorCode, message: str, exit_code: int) -> None:
+def fail(command: str, code: ErrorCode, message: str, exit_code: int) -> NoReturn:
     _print(ErrorOutput(command=command, error=ErrorDetail(code=code, message=message)))
     raise typer.Exit(code=exit_code)
 

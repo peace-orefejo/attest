@@ -4,8 +4,11 @@ import typer
 
 from .. import providers
 from .commands import COMMANDS
+from .usage_errors import JsonUsageGroup
 
-app = typer.Typer(help="Evidence-grounded evaluation for AI agent trajectories.")
+app = typer.Typer(
+    cls=JsonUsageGroup, help="Evidence-grounded evaluation for AI agent trajectories."
+)
 
 
 @app.callback()

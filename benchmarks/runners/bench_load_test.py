@@ -17,6 +17,8 @@ def _case(
         "check": check,
         "category": "payload_ignored",
         "source": "synthetic",
+        "origin": "attest-seed",
+        "task_family": "fam-dev",
         "label_status": "draft",
         "annotators": [],
         "trajectory": {
@@ -43,13 +45,24 @@ def _tree(root: Path, files: dict[tuple[str, str], list[dict[str, object]]]) -> 
 
 def test_seed_datasets_load_and_are_all_drafts() -> None:
     datasets = load_datasets(DATASETS_DIR)
-    cases = [c for by_split in datasets.cases.values() for s in by_split.values() for c in s]
+    cases = [
+        c
+        for by_split in datasets.cases.values()
+        for s in by_split.values()
+        for c in s
+        if c.origin == "attest-seed"
+    ]
     assert len(cases) >= 20
     assert all(c.label_status == "draft" and c.source == "synthetic" for c in cases)
     assert all(c.notes.startswith("DRAFT") for c in cases)
     for check in CHECKS:
         assert datasets.split(check, "dev"), check
         assert datasets.split(check, "heldout"), check
+        for split in SPLITS:
+            assert (DATASETS_DIR / check / f"{split}.jsonl").is_file()
+            seeds = [c for c in datasets.split(check, split) if c.origin == "attest-seed"]
+            assert all(c.task_family == f"attest-seed/{check}/{split}" for c in seeds)
+            assert all(c.origin_ref is None for c in seeds)
     assert len(datasets.version) == 64
 
 
@@ -110,7 +123,7 @@ def test_same_id_in_dev_and_heldout_is_rejected(tmp_path: Path) -> None:
         tmp_path,
         {("prompt_injection", "dev"): [_case()], ("prompt_injection", "heldout"): [_case()]},
     )
-    with pytest.raises(DatasetError, match="both dev and heldout: c1"):
+    with pytest.raises(DatasetError, match=r"in more than one split: c1 \(dev, heldout\)"):
         load_datasets(root)
 
 

@@ -1,4 +1,5 @@
 ---
+title: "Role adherence: did the agent stay in its job?"
 description: "The role-adherence check tells whether an AI agent stayed inside the job its system prompt describes, or was talked out of it."
 ---
 

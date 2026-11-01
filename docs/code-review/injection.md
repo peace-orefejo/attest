@@ -1,4 +1,5 @@
 ---
+title: "Prompt injection in pull request diffs"
 description: "Find instructions planted in a pull request to steer an AI code reviewer, and see which review outputs obeyed them."
 ---
 

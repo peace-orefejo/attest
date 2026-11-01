@@ -7,7 +7,25 @@ requires-python = ">=3.11"
 license = "AGPL-3.0-only"
 license-files = ["LICENSE"]
 authors = [{ name = "Adepeju Orefejo", email = "adepejuorefejo5@gmail.com" }]
-keywords = ["evals", "evaluation", "llm", "agents", "ai", "prompt-injection", "faithfulness", "trajectory"]
+keywords = [
+    "evals",
+    "evaluation",
+    "llm",
+    "agents",
+    "ai",
+    "ai-agents",
+    "agent-evaluation",
+    "llm-evaluation",
+    "ai-evaluation",
+    "llm-as-a-judge",
+    "hallucination-detection",
+    "prompt-injection",
+    "tool-calling",
+    "faithfulness",
+    "groundedness",
+    "trajectory",
+    "code-review",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -93,7 +111,7 @@ exclude = ["**/*_test.py", "**/conftest.py", "**/fixtures"]
 exclude = ["/.github", "/.claude", "/benchmarks"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "benchmarks/runners"]
+pythonpath = ["src", "benchmarks/runners", "benchmarks/converters"]
 testpaths = ["src", "benchmarks"]
 python_files = ["*_test.py"]
 markers = [
@@ -103,7 +121,7 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-src = ["src", "benchmarks/runners"]
+src = ["src", "benchmarks/runners", "benchmarks/converters"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
@@ -117,7 +135,7 @@ extend-immutable-calls = ["typer.Option", "typer.Argument", "attest.extraction.l
 
 [tool.pyright]
 include = ["src", "benchmarks"]
-extraPaths = ["src", "benchmarks/runners"]
+extraPaths = ["src", "benchmarks/runners", "benchmarks/converters"]
 exclude = ["**/*_test.py", "**/conftest.py", "**/__pycache__"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"

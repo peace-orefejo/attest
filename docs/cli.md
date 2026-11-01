@@ -1,5 +1,6 @@
 ---
-description: "Every attest command and option: run, tools, injection, role, review, demo, stats, models and schema."
+title: "Command line reference"
+description: "The attest command line for AI agent evaluation: run, tools, injection, role, review, demo, stats, models and schema, with every option."
 ---
 
 # Command line

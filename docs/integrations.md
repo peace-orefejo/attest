@@ -1,4 +1,5 @@
 ---
+title: "Evaluate LangGraph, LangChain and Haystack agents"
 description: "Use attest with LangChain, LangGraph, Haystack or any agent framework, and gate CI on pass rates with confidence intervals."
 ---
 

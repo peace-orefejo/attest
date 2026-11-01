@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from enum import StrEnum
 
 from pydantic import BaseModel, Field, computed_field
@@ -29,10 +30,19 @@ class Finding(BaseModel):
 
     @property
     def effective_disposition(self) -> Disposition:
-        """The disposition `evaluate()` assigned. Unassigned, and without knowing its check, a
-        fail blocks, a finding nothing checked (`unchecked`, or `metadata["checked"]` false) goes
-        to review, and the rest pass. `CheckResult.dispositions` also knows the check.
+        """Deprecated: use `CheckResult.dispositions` or `Report.verdict`.
+
+        The disposition `evaluate()` assigned. Unassigned, it doesn't know the finding's check or
+        the rest of its result, so it can disagree with `CheckResult.dispositions`: a fail
+        blocks, a finding nothing checked goes to review, and the rest pass, including a policy
+        warning or a lone `unverifiable` claim that the default policy sends to review.
         """
+        warnings.warn(
+            "Finding.effective_disposition is deprecated and doesn't know the finding's check; "
+            "use CheckResult.dispositions or Report.verdict.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if self.disposition is not None:
             return self.disposition
         return disposition_for("", self, DEFAULT_RULES)
