@@ -160,6 +160,7 @@ def test_agreement_merge_and_write(datasets: Path, tmp_path: Path) -> None:
         decided_by=["po", "vk"],
         reason="the output does carry an instruction",
         run_sha256=run_sha256(cases[disputed]),
+        labels={"po": "none", "vk": "payload"},
     )
     outcome = merge(annotations, cases, [settle])
     confirmed = outcome.confirmed[disputed]
@@ -257,7 +258,9 @@ def test_adjudications_are_validated(datasets: Path, tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="rulings-log entry"):
         _settle(case_id, "payload", how="owner_ruling")
 
-    outcome = merge(annotations, cases, [_settle(case_id, "payload", decided_by=everyone)])
+    agreed = {name: "none" for name in everyone}
+    overriding = _settle(case_id, "payload", decided_by=everyone, labels=agreed)
+    outcome = merge(annotations, cases, [overriding])
     assert "only an owner ruling can" in outcome.unresolved[case_id][0]
     agreeing = merge(annotations, cases, [_settle(case_id, "none", decided_by=["po"])])
     assert "settled by discussion" not in agreeing.confirmed[case_id].notes
@@ -275,13 +278,20 @@ def test_a_discussion_must_be_between_the_case_annotators(datasets: Path, tmp_pa
         _template(datasets, labels, name, "prompt_injection")
         _fill(labels, name, case_id, {"label": label})
     annotations = load_annotations(labels, cases).annotations
-    outsider = _settle(case_id, "none", decided_by=["po", "qq"])
+    current = {"po": "none", "vk": "payload"}
     assert (
-        "qq didn't label this case" in merge(annotations, cases, [outsider]).unresolved[case_id][0]
+        case_id in merge(annotations, cases, [_settle(case_id, "none", labels=current)]).confirmed
     )
-    assert case_id in merge(annotations, cases, [_settle(case_id, "none")]).confirmed
-    partial = _settle(case_id, "none", decided_by=["po"])
-    assert "without vk" in merge(annotations, cases, [partial]).unresolved[case_id][0]
+    for entry in (
+        _settle(case_id, "none", decided_by=["po", "qq"], labels={"po": "none", "qq": "none"}),
+        _settle(case_id, "none", decided_by=["po"], labels={"po": "none"}),
+    ):
+        outcome = merge(annotations, cases, [entry])
+        assert "unsettled (po none, vk payload)" in outcome.unresolved[case_id][0]
+        [stale] = outcome.stale_adjudications
+        assert stale.entry == entry and "the labels changed" in stale.reason
+    [unbound] = merge(annotations, cases, [_settle(case_id, "none")]).stale_adjudications
+    assert "doesn't record the labels" in unbound.reason
 
 
 def test_three_annotators_with_one_dissent_stay_unresolved(datasets: Path, tmp_path: Path) -> None:
@@ -326,7 +336,7 @@ def test_private_labels_must_stay_out_of_the_repo(
     with pytest.raises(SystemExit) as exc:
         annotate.main(["--datasets", str(datasets), "template", "po"])
     assert exc.value.code == 2
-    assert "keep its labels out of this repository" in capsys.readouterr().err
+    assert "out of this repository: --labels" in capsys.readouterr().err
     labels = ["--labels", str(tmp_path / "labels")]
     with pytest.raises(SystemExit):
         annotate.main(["--datasets", str(datasets), *labels, "merge"])
@@ -395,7 +405,8 @@ def test_an_adjudication_goes_stale_when_its_run_changes(
     cases = _cases(datasets)
     assert cases[case_id].label_status == "draft"
     outcome = merge(load_annotations(labels, cases).annotations, cases, load_adjudications(log))
-    assert outcome.stale_adjudications == [entry] and case_id in outcome.unresolved
+    assert [s.entry for s in outcome.stale_adjudications] == [entry]
+    assert case_id in outcome.unresolved
 
     # settling again on the new run is not a duplicate of the stale entry
     assert (
@@ -428,7 +439,7 @@ def test_settle_validates_the_entry(
     good = ["inj-clean-output", "label", "run", "none", "--how", "owner_ruling", "--ruling", "r1"]
     assert annotate.main([*argv, *good, *tail]) == 0
     assert annotate.main([*argv, *good, *tail]) == 2
-    assert "settled more than once" in capsys.readouterr().err
+    assert "already settled on this run; pass --replace" in capsys.readouterr().err
     [entry] = load_adjudications(log)
     assert (entry.how, entry.ruling, entry.decided_by) == ("owner_ruling", "r1", ["po", "vk"])
 

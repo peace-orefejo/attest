@@ -37,6 +37,11 @@ def parser() -> argparse.ArgumentParser:
     settle.add_argument("--by", nargs="+", required=True, help="who decided")
     settle.add_argument("--reason", required=True)
     settle.add_argument("--ruling", help="the rulings-log entry an owner ruling follows")
+    settle.add_argument(
+        "--replace",
+        action="store_true",
+        help="supersede the item's current entry with this one (the log stays append-only)",
+    )
     settle.add_argument("--adjudications", type=Path, default=ADJUDICATIONS_FILE)
 
     confirm = commands.add_parser("merge", help="confirm cases whose labels are settled")

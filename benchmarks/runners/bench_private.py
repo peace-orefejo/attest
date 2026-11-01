@@ -14,11 +14,16 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import sys
 
 from bench_rows import CaseRow
 
 WITHHELD_ERROR = "error (details withheld: private dataset)"
 ID_KEY_ENV = "ATTEST_BENCH_ID_KEY"
+MIN_KEY_LENGTH = 32
+MIN_DISTINCT_CHARACTERS = 8
+"""Below either, the key gets a warning (it is still used). `openssl rand -hex 32` gives 64
+characters, typically all 16 hex digits."""
 
 
 def withhold_case_details(rows: list[CaseRow], key: bytes | None = None) -> list[CaseRow]:
@@ -30,8 +35,26 @@ def withhold_case_details(rows: list[CaseRow], key: bytes | None = None) -> list
 
 
 def id_key_from_env() -> bytes | None:
+    """The key in `ID_KEY_ENV`, or None. A weak-looking key is used, with a warning on stderr."""
     value = os.environ.get(ID_KEY_ENV, "")
+    weakness = key_weakness(value) if value else None
+    if weakness is not None:
+        print(
+            f"warning: {ID_KEY_ENV} {weakness}, so it could be guessed from a report's key "
+            "fingerprint; use a random key such as the output of `openssl rand -hex 32`",
+            file=sys.stderr,
+        )
     return value.encode() if value else None
+
+
+def key_weakness(value: str) -> str | None:
+    """Why `value` looks too weak to key the case-id hash, or None. Only a rough screen: a long
+    key of varied characters can still be guessable."""
+    if len(value) < MIN_KEY_LENGTH:
+        return f"is {len(value)} characters long, shorter than {MIN_KEY_LENGTH}"
+    if len(set(value)) < MIN_DISTINCT_CHARACTERS:
+        return f"repeats characters: only {len(set(value))} distinct"
+    return None
 
 
 def key_fingerprint(key: bytes | None) -> str | None:

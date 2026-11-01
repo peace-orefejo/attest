@@ -9,18 +9,15 @@ rejected (see `bench_layout`).
 from __future__ import annotations
 
 import hashlib
-from collections import defaultdict
-from collections.abc import Callable
 from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
 from bench_cases import CHECKS, SEED_ORIGIN, SPLITS, Case, CheckName, Split
 from bench_layout import layout_problems, parse_case_file_name
+from bench_leaks import CaseTree, leak_problem
 
 DATASETS_DIR = Path(__file__).resolve().parent.parent / "datasets"
-
-CaseTree = dict[CheckName, dict[Split, list[Case]]]
 
 
 class DatasetError(ValueError):
@@ -69,7 +66,8 @@ def load_datasets(
     Each `<split>.jsonl` must exist (an empty file is fine) unless `allow_missing`, which a
     private dataset covering only some checks uses; external `<split>-<origin>.jsonl` files are
     optional. Case ids are unique across all files, no id and no `task_family` appears in two
-    splits (across every check), each case's `check` must match its folder, every case in an
+    splits (across every check), nor does a family nested under another's path (see
+    `bench_leaks`), each case's `check` must match its folder, every case in an
     external file must have that file's origin, and any entry the loader wouldn't read is
     rejected. In the public datasets (`public`, which defaults to whether `root` is
     `DATASETS_DIR`), every case in a `<split>.jsonl` must have origin `SEED_ORIGIN`; a private
@@ -87,9 +85,9 @@ def load_datasets(
         }
         for check in CHECKS
     }
-    _reject_split_leaks(cases)
-    _reject_family_leaks(cases)
-    _reject_duplicate_ids(cases)
+    problem = leak_problem(cases)
+    if problem is not None:
+        raise DatasetError(problem)
     return Datasets(cases=cases, version=dataset_version(root))
 
 
@@ -166,43 +164,3 @@ def _reject_unknown_entries(root: Path) -> None:
     problems = layout_problems(root)
     if problems:
         raise DatasetError("unrecognised entries in the datasets folder:\n" + "\n".join(problems))
-
-
-def _leaks(cases: CaseTree, key: Callable[[Case], str]) -> str:
-    """Each value of `key` found in more than one split, with those splits, or ''."""
-    found: dict[str, set[str]] = defaultdict(set)
-    for by_split in cases.values():
-        for split, split_cases in by_split.items():
-            for case in split_cases:
-                found[key(case)].add(split)
-    return ", ".join(
-        f"{value} ({', '.join(split for split in SPLITS if split in splits)})"
-        for value, splits in sorted(found.items())
-        if len(splits) > 1
-    )
-
-
-def _reject_split_leaks(cases: CaseTree) -> None:
-    leaked = _leaks(cases, lambda case: case.id)
-    if leaked:
-        raise DatasetError(f"case id(s) in more than one split: {leaked}")
-
-
-def _reject_family_leaks(cases: CaseTree) -> None:
-    leaked = _leaks(cases, lambda case: case.task_family)
-    if leaked:
-        raise DatasetError(
-            f"task_family(s) in more than one split, across all checks: {leaked}; related "
-            "runs must stay in one split"
-        )
-
-
-def _reject_duplicate_ids(cases: CaseTree) -> None:
-    seen: set[str] = set()
-    duplicates: set[str] = set()
-    for by_split in cases.values():
-        for split_cases in by_split.values():
-            for case in split_cases:
-                (duplicates if case.id in seen else seen).add(case.id)
-    if duplicates:
-        raise DatasetError(f"duplicate case id(s): {', '.join(sorted(duplicates))}")
