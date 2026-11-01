@@ -1,4 +1,5 @@
 ---
+title: "Policies: enforce your own rules on AI agent runs"
 description: "Enforce your project's own rules on every AI agent run: required and forbidden text, tool order, allowed tools and rubric checks."
 ---
 

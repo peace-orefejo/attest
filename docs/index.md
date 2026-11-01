@@ -1,13 +1,15 @@
 ---
-description: "attest checks AI agent answers against what their tools actually returned, catching made-up facts, misused tools and prompt injection, with JSON output."
+title: "attest: open-source AI agent evaluation tool for Python"
+description: "Open-source AI agent evaluation tool for Python: checks agent answers against real tool outputs to catch hallucinations, tool misuse and prompt injection."
 ---
 
-# attest
+# attest: open-source AI agent evaluation
 
-**A reality-checker for AI agents.** attest grades an agent's answer against what its tools
-actually returned. It's built to catch made-up facts, misused tools and prompt-injection slips
-that a "does this look good?" grader waves through. Its accuracy hasn't been measured on a
-labelled benchmark yet; [Limitations](limitations.md) says what it assumes.
+**A reality-checker for AI agents.** attest is an open-source Python tool for evaluating AI
+agents. It grades an agent's answer against what its tools actually returned, and it's built to
+catch made-up facts, misused tools and prompt-injection slips that a "does this look good?"
+grader waves through. Its accuracy hasn't been measured on a labelled benchmark yet;
+[Limitations](limitations.md) says what it assumes.
 
 attest grades a **run**: a JSON record of one task, with the question, each tool call and what
 it returned, and the agent's final answer.
@@ -58,6 +60,14 @@ those outputs are the only evidence attest accepts.
 [95% confidence interval](concepts.md#pass-rates-and-confidence), so you can tell a real
 improvement from noise.
 
+## Where it fits among AI evaluation tools
+
+Many AI evaluation tools and agent evaluation tools pair LLM-judge metrics with dashboards,
+tracing and datasets. attest is narrower: a library and a command line that check one recorded
+run against its own tool outputs and print JSON, with no UI and no tracing. It works alongside
+those tools rather than replacing them. [AI agent evaluation tools compared](compare/index.md)
+sets it next to DeepEval, Ragas, LangSmith, Arize Phoenix, TruLens and promptfoo.
+
 ## Code review mode
 
 attest can also check the outputs of an AI code reviewer: flagged issues, diff summaries, group
@@ -67,6 +77,8 @@ kept or dropped before people see it. See [Code review mode](code-review/index.m
 ## Next steps
 
 - [Getting started](getting-started.md): install, set a key and grade your first run.
+- [How to evaluate AI agents](guides/evaluate-ai-agents.md): what to measure and why evidence
+  matters.
 - [How it works](concepts.md): runs, evidence, findings, verdicts and reports.
 - The checks, starting with [Faithfulness](checks/faithfulness.md).
 - [Command line](cli.md) and [JSON output](json-output.md).

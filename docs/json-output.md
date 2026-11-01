@@ -1,4 +1,5 @@
 ---
+title: "JSON output and schemas for agent evaluation results"
 description: "The JSON every attest command prints: the versioned envelope, exit codes, fields per command, jq examples and JSON Schemas."
 ---
 
@@ -23,6 +24,10 @@ When a command can't run, `ok` is `false` and `error` replaces `data`:
 the model doesn't exist (404); the message never includes the key. `command_failed` means
 an error the checks don't absorb stopped the command, such as a provider error during
 `attest review`; `message` names the error.
+
+A usage error, such as an unknown option, a missing argument or `--max-claims abc`, is
+`invalid_input` too. When the command itself is missing or unknown, `command` is `attest`.
+Only `--help` prints plain text.
 
 ## Exit codes
 

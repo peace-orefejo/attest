@@ -50,7 +50,8 @@ class VerdictPolicy(BaseModel):
     (`checked` false), even beside supported claims. It defaults to `review`, so an answer
     attest couldn't verify never reads as a pass. `on_injection_warning` applies to injection
     warnings (`suspicious`, `possible_injection`, `unscanned_content`); `compromised` always
-    blocks.
+    blocks. Any other finding nothing checked (`unchecked`, or `metadata["checked"]` false)
+    gets `review`, or its rule's disposition when that is stricter.
     `min_score` maps a check name to the lowest acceptable score: below it, that check's
     passing findings become `review`. `min_claim_coverage` is the lowest acceptable share of an
     answer's claims that faithfulness could check against the evidence (`claims_checked /

@@ -3,9 +3,11 @@
     uv run python benchmarks/runners/run.py --check faithfulness --split dev \\
         --provider anthropic --out benchmarks/reports/faithfulness-dev.json
     uv run python benchmarks/runners/run.py --offline          # no key: tool use + injection scan
+    uv run python benchmarks/runners/run.py --offline --split validation
     uv run python benchmarks/runners/run.py --split heldout --heldout --out ...
 
-The held-out split is refused unless --heldout is passed too, so it isn't used by accident
+The splits are dev (tuning), validation (checking a change before release) and heldout. The
+held-out split is refused unless --heldout is passed too, so it isn't used by accident
 while developing. A Markdown summary is printed to stdout.
 """
 

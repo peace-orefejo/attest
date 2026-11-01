@@ -60,7 +60,9 @@ def _coverage_problems(report: BenchmarkReport, name: str, min_coverage: float) 
     reasons: list[str] = []
     if report.budget_exhausted:
         reasons.append(f"the {name} report ran out of budget: {report.stopped_reason}")
-    if not report.all_cases_graded:
+    if not report.cases:
+        reasons.append(f"the {name} report has no cases")
+    elif not report.all_cases_graded:
         reasons.append(f"the {name} report has cases that errored or didn't run")
     for check, metrics in sorted(report.checks.items()):
         share = metrics.coverage.coverage.value

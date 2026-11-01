@@ -164,11 +164,12 @@ label folder, or attest's output. Commit a batch's label folders only once every
 finished it, and reviewers should check that each folder belongs to a different person.
 
 1. **Get blank label files.** `annotate.py template <you> --check <check>` writes one file per
-   dev case to `annotations/labels/<you>/<case id>.json` (add `--split heldout` for held-out).
-   Each holds the run to read, the labels left blank, and `run_sha256`, which ties your labels
-   to that exact run: if the run or the items to label (claim texts, call steps) are edited
-   later, your file is reported as stale and skipped, and `template` tells you which files to
-   delete and regenerate, finished or not. Open only your own folder.
+   dev case to `annotations/labels/<you>/<case id>.json` (add `--split validation` or
+   `--split heldout` for the other splits). Each holds the run to read, the labels left
+   blank, and `run_sha256`, which ties your labels to that exact run: if the run or the items
+   to label (claim texts, call steps) are edited later, your file is reported as stale and
+   skipped, and `template` tells you which files to delete and regenerate, finished or not.
+   Open only your own folder.
 2. **Fill them in.** Give every label, a `confidence` (`high`, `medium` or `low`), a one- or
    two-sentence `rationale`, and set `ambiguous: true` if a careful person could reasonably
    label it either way. Files with a blank left are skipped as unfinished. Don't add a

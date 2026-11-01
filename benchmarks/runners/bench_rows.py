@@ -56,6 +56,8 @@ class CaseRow(BaseModel):
     check: str
     category: str
     source: str
+    origin: str | None = None
+    """The case's origin, such as `attest-seed`; None in reports written before origins."""
     label_status: str
     status: CaseStatus = "graded"
     items: list[Item] = Field(default_factory=list[Item])
