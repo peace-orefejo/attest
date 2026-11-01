@@ -14,9 +14,10 @@ Three rules keep the numbers honest:
    rereads the case against the [guidelines](annotations/guidelines.md).
 2. **Results are reported per check.** There is no single "attest accuracy" number. Each check
    gets its own confusion matrix, detection rates and intervals.
-3. **Development and held-out sets are kept apart.** Tune prompts and heuristics against `dev`
-   only. `heldout` is run for a release or a published result, and the runner refuses it unless
-   you pass `--heldout`.
+3. **Development, validation and held-out sets are kept apart.** Tune prompts and heuristics
+   against `dev` only. Check a change against `validation` before a release, without tuning on
+   what it shows. `heldout` is run for a release or a published result, and the runner refuses
+   it unless you pass `--heldout`. Related runs (a `task_family`) never straddle two splits.
 
 > **Status:** the seed cases are a small synthetic set with **draft** labels written by the
 > benchmark author as proposals. Every one must be confirmed or corrected by the owner, with
@@ -55,15 +56,18 @@ uv run python benchmarks/runners/run.py --max-calls 200 --out benchmarks/reports
 # no key: tool use without the answer question, and the injection scan
 uv run python benchmarks/runners/run.py --offline
 
+# validation: no extra flag needed
+uv run python benchmarks/runners/run.py --split validation --out benchmarks/reports/validation.json
+
 # held-out, deliberately
 uv run python benchmarks/runners/run.py --split heldout --heldout --out benchmarks/reports/heldout.json
 ```
 
-Options: `--check` (repeat it; default all), `--split dev|heldout`, `--provider`, `--model`,
-`--max-calls N`, `--cache-dir DIR`, `--offline`, `--appropriate` (adds tool_use's tool-choice
-check, needed to ever predict `incorrect`), `--answer-kind` (faithfulness, default `factual`),
-`--price-per-mtok-in` and `--price-per-mtok-out` (USD per million tokens; without both, the
-report gives tokens and no cost), `--min-coverage` (default 0.95, below), `--out`.
+Options: `--check` (repeat it; default all), `--split dev|validation|heldout`, `--provider`,
+`--model`, `--max-calls N`, `--cache-dir DIR`, `--offline`, `--appropriate` (adds tool_use's
+tool-choice check, needed to ever predict `incorrect`), `--answer-kind` (faithfulness, default
+`factual`), `--price-per-mtok-in` and `--price-per-mtok-out` (USD per million tokens; without
+both, the report gives tokens and no cost), `--min-coverage` (default 0.95, below), `--out`.
 
 `--offline` runs only what needs no model. Faithfulness and role adherence are skipped, tool
 errors that nothing recovered come back `unchecked` (so `acknowledged` and `claimed_success`
@@ -100,7 +104,8 @@ flipped, and exits 1 if F1 or recall in any binary view drops by more than `--to
 Each run writes one JSON report (`--out`, `format_version` 2) and prints a short Markdown
 summary. The report holds:
 
-- `format_version`, `dataset_version` (SHA-256 of all the case files), `attest_version`,
+- `format_version`, `dataset_version` (SHA-256 of all the case files, external
+  `<split>-<origin>.jsonl` files included), `attest_version`,
   `prompt_version`, `provider`, `model` (null offline), `split`, `timestamp`, `settings`,
   `prices`, `skipped_checks`.
 - Run status: `budget_exhausted` (the call budget ran out, so some cases weren't run),
@@ -124,12 +129,13 @@ summary. The report holds:
     interval), the `positive` and `negative` labels, and `effective_recall`, the recall over
     every attempted item with errored and not-run items counted as missed;
   - `per_label` (one label against the rest), `per_category` (coverage, accuracy, effective
-    accuracy and the binary views per category);
+    accuracy and the binary views per category) and `per_origin` (the same, per origin, so a
+    report mixing seed and external cases can be read per source);
   - for faithfulness, `claim_coverage` (the share of claims the verifier could check, that is
     called supported or unsupported) and `run_label_accuracy` when cases carry a `run_label`;
   - `latency` (median and nearest-rank p95 seconds per graded case) and `usage` (calls and
     tokens, and `cost_usd` only when prices are given).
-- `cases`: one row per case with `id`, `category`, `status` (`graded`, `errored` or
+- `cases`: one row per case with `id`, `category`, `origin`, `status` (`graded`, `errored` or
   `not_run`), `items` (each with `expected`, `predicted`, `correct`), `correct`, `latency_s`,
   `usage` and `error`. An errored or not-run row still lists its labelled items, predicted
   `error` or `not_run`.
@@ -152,7 +158,9 @@ An abridged check entry:
 
 The Markdown summary shows coverage beside every accuracy and detection figure, puts graded-only
 and effective figures side by side, and opens with **NOT PUBLISHABLE** and the reasons whenever
-`publishable` is false. It warns separately for each check below `--min-coverage`.
+`publishable` is false. It warns separately for each check below `--min-coverage`. It lists
+the number of cases per origin and, when a check mixes origins, adds a table of coverage and
+accuracy per check and origin.
 
 ### Binary views
 
@@ -181,7 +189,9 @@ interval, not the point estimate.
 
 ## Case format
 
-One case per line in `datasets/<check>/<split>.jsonl`. The model is `Case` in
+One case per line in `datasets/<check>/<split>.jsonl` (seed cases) or
+`datasets/<check>/<split>-<origin>.jsonl` (external cases, see
+[External origins](#external-origins)). The model is `Case` in
 [`runners/bench_cases.py`](runners/bench_cases.py); unknown fields are rejected.
 
 ```json
@@ -190,6 +200,8 @@ One case per line in `datasets/<check>/<split>.jsonl`. The model is `Case` in
   "check": "faithfulness",
   "category": "known_hallucination",
   "source": "synthetic",
+  "origin": "attest-seed",
+  "task_family": "attest-seed/faithfulness/dev",
   "label_status": "draft",
   "annotators": [],
   "trajectory": {"task": "...", "steps": [...], "final_answer": "..."},
@@ -209,7 +221,10 @@ One case per line in `datasets/<check>/<split>.jsonl`. The model is `Case` in
 | `id` | Unique across every check and split. Lowercase letters, digits, `-`, `_`, `.`. |
 | `check` | Must match the folder. |
 | `category` | The scenario, in snake case: `known_hallucination`, `missing_evidence`, `recovered_error`, `claimed_success`, `benign_instruction_lookalike`, `incomplete_trajectory` and so on. Metrics are broken down by it. |
-| `source` | `synthetic` (written for the benchmark), `real` (from a real agent run, anonymised) or `community` (contributed). |
+| `source` | `synthetic` (written for the benchmark), `real` (from a real agent run, anonymised) or `community` (contributed, including runs converted from public datasets). |
+| `origin` | Required. The dataset the run came from: `attest-seed` for the seed cases, or an external one such as `tau-bench`, `agentdojo`, `toolbench`. Lowercase letters, digits, `-`, `_`. Must match the file's origin in a `<split>-<origin>.jsonl` file. |
+| `task_family` | Required. The group of related runs that must stay in one split, such as `tau-bench/retail` or `agentdojo/workspace`. Lowercase letters, digits, `-`, `_`, `.`, `/`. A family may appear in only one split, across all checks. The seed cases use `attest-seed/<check>/<split>`. |
+| `origin_ref` | Optional (default null). Where in the upstream source the run came from: the upstream file path plus a trajectory index or task id, such as `historical_trajectories/gpt-4o-airline.json#17`. The upstream commit is recorded once in `sources/<origin>/SOURCE.md`. |
 | `label_status` | `draft` until double-labelled and agreed; then `confirmed`, which needs at least two annotators. |
 | `annotators` | Initials of everyone who labelled the case. |
 | `trajectory` | An attest `Trajectory`. |
@@ -228,23 +243,50 @@ One case per line in `datasets/<check>/<split>.jsonl`. The model is `Case` in
   on) or `compromised` (the agent acted on it).
 - **role_adherence:** `label`: `in_scope`, `appropriately_refused` or `out_of_scope_complied`.
 
-The loader rejects malformed lines, duplicate ids, an id in both dev and held-out, a `check`
-that doesn't match its folder, tool labels that don't cover every tool call exactly once,
-duplicate claim texts, and a `confirmed` case with fewer than two annotators.
+The loader rejects malformed lines, duplicate ids, an id or a `task_family` in more than one
+split (across all checks), a `check` that doesn't match its folder, a case in a
+`<split>-<origin>.jsonl` file with another origin, any other `.jsonl` file name in a check
+folder, a missing `<split>.jsonl` (in the public datasets), tool labels that don't cover every
+tool call exactly once, duplicate claim texts, and a `confirmed` case with fewer than two
+annotators.
+
+Every `<split>.jsonl` must exist in the public datasets, even when empty: the seed
+`validation.jsonl` files are empty until validation cases are added.
+
+## External origins
+
+Runs converted from public agent datasets sit beside the seed cases, one file per check, split
+and origin: `datasets/<check>/<split>-<origin>.jsonl`, such as
+`datasets/prompt_injection/dev-agentdojo.jsonl`. The loader reads them into the same split as
+`<split>.jsonl`, and `dataset_version` covers them. To add an origin:
+
+1. Vendor only the upstream files you use under `sources/<origin>/`, with the upstream
+   `LICENSE` verbatim, a `NOTICE` line crediting it, and `SOURCE.md` (upstream URL, exact
+   commit, each file's upstream path and sha256, what was selected and why, what was stripped).
+2. Write `converters/<origin>.py`, which regenerates that origin's case files from those inputs
+   deterministically (`uv run python benchmarks/converters/<origin>.py`), and
+   `converters/<origin>_test.py` beside it. See [converters/README.md](converters/README.md).
+3. Every case gets `origin: "<origin>"`, `source: "community"`, an id prefixed with the origin
+   (`agentdojo-banking-ut3-it1`), a `task_family` and an `origin_ref`. Pick task families so
+   related runs (the same upstream task or environment) land in one split.
+4. Strip anything that could act as a label (rewards, success or security flags, grader
+   output) and any real person's personal data. Labels start as drafts, as below.
 
 ## Add and label cases
 
 1. Write the run. Anonymise real runs: no names, emails, keys or customer data.
 2. Label it by hand against the [guidelines](annotations/guidelines.md), without running
    attest first. Explain the label in `notes`.
-3. Add it as `label_status: "draft"` with your initials in `annotators`.
+3. Add it as `label_status: "draft"` with your initials in `annotators`. A seed case takes
+   `origin: "attest-seed"` and `task_family: "attest-seed/<check>/<split>"`.
 4. Two people then label it blind with `runners/annotate.py`: `template` gives each of them
    blank label files, `agreement` reports agreement and Cohen's kappa, `settle` records how a
    disagreement was settled, and `merge --write` confirms the cases they agree on or have
    settled. See
    [Double labelling](annotations/guidelines.md#double-labelling-and-agreement).
-5. Put new cases in `dev` unless you are deliberately growing held-out. Never move a case from
-   held-out to dev after its results have been looked at for tuning; retire it instead.
+5. Put new cases in `dev` unless you are deliberately growing validation or held-out. Never
+   move a case from validation or held-out to dev after its results have been looked at for
+   tuning; retire it instead.
 6. Run `uv run pytest benchmarks` to validate.
 
 Editing any case file changes `dataset_version`, so reports from before and after an edit are
@@ -253,7 +295,8 @@ flagged as not comparable.
 ## Private datasets
 
 Runs from your own agents can hold customer data, so keep them out of this repository. Put them
-in any other folder with the same layout, `<check>/{dev,heldout}.jsonl`, and pass it with
+in any other folder with the same layout, `<check>/{dev,validation,heldout}.jsonl` (plus any
+`<split>-<origin>.jsonl` files), and pass it with
 `--datasets`:
 
 ```bash
@@ -291,7 +334,11 @@ benchmarks/
 │   ├── guidelines.md            labelling rules (draft)
 │   ├── labels/<annotator>/      each annotator's label files, one per case
 │   └── adjudications.jsonl      how each disagreement was settled
-├── datasets/<check>/{dev,heldout}.jsonl
+├── datasets/<check>/
+│   ├── {dev,validation,heldout}.jsonl          seed cases (origin attest-seed)
+│   └── <split>-<origin>.jsonl                  external cases, written by a converter
+├── converters/                  <origin>.py: public dataset runs -> case files
+├── sources/<origin>/            vendored upstream inputs, LICENSE, NOTICE, SOURCE.md
 ├── private/                     your own cases (git-ignored)
 ├── runners/                     case model, loading, grading, metrics, reports, compare,
 │                                annotate (templates, agreement, settle, merge)

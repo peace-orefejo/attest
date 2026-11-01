@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from bench_check_metrics import BinaryMetrics, CheckMetrics
+from collections import Counter
+
+from bench_check_metrics import BinaryMetrics, CategoryMetrics, CheckMetrics
 from bench_metrics import Rate
 from bench_report import BenchmarkReport
 
@@ -25,6 +27,8 @@ def markdown_summary(report: BenchmarkReport) -> str:
         f"{report.provider}/{report.model or 'no model (offline)'}, "
         f"datasets {report.dataset_version[:12]}",
         "",
+        _origin_counts(report),
+        "",
         *_private_note(report),
         *_publish_banner(report),
         READING_GUIDE,
@@ -44,6 +48,7 @@ def markdown_summary(report: BenchmarkReport) -> str:
             for view_name, view in metrics.binary.items()
         ),
         "",
+        *_origin_table(report),
         *_notes(report),
     ]
     return "\n".join(lines).rstrip() + "\n"
@@ -92,7 +97,40 @@ def _view_line(name: str, view_name: str, view: BinaryMetrics, metrics: CheckMet
     return "| " + " | ".join(cells) + " |"
 
 
-def _coverage(metrics: CheckMetrics) -> str:
+def _origin_counts(report: BenchmarkReport) -> str:
+    counts = Counter(row.origin or "unknown" for row in report.cases)
+    listed = ", ".join(f"{origin} {n}" for origin, n in sorted(counts.items()))
+    return f"Cases by origin: {listed or 'none'}."
+
+
+def _origin_table(report: BenchmarkReport) -> list[str]:
+    """Coverage and accuracy per origin, only when some check mixes origins."""
+    if all(len(metrics.per_origin) < 2 for metrics in report.checks.values()):
+        return []
+    return [
+        "| check | origin | coverage | item accuracy (graded only) | item accuracy (effective) |",
+        "|---|---|---|---|---|",
+        *(
+            _origin_line(name, origin, group)
+            for name, metrics in report.checks.items()
+            for origin, group in metrics.per_origin.items()
+        ),
+        "",
+    ]
+
+
+def _origin_line(name: str, origin: str, group: CategoryMetrics) -> str:
+    cells = [
+        name,
+        origin,
+        _coverage(group),
+        _pct(group.item_accuracy),
+        _pct(group.effective.item_accuracy),
+    ]
+    return "| " + " | ".join(cells) + " |"
+
+
+def _coverage(metrics: CheckMetrics | CategoryMetrics) -> str:
     covered, share = metrics.coverage, metrics.coverage.coverage
     if share.value is None or share.low is None or share.high is None:
         return "n/a (0 cases)"

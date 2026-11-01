@@ -49,6 +49,8 @@ def test_offline_run_over_seed_dev_set(tmp_path: Path, capsys: pytest.CaptureFix
     assert "draft labels" in summary and "Offline run" in summary
     assert "NOT PUBLISHABLE" in summary and "| 100% 5/5 (" in summary
     assert "**not** claim extraction" in summary
+    seed_rows = sum(row.origin == "attest-seed" for row in report.cases)
+    assert seed_rows and f"attest-seed {seed_rows}" in summary.split("Cases by origin: ")[1]
 
 
 def test_heldout_needs_explicit_flag(capsys: pytest.CaptureFixture[str]) -> None:
@@ -62,6 +64,38 @@ def test_heldout_runs_with_flag(tmp_path: Path) -> None:
     out = tmp_path / "heldout.json"
     assert run.main(["--offline", "--split", "heldout", "--heldout", "--out", str(out)]) == 0
     assert BenchmarkReport.model_validate_json(out.read_text()).split == "heldout"
+
+
+def test_validation_runs_without_the_heldout_flag(tmp_path: Path) -> None:
+    out = tmp_path / "validation.json"
+    assert run.main(["--offline", "--split", "validation", "--out", str(out)]) == 0
+    report = BenchmarkReport.model_validate_json(out.read_text())
+    assert report.split == "validation"
+    assert report.dataset_version == load_datasets().version
+    expected = len(load_datasets().split("tool_use", "validation"))
+    assert report.checks["tool_use"].coverage.attempted == expected
+
+
+def test_report_breaks_down_a_mixed_dataset_by_origin(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls = [{"tool_call": {"name": "pay", "output": "paid"}}]
+    tool = {"calls": [{"step": 0, "verdict": "correct"}]}
+    root = _write_tree(tmp_path / "datasets", {"tool_use": [_case("t1", "tool_use", tool, calls)]})
+    external = _case("tau-t2", "tool_use", tool, calls)
+    external.update(source="community", origin="tau-bench", task_family="tau-bench/retail")
+    (root / "tool_use" / "dev-tau-bench.jsonl").write_text(json.dumps(external) + "\n")
+    out = tmp_path / "mixed.json"
+    assert run.main(["--offline", "--datasets", str(root), "--out", str(out)]) == 0
+
+    report = BenchmarkReport.model_validate_json(out.read_text())
+    assert sorted(row.origin or "" for row in report.cases) == ["attest-seed", "tau-bench"]
+    per_origin = report.checks["tool_use"].per_origin
+    assert sorted(per_origin) == ["attest-seed", "tau-bench"]
+    assert per_origin["tau-bench"].coverage.attempted == 1
+    summary = capsys.readouterr().out
+    assert "Cases by origin: attest-seed 1, tau-bench 1." in summary
+    assert "| tool_use | tau-bench | 100% 1/1 (" in summary
 
 
 def test_offline_refuses_a_check_that_needs_a_model() -> None:
@@ -107,6 +141,8 @@ def _case(id_: str, check: str, expected: dict[str, Any], steps: list[Any]) -> d
         "check": check,
         "category": "x",
         "source": "synthetic",
+        "origin": "attest-seed",
+        "task_family": "fam-dev",
         "label_status": "draft",
         "trajectory": {
             "task": "t",

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from bench_cases import BINARY_VIEWS, LABELS, BinaryView, CheckName
 from bench_coverage import Coverage, EffectiveAccuracy, coverage, effective_accuracy
@@ -46,6 +46,8 @@ class BinaryMetrics(Detection):
 
 
 class CategoryMetrics(BaseModel):
+    """One group's metrics within a check: a category's, or an origin's."""
+
     coverage: Coverage
     item_accuracy: Rate
     effective: EffectiveAccuracy
@@ -83,6 +85,8 @@ class CheckMetrics(BaseModel):
     binary: dict[str, BinaryMetrics]
     per_label: dict[str, LabelScore]
     per_category: dict[str, CategoryMetrics]
+    per_origin: dict[str, CategoryMetrics] = Field(default_factory=dict[str, CategoryMetrics])
+    """The same breakdown as `per_category`, by the cases' origin (such as `attest-seed`)."""
     claim_coverage: Rate | None = None
     run_label_accuracy: Rate | None = None
     latency: Latency
@@ -118,7 +122,8 @@ def check_metrics(check: CheckName, rows: Sequence[CaseRow], prices: Prices) -> 
         confusion=confusion(pairs, LABELS[check]),
         binary=binary_metrics(check, rows),
         per_label=per_label(pairs, LABELS[check]),
-        per_category=_per_category(check, rows),
+        per_category=_breakdown(check, rows, lambda row: row.category),
+        per_origin=_breakdown(check, rows, lambda row: row.origin or "unknown"),
         claim_coverage=claim_coverage(p for _, p in pairs) if check == "faithfulness" else None,
         run_label_accuracy=accuracy(run_pairs) if run_pairs else None,
         latency=latency([row.latency_s for row in graded if row.latency_s is not None]),
@@ -149,18 +154,21 @@ def _pairs(rows: Sequence[CaseRow]) -> list[Pair]:
     return [(item.expected, item.predicted) for row in rows for item in row.items]
 
 
-def _per_category(check: CheckName, rows: Sequence[CaseRow]) -> dict[str, CategoryMetrics]:
-    by_category: dict[str, list[CaseRow]] = defaultdict(list)
+def _breakdown(
+    check: CheckName, rows: Sequence[CaseRow], key: Callable[[CaseRow], str]
+) -> dict[str, CategoryMetrics]:
+    """Coverage, accuracy and the binary views per group of rows, such as per category."""
+    groups: dict[str, list[CaseRow]] = defaultdict(list)
     for row in rows:
-        by_category[row.category].append(row)
+        groups[key(row)].append(row)
     return {
-        category: CategoryMetrics(
+        group: CategoryMetrics(
             coverage=coverage(members),
             item_accuracy=accuracy(_pairs([row for row in members if row.graded])),
             effective=effective_accuracy(members),
             binary=binary_metrics(check, members),
         )
-        for category, members in sorted(by_category.items())
+        for group, members in sorted(groups.items())
     }
 
 

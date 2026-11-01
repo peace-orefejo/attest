@@ -111,6 +111,7 @@ def _blank_row(case: Case) -> CaseRow:
         check=case.check,
         category=case.category,
         source=case.source,
+        origin=case.origin,
         label_status=case.label_status,
     )
 
