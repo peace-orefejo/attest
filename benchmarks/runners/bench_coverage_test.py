@@ -95,7 +95,9 @@ def _report(rows: list[CaseRow], *, offline: bool = False, drafts: bool = False)
         rows = [row.model_copy(update={"label_status": "draft"}) for row in rows]
     checks = {"prompt_injection": check_metrics("prompt_injection", rows, Prices())}
     settings = GradeSettings(offline=offline)
-    blockers = publishability(checks, settings=settings, budget_exhausted=False, min_coverage=0.95)
+    blockers = publishability(
+        checks, split="dev", settings=settings, budget_exhausted=False, min_coverage=0.95
+    )
     return BenchmarkReport(
         dataset_version="v" * 64,
         attest_version="0",
@@ -146,11 +148,14 @@ def test_threshold_is_inclusive() -> None:
     checks = {"prompt_injection": check_metrics("prompt_injection", rows, Prices())}
     settings = GradeSettings()
     assert (
-        publishability(checks, settings=settings, budget_exhausted=False, min_coverage=0.95) == []
+        publishability(
+            checks, split="dev", settings=settings, budget_exhausted=False, min_coverage=0.95
+        )
+        == []
     )
-    assert publishability(checks, settings=settings, budget_exhausted=True, min_coverage=0.95) == [
-        "the call budget ran out"
-    ]
+    assert publishability(
+        checks, split="dev", settings=settings, budget_exhausted=True, min_coverage=0.95
+    ) == ["the call budget ran out"]
 
 
 def test_faithfulness_summary_names_both_views_and_the_fixed_extractor() -> None:

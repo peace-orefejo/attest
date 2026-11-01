@@ -38,7 +38,8 @@ class BenchmarkReport(BaseModel):
     budget_exhausted: bool = False
     """The call budget ran out, so some cases were not run."""
     all_cases_graded: bool = True
-    """Every case of every check that ran was graded: none errored and none was skipped."""
+    """Every case of every check that ran was graded: none errored and none was skipped. False
+    when no case ran at all, so an empty run never reads as fully graded."""
     stopped_reason: str | None = None
     publishable: bool = False
     not_publishable_because: list[str] = Field(default_factory=list[str])
@@ -50,12 +51,23 @@ class BenchmarkReport(BaseModel):
 def publishability(
     checks: Mapping[str, CheckMetrics],
     *,
+    split: str,
     settings: GradeSettings,
     budget_exhausted: bool,
     min_coverage: float,
 ) -> list[str]:
-    """Why these numbers may not be published; empty when they may."""
+    """Why these numbers may not be published; empty when they may.
+
+    A run with no cases, or a check with none in `split`, has nothing to publish: its
+    coverage is undefined rather than full."""
     reasons: list[str] = []
+    if checks and not any(metrics.coverage.attempted for metrics in checks.values()):
+        reasons.append(f"the run has no cases in {split}")
+    reasons.extend(
+        f"no cases for {name} in {split}"
+        for name, metrics in checks.items()
+        if not metrics.coverage.attempted
+    )
     drafts = sum(metrics.draft_cases for metrics in checks.values())
     if drafts:
         reasons.append(f"{drafts} case(s) carry draft labels")
