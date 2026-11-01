@@ -11,12 +11,17 @@ from bench_annotations import Annotation, Annotations, ItemKey, label_items
 from bench_cases import Case, FaithfulnessExpected
 
 
+class StaleAdjudication(BaseModel):
+    entry: Adjudication
+    reason: str
+
+
 class MergeOutcome(BaseModel):
     confirmed: dict[str, Case]
     unresolved: dict[str, list[str]]
     """Case id -> why it can't be confirmed yet."""
-    stale_adjudications: list[Adjudication]
-    """Log entries settled on an older version of their run; ignored. Settle the case again."""
+    stale_adjudications: list[StaleAdjudication]
+    """Log entries that no longer describe their item, and why; ignored. Settle it again."""
 
 
 def merge(
@@ -24,26 +29,57 @@ def merge(
 ) -> MergeOutcome:
     """Confirm every case at least two annotators labelled and whose disagreements are settled.
 
-    Adjudications settled on an older version of a run are never applied; they are returned in
-    `stale_adjudications`. Raises ValueError if an adjudication names no current item or two
-    current ones settle the same item.
+    Adjudications settled on an older version of a run are never applied, and neither is a
+    discussion settled on labels the annotators no longer give (an owner ruling stands whatever
+    the labels); both are returned in `stale_adjudications`. Raises ValueError if an
+    adjudication names no current item or two current ones settle the same item.
     """
     indexed = index_adjudications(adjudications, cases)
     by_case: dict[str, dict[str, Annotation]] = {}
     for annotator, labelled in annotations.items():
         for case_id, annotation in labelled.items():
             by_case.setdefault(case_id, {})[annotator] = annotation
+    stale = [StaleAdjudication(entry=x, reason=RUN_CHANGED) for x in indexed.stale]
+    settled: Settled = {}
+    for (case_id, key), x in indexed.settled.items():
+        reason = _labels_changed(x, by_case.get(case_id, {}))
+        if reason is None:
+            settled[(case_id, key)] = x
+        else:
+            stale.append(StaleAdjudication(entry=x, reason=reason))
     confirmed: dict[str, Case] = {}
     unresolved: dict[str, list[str]] = {}
     for case_id in sorted(by_case):
-        result = _merge_case(cases[case_id], by_case[case_id], indexed.settled)
+        result = _merge_case(cases[case_id], by_case[case_id], settled)
         if isinstance(result, Case):
             confirmed[case_id] = result
         else:
             unresolved[case_id] = result
-    return MergeOutcome(
-        confirmed=confirmed, unresolved=unresolved, stale_adjudications=indexed.stale
+    return MergeOutcome(confirmed=confirmed, unresolved=unresolved, stale_adjudications=stale)
+
+
+RUN_CHANGED = "the run changed after it was settled; settle it again"
+
+
+def _labels_changed(x: Adjudication, labelled: dict[str, Annotation]) -> str | None:
+    """Why a discussion no longer settles its item, or None. Owner rulings never go stale here.
+
+    A case nobody has current labels for isn't merged, so its entries aren't checked."""
+    if x.how != "discussion" or not labelled:
+        return None
+    if x.labels is None:
+        return "it doesn't record the labels it settled; settle it again with --replace"
+    now = {name: label_items(a.labels)[x.key] for name, a in labelled.items()}
+    if now == x.labels:
+        return None
+    return (
+        f"the labels changed after it was settled (then {_votes(x.labels)}, now {_votes(now)}); "
+        "settle it again with --replace"
     )
+
+
+def _votes(labels: dict[str, str]) -> str:
+    return ", ".join(f"{name} {label}" for name, label in sorted(labels.items()))
 
 
 def _merge_case(
@@ -68,17 +104,18 @@ def _merge_case(
         if adjudication is not None and unanimous and adjudication.label in agreed:
             adjudication = None
         if adjudication is not None:
-            problem = _adjudication_problem(adjudication, labelled, unanimous=unanimous)
-            if problem is not None:
-                problems.append(problem)
+            if adjudication.how == "discussion" and unanimous:
+                problems.append(
+                    f"the adjudication of {key[0]} {key[1]!r} overrides a label every annotator "
+                    "agreed on; only an owner ruling can"
+                )
                 continue
             final[key] = adjudication.label
             used.append(adjudication)
         elif unanimous:
             final[key] = next(iter(given.values()))
         else:
-            votes = ", ".join(f"{name} {label}" for name, label in sorted(given.items()))
-            problems.append(f"{key[0]} {key[1]!r} is unsettled ({votes})")
+            problems.append(f"{key[0]} {key[1]!r} is unsettled ({_votes(given)})")
     if problems:
         return problems
     try:
@@ -93,22 +130,6 @@ def _merge_case(
             "notes": _notes(labelled, used),
         }
     )
-
-
-def _adjudication_problem(
-    x: Adjudication, labelled: dict[str, Annotation], *, unanimous: bool
-) -> str | None:
-    what = f"the adjudication of {x.dimension} {x.subject!r}"
-    if x.how == "discussion":
-        if unanimous:
-            return f"{what} overrides a label every annotator agreed on; only an owner ruling can"
-        outsiders = sorted(set(x.decided_by) - set(labelled))
-        if outsiders:
-            return f"{what} is a discussion but {', '.join(outsiders)} didn't label this case"
-        absent = sorted(set(labelled) - set(x.decided_by))
-        if absent:
-            return f"{what} is a discussion without {', '.join(absent)}, who labelled this case"
-    return None
 
 
 def _with_labels(case: Case, final: dict[ItemKey, str]) -> Any:
