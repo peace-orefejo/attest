@@ -7,7 +7,25 @@ requires-python = ">=3.11"
 license = "AGPL-3.0-only"
 license-files = ["LICENSE"]
 authors = [{ name = "Adepeju Orefejo", email = "adepejuorefejo5@gmail.com" }]
-keywords = ["evals", "evaluation", "llm", "agents", "ai", "prompt-injection", "faithfulness", "trajectory"]
+keywords = [
+    "evals",
+    "evaluation",
+    "llm",
+    "agents",
+    "ai",
+    "ai-agents",
+    "agent-evaluation",
+    "llm-evaluation",
+    "ai-evaluation",
+    "llm-as-a-judge",
+    "hallucination-detection",
+    "prompt-injection",
+    "tool-calling",
+    "faithfulness",
+    "groundedness",
+    "trajectory",
+    "code-review",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",

@@ -1,4 +1,5 @@
 ---
+title: "attest.code_review API reference"
 description: "API reference for attest.code_review: review(), PullRequest, ReviewOutput, ReviewResult, gate() and guidelines."
 ---
 

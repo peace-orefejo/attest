@@ -27,6 +27,19 @@ Grade an agent's answer against what its tools actually returned.
 
 <br>
 
+attest is an open-source Python library and CLI for **AI agent evaluation**. It checks a
+tool-using agent's run against the evidence it recorded: every claim in the answer against the
+tool outputs, every tool call against the allowed tools and its errors, the content the agent
+read for prompt injection, and the agent's behaviour against its system prompt. Each finding
+maps to a pass, review or block verdict, and every command prints JSON.
+
+Full documentation: **[peace-orefejo.github.io/attest](https://peace-orefejo.github.io/attest/)**,
+including [how to evaluate AI agents](https://peace-orefejo.github.io/attest/guides/evaluate-ai-agents/)
+and a [comparison with other agent evaluation tools](https://peace-orefejo.github.io/attest/compare/)
+such as DeepEval, Ragas, LangSmith and Arize Phoenix.
+
+<br>
+
 ## Quick start
 
 attest grades a **run**: a JSON record of one task, with the question, each tool call and what

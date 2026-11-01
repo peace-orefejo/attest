@@ -1,5 +1,6 @@
 ---
-description: "How to contribute to attest: set up with uv, run the tests, follow the code rules and send a pull request."
+title: "Contributing"
+description: "How to contribute to attest, an open-source AI agent evaluation tool: set up with uv, run the offline tests, follow the code rules and send a pull request."
 ---
 
 --8<-- "CONTRIBUTING.md"

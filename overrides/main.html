@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
 {% block htmltitle %}
-  {% if page.is_homepage %}
-    <title>{{ config.site_name }}: evidence-grounded evaluation for AI agents</title>
+  {% if page.is_homepage and page.meta and page.meta.title %}
+    <title>{{ page.meta.title }}</title>
   {% else %}
     {{ super() }}
   {% endif %}
 {% endblock %}
 
 {% block extrahead %}
-  {% if page.is_homepage %}
-    {% set title = config.site_name ~ ": evidence-grounded evaluation for AI agents" %}
+  {% if page.is_homepage and page.meta and page.meta.title %}
+    {% set title = page.meta.title %}
   {% elif page.meta and page.meta.title %}
     {% set title = page.meta.title ~ " - " ~ config.site_name %}
   {% else %}
@@ -18,6 +18,9 @@
   {% endif %}
   {% set description = page.meta.description if page.meta and page.meta.description else config.site_description %}
   {% set image = config.site_url ~ "assets/brand/attest-card.png" %}
+  {% if page.is_homepage and config.extra.google_site_verification %}
+    <meta name="google-site-verification" content="{{ config.extra.google_site_verification }}">
+  {% endif %}
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="{{ config.site_name }}">
   <meta property="og:title" content="{{ title }}">
@@ -36,16 +39,22 @@
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "SoftwareSourceCode",
+        "@type": ["SoftwareApplication", "SoftwareSourceCode"],
         "name": "attest",
         "alternateName": "agent-attest",
         "description": {{ config.site_description | tojson }},
+        "applicationCategory": "DeveloperApplication",
+        "applicationSubCategory": "AI agent evaluation",
+        "operatingSystem": "Linux, macOS, Windows",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "license": "https://www.gnu.org/licenses/agpl-3.0.html",
         "url": {{ config.site_url | tojson }},
+        "downloadUrl": "https://pypi.org/project/agent-attest/",
+        "installUrl": "https://pypi.org/project/agent-attest/",
         "codeRepository": {{ config.repo_url | tojson }},
         "programmingLanguage": "Python",
-        "license": "https://www.gnu.org/licenses/agpl-3.0.html",
         "author": {"@type": "Person", "name": "Adepeju Orefejo"},
-        "keywords": "AI agent evaluation, LLM evals, hallucination detection, prompt injection, AI code review"
+        "keywords": "AI agent evaluation, agent evaluation tools, LLM agent evaluation, hallucination detection, tool call evaluation, prompt injection detection, AI code review"
       }
     </script>
   {% endif %}

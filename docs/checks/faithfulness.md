@@ -1,4 +1,5 @@
 ---
+title: "Faithfulness: verify agent claims against tool outputs"
 description: "The faithfulness check splits an agent's answer into claims and verifies each one against the real tool outputs to catch hallucinations."
 ---
 

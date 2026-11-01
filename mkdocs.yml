@@ -1,5 +1,5 @@
 site_name: attest
-site_description: attest checks AI agent answers against what their tools actually returned, catching made-up facts, misused tools and prompt injection.
+site_description: attest is an open-source AI agent evaluation tool for Python. It checks agent answers against what their tools actually returned, catching made-up facts, misused tools and prompt injection.
 site_url: https://peace-orefejo.github.io/attest/
 repo_url: https://github.com/peace-orefejo/attest
 repo_name: peace-orefejo/attest
@@ -35,6 +35,12 @@ theme:
   favicon: assets/brand/attest-mark.svg
   icon:
     repo: fontawesome/brands/github
+
+extra:
+  # Google Search Console: to verify with the "HTML tag" method, paste only the content value
+  # of the tag Search Console gives you (<meta name="google-site-verification" content="...">)
+  # here. It's added to the home page only. Empty means no tag.
+  google_site_verification: ""
 
 extra_css:
   - assets/extra.css
@@ -96,6 +102,10 @@ nav:
   - Home: index.md
   - Getting started: getting-started.md
   - How it works: concepts.md
+  - Guides:
+      - How to evaluate AI agents: guides/evaluate-ai-agents.md
+      - Detecting hallucinations: guides/agent-hallucinations.md
+      - Prompt injection in tool outputs: guides/prompt-injection-tool-outputs.md
   - Checks:
       - Faithfulness: checks/faithfulness.md
       - Tool use: checks/tool-use.md
@@ -112,6 +122,9 @@ nav:
   - JSON output: json-output.md
   - Models and providers: providers.md
   - Integrations: integrations.md
+  - Compare:
+      - AI agent evaluation tools: compare/index.md
+      - attest vs DeepEval: compare/deepeval.md
   - Limitations: limitations.md
   - Architecture: architecture.md
   - API reference:

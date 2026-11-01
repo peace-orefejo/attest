@@ -1,4 +1,5 @@
 ---
+title: "Code review outputs and gate decisions"
 description: "Reference for attest's code review types: ReviewOutput, PullRequest, ReviewResult, OutputDecision and GateDecision."
 ---
 

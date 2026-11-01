@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://peace-orefejo.github.io/attest/sitemap.xml
