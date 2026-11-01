@@ -44,8 +44,9 @@ DeepEval's features below come from its
   seconds.
 - You want tool errors followed through the run: retried, replaced by a declared fallback,
   reported, ignored, or reported as success when they failed.
-- You want to know whether a fetched page, file or image carried injected instructions, and
-  whether the agent acted on them, from a scan that needs no API key.
+- You want to scan fetched pages, files and images for injected instructions without an API
+  key, with an optional model-backed deep check of whether the agent acted beyond what it was
+  asked to do.
 - You want a `pass`, `review` or `block` verdict and JSON you can gate CI on with `jq`.
 
 ## Using both
@@ -64,7 +65,8 @@ if report.verdict == "block":
 
 ## Where attest is narrower
 
-attest has no UI, tracing, datasets or synthetic data generation, and fewer checks than DeepEval.
+attest has no UI, tracing, user-facing dataset management or synthetic data generation, and fewer
+checks than DeepEval.
 Its accuracy hasn't been measured on a labelled benchmark yet, and it trusts that the run it
 reads is authentic and complete. See [Limitations](../limitations.md) and the full
 [comparison of AI agent evaluation tools](index.md).

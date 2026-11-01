@@ -20,7 +20,7 @@ says plainly where attest is narrower.
 - **attest** checks one recorded agent run against its own tool outputs: each claim in the
   answer, each tool call and error, injected instructions in what the agent read, and the
   agent's role. It's a Python library and a command line that print JSON. It has no UI, no
-  tracing and no dataset management, and its own accuracy hasn't been measured on a labelled
+  tracing and no user-facing dataset management, and its own accuracy hasn't been measured on a labelled
   benchmark yet.
 - **DeepEval** is a broad, pytest-style evaluation framework with many metrics, including RAG,
   agentic and conversational ones, and a hosted platform, Confident AI.
