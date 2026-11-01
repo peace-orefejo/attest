@@ -14,7 +14,8 @@ All notable changes to `agent-attest` are documented here. This project follows
   becoming review results, never includes the key or the provider's response in its message,
   and is printed by the CLI as a `provider_config` error (exit 1).
 - Property-based tests (Hypothesis, dev only) for evidence escaping, error recovery,
-  dispositions and claim completion.
+  dispositions and claim completion, including that a stricter `VerdictPolicy` never gives a
+  weaker verdict and that a finding nothing checked is never weaker than its rule.
 - `--max-claims N` on `attest run` and `attest review`, and `max_claims=` on `Attest.review()`,
   set how many claims of each answer or output are checked (default 40). A negative value is
   invalid input (exit 2 on the command line, `ValueError` in Python).
@@ -39,11 +40,14 @@ All notable changes to `agent-attest` are documented here. This project follows
   used to judge each finding by severity alone, so a faithfulness result whose claims were all
   `unverifiable`, a `warn` policy finding or an ignored tool error passed; they now go to
   review, and a finding nothing checked (`unchecked`, or `metadata["checked"]` false) goes to
-  review too. `Finding.effective_disposition` keeps the severity-only rule for a finding on its
-  own.
-- The default verdict policy sends a finding nothing checked (`unchecked`, or
-  `metadata["checked"]` false) to review when its check has no rule for that verdict, such as
-  one from a custom check. It used to pass unless its severity was `fail`.
+  review too.
+- A finding nothing checked (`unchecked`, or `metadata["checked"]` false) gets the stricter of
+  `review` and the disposition its check's rule gives, in every check and under every
+  `VerdictPolicy`. It used to pass in a custom check unless its severity was `fail`, and a
+  stricter rule could make it weaker: under `on_injection_warning="block"` an unchecked
+  injection warning got `review`; it now blocks. An unchecked `fail` finding blocks.
+  `on_inconclusive_faithfulness` is the rule for unchecked faithfulness claims, so setting it to
+  `pass` still lets them pass.
 - `max_claims` below 0 raises `ValueError`.
 - No failed or missing evaluation turns into a pass. When claim extraction, verification, the
   role, deep injection, tool-choice or policy judge, or a code review injection confirmation
@@ -62,7 +66,16 @@ All notable changes to `agent-attest` are documented here. This project follows
 - The CLI prints a JSON error instead of a traceback for files that aren't valid UTF-8
   (`invalid_input`) and for errors no check absorbs (`command_failed`).
 
+### Deprecated
+- `Finding.effective_disposition` warns with `DeprecationWarning`. It doesn't know the finding's
+  check or result, so it can disagree with the verdict, for example passing a `warn` policy
+  finding or a lone `unverifiable` claim the default policy sends to review. Use
+  `CheckResult.dispositions` or `Report.verdict`.
+
 ### Fixed
+- A usage error, such as an unknown option, a missing argument or `--max-claims abc`, prints the
+  JSON `invalid_input` error on stdout (exit 2) for every command, instead of Click's usage box
+  on stderr.
 - A custom verifier that answered one claim twice and skipped another no longer hides the
   skipped claim.
 
