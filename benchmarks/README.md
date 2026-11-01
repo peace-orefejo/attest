@@ -78,6 +78,14 @@ If `--max-calls` runs out, the remaining cases are recorded as `not_run` and the
 `budget_exhausted: true`. A case whose evaluation raises is recorded as `errored` with its error.
 Neither is quietly dropped: both count against coverage and the effective metrics (below).
 
+A case whose check couldn't judge part of it is recorded as `errored` too. When a model call
+inside a check fails (a missing or rejected key, a timeout), attest reports the affected finding
+as `unchecked`, or a claim as `unverifiable` with `checked` false. Read as a prediction, that
+finding could pass for a clean label (an injection run whose deep check failed would read
+`none`), so the case is errored instead and its error says what was left unchecked. The one
+exception is `--offline`, where
+a tool error's `unchecked` recovery is the documented prediction.
+
 Compare two runs:
 
 ```bash
@@ -98,6 +106,12 @@ and no metric deltas) when:
 `bypassed`). Otherwise it prints metric deltas per check and every case whose correctness
 flipped, and exits 1 if F1 or recall in any binary view drops by more than `--tolerance`
 (default 0.02).
+
+When a check's cases come from more than one origin, it also prints the deltas per origin
+(`origin_deltas` in `--json`), and applies the same rule to each origin, so a drop in one
+origin can't hide behind a gain in another. An origin is gated only when it has at least 10
+cases in both reports: below that, one case flipping moves recall by a tenth or more. Smaller
+origins, and origins in only one report, are listed with a warning.
 
 ## How results are reported
 
@@ -225,7 +239,7 @@ One case per line in `datasets/<check>/<split>.jsonl` (seed cases) or
 | `category` | The scenario, in snake case: `known_hallucination`, `missing_evidence`, `recovered_error`, `claimed_success`, `benign_instruction_lookalike`, `incomplete_trajectory` and so on. Metrics are broken down by it. |
 | `source` | `synthetic` (written for the benchmark), `real` (from a real agent run, anonymised) or `community` (contributed, including runs converted from public datasets). |
 | `origin` | Required. The dataset the run came from: `attest-seed` for the seed cases, or an external one such as `tau-bench`, `agentdojo`, `toolbench`. Lowercase letters, digits, `-`, `_`. Must match the file's origin in a `<split>-<origin>.jsonl` file. |
-| `task_family` | Required. The group of related runs that must stay in one split, such as `tau-bench/retail` or `agentdojo/workspace`. Lowercase letters, digits, `-`, `_`, `.`, `/`. A family may appear in only one split, across all checks. The seed cases use `attest-seed/<check>/<split>`. |
+| `task_family` | Required. The group of related runs that must stay in one split, such as `tau-bench/retail` or `agentdojo/workspace`. Lowercase letters, digits, `-`, `_`, `.`, `/`. A family may appear in only one split, across all checks, and so may every family nested under it at a `/`: `tau-bench/airline/25-49` belongs to `tau-bench/airline`, while `tau-bench/airline-25-49` is a separate family. The seed cases use `attest-seed/<check>/<split>`. |
 | `origin_ref` | Optional (default null). Where in the upstream source the run came from: the upstream file path plus a trajectory index or task id, such as `historical_trajectories/gpt-4o-airline.json#17`. The upstream commit is recorded once in `sources/<origin>/SOURCE.md`. |
 | `label_status` | `draft` until double-labelled and agreed; then `confirmed`, which needs at least two annotators. |
 | `annotators` | Initials of everyone who labelled the case. |
@@ -246,7 +260,7 @@ One case per line in `datasets/<check>/<split>.jsonl` (seed cases) or
 - **role_adherence:** `label`: `in_scope`, `appropriately_refused` or `out_of_scope_complied`.
 
 The loader rejects malformed lines, duplicate ids, an id or a `task_family` in more than one
-split (across all checks), a `check` that doesn't match its folder, a case in a
+split (across all checks), a family nested under a family in another split, a `check` that doesn't match its folder, a case in a
 `<split>-<origin>.jsonl` file with another origin, a case in a public `<split>.jsonl` whose
 origin isn't `attest-seed` (external cases go in `<split>-<origin>.jsonl`), a missing
 `<split>.jsonl` (in the public datasets), tool labels that don't cover every tool call exactly
@@ -343,7 +357,9 @@ compare reports whose ids were hashed differently.
 
 Make the key random and high-entropy, such as the output of `openssl rand -hex 32`, never a
 word or passphrase. Anyone with a report can test guessed keys against its fingerprint offline,
-so a weak key can be brute-forced, and then every case id can be confirmed by hashing.
+so a weak key can be brute-forced, and then every case id can be confirmed by hashing. The
+runner warns (and still uses the key) when it is shorter than 32 characters or has fewer than
+8 distinct characters. That is only a rough screen: a long key can still be guessable.
 
 The withholding covers the report only. Don't commit or upload the case files, and remember
 that the provider sees each case while grading it. The response cache (`--cache-dir`) quotes

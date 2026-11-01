@@ -23,6 +23,10 @@ All notable changes to `agent-attest` are documented here. This project follows
   default `VerdictPolicy()` gives it.
 - Benchmark: 10 draft-labelled prompt_injection and tool_use cases converted from public
   AgentDojo runs (`benchmarks/converters/agentdojo.py`).
+- Benchmark: `annotate.py settle --replace` corrects a settled entry by appending one that
+  supersedes it, so the adjudication log stays append-only.
+- Benchmark: `compare.py` reports deltas per origin and fails on a regression in any origin
+  with at least 10 cases in both reports, not only on the aggregate.
 
 ### Changed
 - **Breaking:** `Report.passed` now means the run passed: `verdict == "pass"`. It used to mean
@@ -80,6 +84,20 @@ All notable changes to `agent-attest` are documented here. This project follows
   on stderr.
 - A custom verifier that answered one claim twice and skipped another no longer hides the
   skipped claim.
+- Benchmark: a case whose check left part of it unchecked (for example, the deep injection check
+  failed for want of an API key) is recorded as errored, not graded as a clean label.
+- Benchmark: `annotate.py settle` refuses entries `merge` would reject: a label the item can't
+  take, a malformed `--by` name, a blank reason, or a discussion not between the case's
+  current annotators.
+- Benchmark: a settled discussion goes stale, and is reported, when the annotators' labels for
+  the item change on the same run.
+- Benchmark: `settle` locks the adjudication log while it appends, and `merge --write`
+  replaces each case file atomically.
+- Benchmark: a task family nested under a family in another split, such as
+  `tau-bench/airline/25-49` beside `tau-bench/airline`, is rejected as a split leak.
+- Benchmark: a short or repetitive `ATTEST_BENCH_ID_KEY` gets a warning.
+- Benchmark: in private mode, `annotate.py` checks only the paths each command reads or writes,
+  so `settle` with an owner ruling no longer needs `--labels` outside the repository.
 
 ## [0.8.1] - 2026-10-31
 

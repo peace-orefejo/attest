@@ -1,20 +1,33 @@
-"""Compare two benchmark reports: metric deltas per check, flipped cases, regressions."""
+"""Compare two benchmark reports: metric deltas per check and per origin, flips, regressions.
+
+A drop in F1 or recall in any binary view beyond the tolerance is a regression, for each check
+as a whole and for each origin of a check that mixes origins. An origin is gated only when it
+has at least `MIN_ORIGIN_CASES` cases in both reports: below that, one case flipping moves
+recall by a tenth or more, so its deltas are shown but don't fail the comparison.
+"""
 
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
 from bench_check_metrics import CheckMetrics
+from bench_headline import headline, origin_headline
 from bench_report import BenchmarkReport
 
 GATED_METRICS = ("f1", "recall")
 """A drop in either of these, in any binary view, beyond the tolerance is a regression."""
+MIN_ORIGIN_CASES = 10
+"""An origin needs this many cases in both reports before a drop in it is a regression."""
 
 
 class MetricDelta(BaseModel):
     old: float | None
     new: float | None
     delta: float | None
+
+
+Deltas = dict[str, MetricDelta]
+"""Metric name -> its change."""
 
 
 class Flip(BaseModel):
@@ -25,7 +38,12 @@ class Flip(BaseModel):
 
 
 class Comparison(BaseModel):
-    deltas: dict[str, dict[str, MetricDelta]]
+    deltas: dict[str, Deltas]
+    origin_deltas: dict[str, dict[str, Deltas]] = Field(
+        default_factory=dict[str, dict[str, Deltas]]
+    )
+    """Check -> origin -> metric deltas, for each check whose cases come from more than one
+    origin, and each origin in both reports."""
     flips: list[Flip]
     regressions: list[str]
     warnings: list[str] = Field(default_factory=list[str])
@@ -37,28 +55,6 @@ class Comparison(BaseModel):
         return bool(self.regressions)
 
 
-def headline(metrics: CheckMetrics) -> dict[str, float | None]:
-    """The metrics compare reports on, by name. Binary-view metrics are `<view>.<metric>`."""
-    values: dict[str, float | None] = {
-        "coverage": metrics.coverage.coverage.value,
-        "item_accuracy": metrics.item_accuracy.value,
-        "effective_item_accuracy": metrics.effective.item_accuracy.value,
-        "case_accuracy": metrics.case_accuracy.value,
-    }
-    for name, view in metrics.binary.items():
-        values[f"{name}.precision"] = view.precision.value
-        values[f"{name}.recall"] = view.recall.value
-        values[f"{name}.effective_recall"] = view.effective_recall.value
-        values[f"{name}.f1"] = view.f1
-        values[f"{name}.false_positive_rate"] = view.false_positive_rate.value
-        values[f"{name}.false_negative_rate"] = view.false_negative_rate.value
-    values["latency_median_s"] = metrics.latency.median_s
-    values["tokens_per_case"] = metrics.usage.tokens_per_case
-    if metrics.claim_coverage is not None:
-        values["claim_coverage"] = metrics.claim_coverage.value
-    return values
-
-
 def compare(
     old: BenchmarkReport,
     new: BenchmarkReport,
@@ -68,27 +64,65 @@ def compare(
 ) -> Comparison:
     """Deltas, flips and regressions. Check compatibility first (`bench_compat`); pass the
     failed checks as `bypassed` when the comparison is forced."""
-    deltas: dict[str, dict[str, MetricDelta]] = {}
+    deltas: dict[str, Deltas] = {}
+    origin_deltas: dict[str, dict[str, Deltas]] = {}
     regressions: list[str] = []
+    warnings = _warnings(old, new)
     for check in sorted(old.checks.keys() & new.checks.keys()):
-        before, after = headline(old.checks[check]), headline(new.checks[check])
-        deltas[check] = {name: _delta(before[name], after.get(name)) for name in before}
-        for name, change in deltas[check].items():
-            view, _, metric = name.rpartition(".")
-            if (
-                view
-                and metric in GATED_METRICS
-                and change.delta is not None
-                and change.delta < -tolerance
-            ):
-                regressions.append(f"{check} {name} dropped by {-change.delta:.3f}")
+        before, after = old.checks[check], new.checks[check]
+        deltas[check] = _deltas(headline(before), headline(after))
+        regressions.extend(_regressions(check, deltas[check], tolerance))
+        if len(before.per_origin.keys() | after.per_origin.keys()) > 1:
+            origin_deltas[check] = _origins(check, before, after, tolerance, regressions, warnings)
     return Comparison(
         deltas=deltas,
+        origin_deltas=origin_deltas,
         flips=_flips(old, new),
         regressions=regressions,
-        warnings=_warnings(old, new),
+        warnings=warnings,
         bypassed=list(bypassed or []),
     )
+
+
+def _origins(
+    check: str,
+    before: CheckMetrics,
+    after: CheckMetrics,
+    tolerance: float,
+    regressions: list[str],
+    warnings: list[str],
+) -> dict[str, Deltas]:
+    """Deltas per origin; adds each gated origin's regressions and every caveat in place."""
+    by_origin: dict[str, Deltas] = {}
+    for origin in sorted(before.per_origin.keys() | after.per_origin.keys()):
+        was, now = before.per_origin.get(origin), after.per_origin.get(origin)
+        if was is None or now is None:
+            warnings.append(f"{check} origin {origin} is in only one report and isn't compared.")
+            continue
+        by_origin[origin] = _deltas(origin_headline(was), origin_headline(now))
+        if min(was.coverage.attempted, now.coverage.attempted) < MIN_ORIGIN_CASES:
+            warnings.append(
+                f"{check} origin {origin} has fewer than {MIN_ORIGIN_CASES} cases in a report, "
+                "so a drop there isn't gated."
+            )
+            continue
+        regressions.extend(_regressions(f"{check} origin {origin}", by_origin[origin], tolerance))
+    return by_origin
+
+
+def _deltas(before: dict[str, float | None], after: dict[str, float | None]) -> Deltas:
+    return {name: _delta(before[name], after.get(name)) for name in before}
+
+
+def _regressions(scope: str, deltas: Deltas, tolerance: float) -> list[str]:
+    found: list[str] = []
+    for name, change in deltas.items():
+        view, _, metric = name.rpartition(".")
+        if not view or metric not in GATED_METRICS or change.delta is None:
+            continue
+        if change.delta < -tolerance:
+            found.append(f"{scope} {name} dropped by {-change.delta:.3f}")
+    return found
 
 
 def _delta(old: float | None, new: float | None) -> MetricDelta:
@@ -111,60 +145,3 @@ def _warnings(old: BenchmarkReport, new: BenchmarkReport) -> list[str]:
         f"{check} is in only one report and isn't compared."
         for check in sorted(old.checks.keys() ^ new.checks.keys())
     ]
-
-
-def format_comparison(comparison: Comparison) -> str:
-    lines = _bypass_banner(comparison.bypassed)
-    for check, metrics in comparison.deltas.items():
-        lines.append(f"## {check}")
-        lines.append("| metric | old | new | delta |")
-        lines.append("|---|---|---|---|")
-        lines.extend(
-            f"| {name} | {_num(d.old)} | {_num(d.new)} | {_signed(d.delta)} |"
-            for name, d in metrics.items()
-        )
-        lines.append("")
-    if comparison.flips:
-        lines.append("## Flipped cases")
-        lines.extend(
-            f"- {f.check} {f.id}: {_mark(f.old_correct)} -> {_mark(f.new_correct)}"
-            for f in comparison.flips
-        )
-        lines.append("")
-    lines.extend(f"- warning: {note}" for note in comparison.warnings)
-    lines.extend(f"- REGRESSION: {note}" for note in comparison.regressions)
-    if not comparison.regressions:
-        lines.append("No regressions beyond the tolerance.")
-    return "\n".join(lines).rstrip() + "\n"
-
-
-def _bypass_banner(bypassed: list[str]) -> list[str]:
-    if not bypassed:
-        return []
-    return [
-        "!!! FORCED COMPARISON (--allow-incompatible): these reports are NOT like for like. "
-        "Bypassed checks:",
-        *(f"!!! - {reason}" for reason in bypassed),
-        "",
-    ]
-
-
-def format_refusal(reasons: list[str]) -> str:
-    """Why compare refused, with no metric deltas."""
-    lines = ["Refusing to compare: the reports are not like for like.", ""]
-    lines.extend(f"- {reason}" for reason in reasons)
-    lines.append("")
-    lines.append("Fix the runs, or pass --allow-incompatible to compare them anyway.")
-    return "\n".join(lines) + "\n"
-
-
-def _num(value: float | None) -> str:
-    return "n/a" if value is None else f"{value:.3f}"
-
-
-def _signed(value: float | None) -> str:
-    return "n/a" if value is None else f"{value:+.3f}"
-
-
-def _mark(correct: bool) -> str:
-    return "correct" if correct else "wrong"

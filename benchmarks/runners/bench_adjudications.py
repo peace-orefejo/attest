@@ -1,7 +1,12 @@
-"""The adjudication log: how each disagreement was settled, bound to the run it was settled on."""
+"""The adjudication log: how each disagreement was settled, bound to the run it was settled on.
+
+The log is append-only. A correction is a new entry whose `replaces` names the entry it
+supersedes (by `entry_id`); merge applies the newest entry of each chain and ignores the rest.
+"""
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Literal
 
@@ -29,16 +34,33 @@ class Adjudication(BaseModel):
     """For an owner ruling, the rulings-log entry it follows. Required for owner rulings."""
     run_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     """The run it was settled on. If the run is edited later, the entry is stale and ignored."""
+    labels: dict[str, str] | None = None
+    """For a discussion, each annotator's label for the item when it was settled. If any of
+    them changes later, the entry is stale and ignored. Owner rulings don't record it."""
+    replaces: str | None = None
+    """The `entry_id` of the earlier entry for the same item that this one supersedes."""
+    settled_at: str | None = None
+    """When it was recorded (UTC, ISO 8601)."""
 
     @model_validator(mode="after")
-    def _ruling_named(self) -> Adjudication:
+    def _consistent(self) -> Adjudication:
         if self.how == "owner_ruling" and not (self.ruling or "").strip():
             raise ValueError("an owner ruling must name its rulings-log entry in `ruling`")
+        if self.labels is not None and set(self.labels) != set(self.decided_by):
+            raise ValueError("a discussion's `labels` must come from exactly its `decided_by`")
         return self
 
     @property
     def key(self) -> ItemKey:
         return (self.dimension, self.subject)
+
+    @property
+    def entry_id(self) -> str:
+        """Identifies this entry, so a later one can name it in `replaces`."""
+        return hashlib.sha256(self.to_line().encode()).hexdigest()[:16]
+
+    def to_line(self) -> str:
+        return self.model_dump_json(exclude_none=True)
 
     def describe(self) -> str:
         return f"{self.case_id} {self.dimension} {self.subject!r}"
@@ -57,8 +79,12 @@ class IndexedAdjudications(BaseModel):
 def load_adjudications(path: Path) -> list[Adjudication]:
     if not path.is_file():
         return []
+    return parse_adjudications(path, path.read_text(encoding="utf-8"))
+
+
+def parse_adjudications(path: Path, text: str) -> list[Adjudication]:
     entries: list[Adjudication] = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for number, line in enumerate(text.splitlines(), start=1):
         if not line.strip():
             continue
         try:
@@ -71,14 +97,18 @@ def load_adjudications(path: Path) -> list[Adjudication]:
 def index_adjudications(
     adjudications: list[Adjudication], cases: dict[str, Case]
 ) -> IndexedAdjudications:
-    """Split the log into current and stale entries.
+    """Split the log into current and stale entries, dropping every replaced entry.
 
-    Raises ValueError if an entry names no current item or two current entries settle one item.
+    Raises ValueError if an entry names no current item, two current entries settle one item,
+    or a `replaces` names no earlier entry for the same item, or one already replaced.
     """
+    errors: list[str] = []
+    replaced = _replaced(adjudications, errors)
     settled: Settled = {}
     stale: list[Adjudication] = []
-    errors: list[str] = []
-    for x in adjudications:
+    for position, x in enumerate(adjudications):
+        if position in replaced:
+            continue
         case = cases.get(x.case_id)
         if case is None or x.key not in label_items(case.expected):
             errors.append(f"{x.describe()} matches no item of any case")
@@ -93,12 +123,20 @@ def index_adjudications(
     return IndexedAdjudications(settled=settled, stale=stale)
 
 
-def append_adjudication(path: Path, entry: Adjudication, cases: dict[str, Case]) -> None:
-    """Add `entry` to the log at `path`, refusing it if the log would become invalid."""
-    existing = load_adjudications(path)
-    index_adjudications([*existing, entry], cases)
-    text = path.read_text(encoding="utf-8") if path.is_file() else ""
-    separator = "\n" if text and not text.endswith("\n") else ""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as log:
-        log.write(separator + entry.model_dump_json(exclude_none=True) + "\n")
+def _replaced(adjudications: list[Adjudication], errors: list[str]) -> set[int]:
+    """Positions of the entries a later entry replaces; adds each broken `replaces` to errors."""
+    positions: dict[str, int] = {}
+    replaced: set[int] = set()
+    for position, x in enumerate(adjudications):
+        if x.replaces is not None:
+            target = positions.get(x.replaces)
+            if target is None:
+                errors.append(f"{x.describe()} replaces {x.replaces}, no earlier entry")
+            elif adjudications[target].describe() != x.describe():
+                errors.append(f"{x.describe()} replaces {x.replaces}, an entry for another item")
+            elif target in replaced:
+                errors.append(f"{x.describe()} replaces {x.replaces}, which is already replaced")
+            else:
+                replaced.add(target)
+        positions.setdefault(x.entry_id, position)
+    return replaced

@@ -311,3 +311,55 @@ def test_template_takes_the_validation_split(tmp_path: Path) -> None:
     argv = ["--datasets", str(root), "--labels", str(labels)]
     assert annotate.main([*argv, "template", "po", "--split", "validation"]) == 0
     assert [p.name for p in (labels / "po").iterdir()] == ["c1.json"]
+
+
+@pytest.mark.parametrize(
+    ("dev_family", "heldout_family"),
+    [
+        ("tau-bench/airline", "tau-bench/airline/25-49"),
+        ("tau-bench/airline/25-49", "tau-bench"),
+        ("tau-bench/airline/", "tau-bench/airline//25-49"),
+    ],
+)
+def test_a_family_nested_under_one_in_another_split_is_rejected(
+    tmp_path: Path, dev_family: str, heldout_family: str
+) -> None:
+    root = _tree(
+        tmp_path,
+        {
+            "prompt_injection/dev-tau-bench.jsonl": [_case("tau-1", task_family=dev_family)],
+            "role_adherence/heldout-tau-bench.jsonl": [
+                _case("tau-2", "role_adherence", task_family=heldout_family)
+            ],
+        },
+    )
+    with pytest.raises(DatasetError, match=r"nested under a family in another split"):
+        load_datasets(root)
+
+
+def test_families_sharing_a_name_prefix_but_not_a_path_may_split(tmp_path: Path) -> None:
+    root = _tree(
+        tmp_path,
+        {
+            "prompt_injection/dev-tau-bench.jsonl": [
+                _case("tau-1", task_family="tau-bench/airline-0-24"),
+                _case("tau-3", task_family="tau-bench/airline/0-24"),
+            ],
+            "prompt_injection/heldout-tau-bench.jsonl": [
+                _case("tau-2", task_family="tau-bench/airline-25-49")
+            ],
+        },
+    )
+    datasets = load_datasets(root)
+    assert len(datasets.split("prompt_injection", "heldout")) == 1
+
+
+def test_seed_families_are_siblings_not_prefixes() -> None:
+    families = {
+        case.task_family
+        for by_split in load_datasets().cases.values()
+        for split_cases in by_split.values()
+        for case in split_cases
+        if case.origin == "attest-seed"
+    }
+    assert families and all(f.count("/") == 2 for f in families)
