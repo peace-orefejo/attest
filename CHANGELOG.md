@@ -24,6 +24,8 @@ All notable changes to `agent-attest` are documented here. This project follows
 - Benchmark: ten draft-labelled cases converted from τ-bench's public gpt-4o runs, with the converter that regenerates them (`benchmarks/converters/tau_bench.py`).
 - Benchmark: 10 draft-labelled prompt_injection and tool_use cases converted from public
   AgentDojo runs (`benchmarks/converters/agentdojo.py`).
+- Benchmark: 12 draft-labelled ToolBench cases (faithfulness, tool use, recovery) converted from
+  vendored, contact-redacted upstream samples by `benchmarks/converters/toolbench.py`.
 - Benchmark: `annotate.py settle --replace` corrects a settled entry by appending one that
   supersedes it, so the adjudication log stays append-only.
 - Benchmark: `compare.py` reports deltas per origin and fails on a regression in any origin
