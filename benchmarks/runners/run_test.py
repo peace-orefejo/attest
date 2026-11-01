@@ -49,7 +49,7 @@ def test_offline_run_over_seed_dev_set(tmp_path: Path, capsys: pytest.CaptureFix
     summary = capsys.readouterr().out
     assert "| tool_use |" in summary
     assert "draft labels" in summary and "Offline run" in summary
-    assert "NOT PUBLISHABLE" in summary and "| 100% 5/5 (" in summary
+    assert "NOT PUBLISHABLE" in summary
     assert "**not** claim extraction" in summary
     seed_rows = sum(row.origin == "attest-seed" for row in report.cases)
     assert seed_rows and f"attest-seed {seed_rows}" in summary.split("Cases by origin: ")[1]

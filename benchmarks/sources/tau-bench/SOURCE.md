@@ -19,8 +19,8 @@ the trimmed copy here, which the converter's tests check.
 
 Tool lists (`allowed_tools`) are the tool names declared in upstream
 `tau_bench/envs/airline/tools/*.py` and `tau_bench/envs/retail/tools/*.py` (the `ALL_TOOLS` of
-each `__init__.py`) at the same commit. They are written out in `benchmarks/converters/tau_bench.py`
-rather than vendored.
+each `__init__.py`) at the same commit. They are written out in
+`benchmarks/converters/tau_bench_upstream.py` rather than vendored.
 
 ## What was selected and why
 
@@ -42,8 +42,12 @@ for a mix of clean and failing behaviour across the checks the source fits:
 
 Splits follow task families so no task's trials straddle two splits: every retail task is dev
 (`tau-bench/retail`), airline tasks 0–24 are validation (`tau-bench/airline-0-24`) and airline
-tasks 25–49 are heldout (`tau-bench/airline-25-49`). τ-bench's `reward` was glanced at only to
-find candidate runs; no label is taken from it.
+tasks 25–49 are heldout (`tau-bench/airline-25-49`). Upstream groups several airline tasks
+around one simulated user (for example tasks 23 and 24 are both `yara_garcia_1905`, and tasks
+25 to 27 are all `aarav_ahmed_6699`); checked against upstream
+`tau_bench/envs/airline/tasks_test.py` at the commit above, no user appears on both sides of
+the 24/25 boundary, so no near-identical scenario straddles validation and heldout. τ-bench's
+`reward` was glanced at only to find candidate runs; no label is taken from it.
 
 ## What was stripped
 
@@ -58,9 +62,9 @@ emails), so nothing was redacted.
 
 - `system_prompt`: the run's system message (the domain policy).
 - `task`: the first user message, then each user turn listed for the case in
-  `tau_bench_selection.py` as "Later the user said: ...". Turns that only give identity details,
-  confirm an already stated request or say goodbye are left out, and the simulator's
-  `###STOP###` token is removed. Each case's `notes` say this.
+  `tau_bench_retail_cases.py` or `tau_bench_airline_cases.py` as "Later the user said: ...".
+  Turns that only give identity details, confirm an already stated request or say goodbye are
+  left out, and the simulator's `###STOP###` token is removed. Each case's `notes` say this.
 - `steps`: every assistant tool call in order, with its parsed arguments and the tool message
   that answers it. Upstream reuses some call ids within a run, so outputs are matched by
   position after the call as well as by id. Text sent in the same message as a tool call becomes

@@ -21,6 +21,7 @@ All notable changes to `agent-attest` are documented here. This project follows
   invalid input (exit 2 on the command line, `ValueError` in Python).
 - `CheckResult.dispositions`: each finding's disposition, the assigned one or else the one the
   default `VerdictPolicy()` gives it.
+- Benchmark: ten draft-labelled cases converted from τ-bench's public gpt-4o runs, with the converter that regenerates them (`benchmarks/converters/tau_bench.py`).
 
 ### Changed
 - **Breaking:** `Report.passed` now means the run passed: `verdict == "pass"`. It used to mean

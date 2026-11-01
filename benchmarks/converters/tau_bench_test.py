@@ -7,24 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from bench_cases import Case
+from bench_cases import CHECKS, SPLITS, Case
+from bench_layout import layout_problems, parse_case_file_name
+from bench_load import load_datasets
 
 # isort: split
-from tau_bench import (
-    DATASETS_DIR,
-    ORIGIN,
-    SOURCE_DIR,
-    SPLIT_OF_FAMILY,
-    TOOLS,
-    case_files,
-    domain_of,
-    load_runs,
-    task_family,
-    write_cases,
-)
+from tau_bench import SPLIT_OF_FAMILY, case_files, task_family, write_cases
 from tau_bench_selection import CASES
+from tau_bench_upstream import DATASETS_DIR, ORIGIN, SOURCE_DIR, TOOLS, domain_of, load_runs
 
-NEW_FIELDS = {"origin", "task_family", "origin_ref"}
 LABEL_KEYS = {"reward", "reward_info", "info", "actions", "outputs", "success", "user_cost"}
 FILE_NAME = re.compile(rf"^(dev|validation|heldout)-{re.escape(ORIGIN)}\.jsonl$")
 
@@ -66,9 +57,8 @@ def test_every_case_validates_and_carries_the_new_fields() -> None:
     cases = _emitted()
     assert len(cases) == len(CASES)
     for _, case in cases:
-        Case.model_validate({k: v for k, v in case.items() if k not in NEW_FIELDS})
-        assert re.fullmatch(r"[a-z0-9][a-z0-9_-]*", str(case["origin"]))
-        assert re.fullmatch(r"[a-z0-9][a-z0-9_./-]*", str(case["task_family"]))
+        model = Case.model_validate(case)
+        assert model.origin == ORIGIN and model.origin_ref
         assert case["origin"] == ORIGIN
         assert case["source"] == "community"
         assert case["label_status"] == "draft"
@@ -77,6 +67,35 @@ def test_every_case_validates_and_carries_the_new_fields() -> None:
     ids = [str(case["id"]) for _, case in cases]
     assert len(set(ids)) == len(ids)
     assert all(case_id.startswith(f"{ORIGIN}-") for case_id in ids)
+
+
+def test_the_public_loader_accepts_every_case() -> None:
+    datasets = load_datasets()
+    loaded = {
+        case.id: (split, case)
+        for check in CHECKS
+        for split in SPLITS
+        for case in datasets.split(check, split)
+        if case.origin == ORIGIN
+    }
+    assert sorted(loaded) == sorted(spec.id for spec in CASES)
+    assert all(split == SPLIT_OF_FAMILY[case.task_family] for split, case in loaded.values())
+    assert not layout_problems(DATASETS_DIR)
+    for path in DATASETS_DIR.glob(f"*/*-{ORIGIN}.jsonl"):
+        name = parse_case_file_name(path.name)
+        assert name is not None and name.origin == ORIGIN
+
+
+def test_no_other_origin_shares_a_task_family() -> None:
+    datasets = load_datasets()
+    families: dict[str, set[str]] = {}
+    for check in CHECKS:
+        for split in SPLITS:
+            for case in datasets.split(check, split):
+                families.setdefault(case.task_family, set()).add(case.origin)
+    ours = {family for family, origins in families.items() if ORIGIN in origins}
+    assert ours == set(SPLIT_OF_FAMILY)
+    assert all(families[family] == {ORIGIN} for family in ours)
 
 
 def test_cases_sit_in_their_check_folder() -> None:
@@ -146,3 +165,16 @@ def test_vendored_files_match_source_md() -> None:
         if path.is_file() and path.name not in {"SOURCE.md", "NOTICE"}
     }
     assert vendored == recorded
+
+
+def test_no_simulated_user_spans_two_task_families() -> None:
+    user_id = re.compile(r"\b[a-z]+_[a-z]+_\d{4}\b")
+    families_of_user: dict[str, set[str]] = {}
+    for spec in CASES:
+        run = next(r for r in load_runs(spec.upstream_file) if r.task_id == spec.task_id)
+        family = task_family(domain_of(spec.upstream_file), spec.task_id)
+        for user in user_id.findall(run.model_dump_json()):
+            if not user.startswith(("credit_card_", "gift_card_", "paypal_")):
+                families_of_user.setdefault(user, set()).add(family)
+    assert families_of_user
+    assert all(len(families) == 1 for families in families_of_user.values())
