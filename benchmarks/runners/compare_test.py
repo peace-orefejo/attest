@@ -197,3 +197,74 @@ def test_cli_rejects_an_unreadable_report(
     old, _ = _write(tmp_path, _report(GOOD), _report(GOOD))
     assert compare.main([old, str(tmp_path / "absent.json")]) == compare.REFUSED
     assert "can't read report" in capsys.readouterr().err
+
+
+def _origin_report(misses: dict[str, int]) -> BenchmarkReport:
+    """Ten injection runs per origin, five of them payloads; `misses` payloads per origin are
+    predicted `none`."""
+    rows: list[CaseRow] = []
+    for origin, missed in misses.items():
+        for number in range(10):
+            expected = "payload" if number < 5 else "none"
+            predicted = "none" if number < missed else expected
+            graded = item("run", expected, predicted)
+            rows.append(
+                CaseRow(
+                    id=f"{origin}-{number}",
+                    check="prompt_injection",
+                    category="c",
+                    source="synthetic",
+                    origin=origin,
+                    label_status="draft",
+                    items=[graded],
+                    correct=graded.correct,
+                    latency_s=0.1,
+                )
+            )
+    return _report(
+        GOOD,
+        cases=rows,
+        checks={"prompt_injection": check_metrics("prompt_injection", rows, Prices())},
+    )
+
+
+def test_a_regression_in_one_origin_is_reported_and_fails_compare(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    old = _origin_report({"attest-seed": 1, "tau-bench": 0})
+    new = _origin_report({"attest-seed": 0, "tau-bench": 1})
+    result = compare_reports(old, new, tolerance=0.02)
+    aggregate = result.deltas["prompt_injection"]["violation_detection.recall"]
+    assert aggregate.delta == pytest.approx(0.0)
+    tau = result.origin_deltas["prompt_injection"]["tau-bench"]["violation_detection.recall"]
+    assert (tau.old, tau.new) == (1.0, pytest.approx(0.8))
+    assert result.regressions == [
+        "prompt_injection origin tau-bench violation_detection.recall dropped by 0.200",
+        "prompt_injection origin tau-bench violation_detection.f1 dropped by 0.111",
+    ]
+
+    old_path, new_path = _write(tmp_path, old, new)
+    assert compare.main([old_path, new_path]) == 1
+    out = capsys.readouterr().out
+    assert "### prompt_injection by origin" in out
+    assert "| tau-bench | violation_detection.recall | 1.000 | 0.800 | -0.200 |" in out
+    assert "REGRESSION: prompt_injection origin tau-bench" in out
+    assert compare.main([old_path, new_path, "--json"]) == 1
+    assert '"tau-bench": {' in capsys.readouterr().out
+
+
+def test_a_small_or_one_sided_origin_is_shown_but_not_gated() -> None:
+    old = _origin_report({"attest-seed": 0, "tau-bench": 0})
+    fewer = [row for row in old.cases if row.id != "tau-bench-9"]
+    small = old.model_copy(
+        update={"checks": {"prompt_injection": check_metrics("prompt_injection", fewer, Prices())}}
+    )
+    result = compare_reports(small, _origin_report({"attest-seed": 0, "tau-bench": 1}), tolerance=0)
+    assert "tau-bench" in result.origin_deltas["prompt_injection"]
+    assert all("origin" not in note for note in result.regressions)
+    assert any("fewer than 10 cases" in note for note in result.warnings)
+
+    only_seed = _origin_report({"attest-seed": 0})
+    result = compare_reports(only_seed, old, tolerance=0.02)
+    assert "only one report" in " ".join(result.warnings)
+    assert compare_reports(only_seed, only_seed, tolerance=0).origin_deltas == {}

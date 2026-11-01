@@ -4,6 +4,7 @@
     uv run python benchmarks/runners/annotate.py agreement po vk
     uv run python benchmarks/runners/annotate.py settle inj-clean-output label run none \\
         --how discussion --by po vk --reason "the output only has data"
+    uv run python benchmarks/runners/annotate.py settle ... --replace   # correct that entry
     uv run python benchmarks/runners/annotate.py merge            # dry run
     uv run python benchmarks/runners/annotate.py merge --write    # confirm the settled cases
 
@@ -13,7 +14,9 @@ files' draft labels, or attest's output until your own labels are done.
 
 For a private dataset (`--datasets` anywhere but benchmarks/datasets), pass `--labels` and
 `--adjudications` outside this repository or under benchmarks/private/: label files copy the
-runs.
+runs. Each command is held to the paths it reads or writes: `template` and `agreement` to
+`--labels`, `merge` to both, and `settle` to `--adjudications`, plus `--labels` for a
+discussion, whose annotators' labels it reads.
 """
 
 from __future__ import annotations
@@ -22,20 +25,20 @@ import argparse
 import sys
 from pathlib import Path
 
-from bench_adjudications import Adjudication, append_adjudication, load_adjudications
+from bench_adjudications import load_adjudications
 from bench_agreement import agreement, markdown
 from bench_annotate_args import parser as annotate_parser
-from bench_annotations import ANNOTATOR_PATTERN, AnnotationError, run_sha256
+from bench_annotations import ANNOTATOR_PATTERN, AnnotationError
 from bench_cases import CHECKS, Case
 from bench_label_files import load_annotations
 from bench_load import DATASETS_DIR, DatasetError, load_datasets
 from bench_merge import merge
+from bench_settle import Settlement, settle
 from bench_template import write_templates
 from bench_write import write_cases
 
 REPO_DIR = DATASETS_DIR.parent.parent
 PRIVATE_DIR = DATASETS_DIR.parent / "private"
-USES_LOG = ("merge", "settle")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -43,13 +46,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     private = args.datasets.resolve() != DATASETS_DIR.resolve()
     if private:
-        paths = [args.labels] + ([args.adjudications] if args.command in USES_LOG else [])
-        exposed = [str(path) for path in paths if _inside_repo(path)]
+        exposed = [f"{flag} {path}" for flag, path in _private_paths(args) if _inside_repo(path)]
         if exposed:
             parser.error(
-                f"--datasets is private, so keep its labels out of this repository: "
-                f"{', '.join(exposed)} is inside it. Pass --labels and --adjudications "
-                f"outside the repository or under {PRIVATE_DIR}"
+                f"--datasets is private, so keep its labels and adjudications out of this "
+                f"repository: {', '.join(exposed)} is inside it. Pass them outside the "
+                f"repository or under {PRIVATE_DIR}"
             )
     if args.command == "agreement" and args.first == args.second:
         parser.error("compare two different annotators")
@@ -82,12 +84,18 @@ def _template(folder: Path, cases: list[Case], *, private: bool) -> int:
     return 0
 
 
+def _private_paths(args: argparse.Namespace) -> list[tuple[str, Path]]:
+    """The label and adjudication paths this command reads or writes."""
+    paths: list[tuple[str, Path]] = []
+    if args.command != "settle" or args.how == "discussion":
+        paths.append(("--labels", args.labels))
+    if args.command in ("merge", "settle"):
+        paths.append(("--adjudications", args.adjudications))
+    return paths
+
+
 def _settle(args: argparse.Namespace, cases: dict[str, Case]) -> int:
-    case = cases.get(args.case_id)
-    if case is None:
-        raise AnnotationError(f"{args.case_id}: no such case")
-    entry = Adjudication(
-        case_id=case.id,
+    settlement = Settlement(
         dimension=args.dimension,
         subject=args.subject,
         label=args.label,
@@ -95,10 +103,17 @@ def _settle(args: argparse.Namespace, cases: dict[str, Case]) -> int:
         decided_by=args.by,
         reason=args.reason,
         ruling=args.ruling,
-        run_sha256=run_sha256(case),
     )
-    append_adjudication(args.adjudications, entry, cases)
-    print(f"settled {entry.describe()} as {entry.label!r} in {args.adjudications}")
+    entry = settle(
+        args.case_id,
+        settlement,
+        cases,
+        labels_root=args.labels,
+        log=args.adjudications,
+        replace=args.replace,
+    )
+    replaced = f", replacing entry {entry.replaces}" if entry.replaces else ""
+    print(f"settled {entry.describe()} as {entry.label!r} in {args.adjudications}{replaced}")
     return 0
 
 
@@ -120,10 +135,9 @@ def _labelled(args: argparse.Namespace, cases: dict[str, Case]) -> int:
         print(report.model_dump_json(indent=2) if args.json else markdown(report), end="")
         return 0
     outcome = merge(loaded.annotations, cases, load_adjudications(args.adjudications))
-    for x in outcome.stale_adjudications:
+    for stale in outcome.stale_adjudications:
         print(
-            f"skipping stale adjudication of {x.describe()}: the run changed after it was "
-            f"settled; settle it again",
+            f"skipping stale adjudication of {stale.entry.describe()}: {stale.reason}",
             file=sys.stderr,
         )
     for case_id, reasons in outcome.unresolved.items():

@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from bench_private import WITHHELD_ERROR, private_case_id, withhold_case_details
+import pytest
+
+from bench_private import (
+    ID_KEY_ENV,
+    WITHHELD_ERROR,
+    id_key_from_env,
+    private_case_id,
+    withhold_case_details,
+)
 from bench_rows import CaseRow, item
 
 
@@ -50,3 +58,36 @@ def test_a_key_makes_ids_uncheckable_without_it() -> None:
     assert keyed != private_case_id("vera-refund-42", b"other")
     [row] = withhold_case_details([_row()], b"secret")
     assert row.id == keyed
+
+
+@pytest.mark.parametrize(
+    ("value", "warned"),
+    [
+        ("x", "1 characters long, shorter than 32"),
+        ("correct horse battery", "shorter than 32"),
+        ("ab" * 20, "only 2 distinct"),
+        ("0123456" * 6, "only 7 distinct"),
+        ("4f9c2a7e1b8d3f60a5c7e9b2d4f6a8c1", None),
+    ],
+)
+def test_a_weak_key_is_used_with_a_warning(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    value: str,
+    warned: str | None,
+) -> None:
+    monkeypatch.setenv(ID_KEY_ENV, value)
+    assert id_key_from_env() == value.encode()
+    err = capsys.readouterr().err
+    if warned is None:
+        assert err == ""
+    else:
+        assert f"warning: {ID_KEY_ENV}" in err and warned in err and "openssl rand" in err
+
+
+def test_no_key_means_no_hmac_and_no_weak_key_warning(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv(ID_KEY_ENV, raising=False)
+    assert id_key_from_env() is None
+    assert capsys.readouterr().err == ""

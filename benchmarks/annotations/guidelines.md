@@ -186,8 +186,9 @@ finished it, and reviewers should check that each folder belongs to a different 
 
 For a private dataset, the label files and the adjudication log copy or quote the runs, so
 `annotate.py` refuses to put them inside this repository, following symlinks to where each file
-would actually land. Pass `--labels` (and, for `settle` and `merge`, `--adjudications`) outside
-it or under `benchmarks/private/`.
+would actually land. Pass the paths each command uses outside it or under `benchmarks/private/`:
+`--labels` for `template`, `agreement` and `merge`, `--adjudications` for `settle` and `merge`,
+and `--labels` for `settle --how discussion`, which reads the annotators' labels.
 
 ## Settling disagreements
 
@@ -200,16 +201,37 @@ uv run python benchmarks/runners/annotate.py settle inj-clean-output label run n
 ```
 
 The case id, `dimension` and `subject` name the item as `agreement` lists it: `claim` and the
-claim text, `verdict` or `recovery` and `step N`, or `label` and `run`. `settle` checks that the
-item exists and records the case's current `run_sha256`, so an entry only ever applies to the run
-it was settled on. If the run is edited later, the entry goes stale: `merge` ignores it and
-reports it, and once the annotators have relabelled the edited run, any remaining disagreement
-has to be settled again. Don't hand-edit entries; `merge` refuses the whole log if an entry names
-no current item or two current entries settle the same item.
+claim text, `verdict` or `recovery` and `step N`, or `label` and `run`. `settle` refuses an
+entry `merge` would reject. It checks that:
+
+- the item exists, and the label is one its dimension allows (in a recovery case, `verdict`
+  takes the tool-use labels and `recovery` the recovery labels);
+- every `--by` name is lowercase initials or an id, such as `po`;
+- `--reason` isn't blank, and an owner ruling names its `--ruling`;
+- for a discussion, `--by` names exactly the annotators with finished, current label files for
+  the case (read from `--labels`), and they still disagree on the item.
+
+It records the case's current `run_sha256`, so an entry only ever applies to the run it was
+settled on. A discussion also records each annotator's label for the item. If the run is edited
+later, or any of those labels changes (an annotator relabels the same run), the entry goes stale:
+`merge` ignores it, reports it and says why, and any remaining disagreement has to be settled
+again. An owner ruling records no labels and keeps applying however the labels change.
+
+To correct an entry, settle the item again with `--replace`. The log stays append-only: the new
+entry names the one it supersedes in `replaces`, and `merge` applies only the newest entry of
+each item. Without `--replace`, `settle` refuses an item already settled on its current run.
+Don't hand-edit entries; `merge` refuses the whole log if an entry names no current item, two
+current entries settle the same item, or a `replaces` doesn't name an earlier entry for the same
+item.
+
+`settle` locks the log while it reads and appends to it, so two people settling at once can't
+interleave lines. The lock uses `flock`, so it works on macOS and Linux; on Windows, don't run
+two settles on the same log at once.
 
 1. The two annotators discuss the case against these guidelines. If they agree after
    discussion, record it with `--how discussion`; `--by` lists every annotator who labelled
-   the case and no one else, or `merge` won't apply it.
+   the case and no one else. Leave your label files as they were: the entry is bound to the
+   labels you discussed, and editing them makes it stale.
 2. If they still disagree, the owner decides, adds a ruling to the log below, and records it
    with `--how owner_ruling` and `--ruling` naming the log entry, so the same question is
    decided the same way next time. Only an owner ruling can override a label every annotator
