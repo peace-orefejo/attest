@@ -1,5 +1,9 @@
 """Report scoring and the verdict of a report built without `evaluate()`."""
 
+import warnings
+
+import pytest
+
 from attest.disposition_rules import DEFAULT_RULES
 from attest.results import CheckResult, Finding, Report, Severity
 from attest.scoring.dispositions import apply_verdict_policy
@@ -70,3 +74,23 @@ def test_the_default_rules_match_the_default_policy():
     assert DEFAULT_RULES.on_inconclusive_faithfulness == policy.on_inconclusive_faithfulness
     assert DEFAULT_RULES.on_injection_warning == policy.on_injection_warning
     assert DEFAULT_RULES.tool_use.model_dump() == policy.tool_use.model_dump()
+
+
+def test_effective_disposition_is_deprecated_and_still_works():
+    with pytest.warns(DeprecationWarning, match="CheckResult.dispositions"):
+        assert _warning("w").effective_disposition == "pass"
+    with pytest.warns(DeprecationWarning):
+        assert _warning("w", checked=False).effective_disposition == "review"
+
+
+def test_scoring_and_serialising_a_report_never_reads_effective_disposition():
+    finding = Finding(severity=Severity.FAIL, verdict="unsupported", subject="x")
+    report = Report(results=[CheckResult(check="faithfulness", passed=False, findings=[finding])])
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        applied = apply_verdict_policy(report)
+        for candidate in (report, applied):
+            candidate.model_dump()
+            candidate.model_dump_json()
+            Report.model_validate_json(candidate.model_dump_json())
+            assert candidate.verdict == "block"

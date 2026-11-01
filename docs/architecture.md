@@ -19,7 +19,8 @@ dependency of everything else.
 and runs checks with them. `cli/` is the `attest` command, one module per command group in
 `cli/commands/`. Both are thin and call into the features. Every command prints its result
 through `cli/json_output.py`, which holds the versioned JSON envelope, the per-command output
-models and the JSON Schemas built from them.
+models and the JSON Schemas built from them. `cli/usage_errors.py` prints usage errors, such
+as an unknown option, as the same JSON error envelope.
 
 **Features.** One package per job:
 

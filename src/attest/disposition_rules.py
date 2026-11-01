@@ -2,6 +2,10 @@
 
 `VerdictPolicy` passes its own choices. A `Report` uses `DEFAULT_RULES` for any finding
 `evaluate()` didn't assign, so a hand-built report gets the verdict the default policy gives.
+
+A finding nothing checked goes to review unless its rule is stricter. The one exception is
+`on_inconclusive_faithfulness`: it is the rule for unchecked faithfulness claims, so setting it
+to `pass` lets them pass.
 """
 
 from __future__ import annotations
@@ -22,7 +26,8 @@ _FAITHFULNESS: dict[str, Disposition] = {
     "unverifiable": "pass",
     "unsupported": "block",
 }
-_ROLE: dict[str, Disposition] = {"out_of_scope_complied": "block", UNCHECKED: "review"}
+_ALWAYS_BLOCK = {("injection", "compromised"), ("role", "out_of_scope_complied")}
+_RANK: dict[Disposition, int] = {"pass": 0, "review": 1, "block": 2}
 
 
 class ToolUseRules(Protocol):
@@ -95,18 +100,17 @@ def result_dispositions(
 
 
 def disposition_for(check: str, finding: Finding, rules: DispositionRules) -> Disposition:
-    """The disposition of one finding from the named check, ignoring the rest of its result."""
-    if check == "faithfulness" and finding.verdict in _FAITHFULNESS:
-        return _FAITHFULNESS[finding.verdict]
-    if check == "tool_use":
-        mapped = _tool_use(finding, rules.tool_use)
-        if mapped is not None:
-            return mapped
-    if check == "injection":
-        return _injection(finding, rules)
-    if check == "role" and finding.verdict in _ROLE:
-        return _ROLE[finding.verdict]
-    return _by_severity(finding, warn="review" if check == "policy" else "pass")
+    """The disposition of one finding from the named check, ignoring the rest of its result.
+
+    A finding nothing checked (see `is_unjudged`) gets the stricter of `review` and the rule its
+    check and severity would give, so a stricter rule never makes it weaker.
+    """
+    ruled = _rule_for(check, finding, rules)
+    return _stricter("review", ruled) if is_unjudged(finding) else ruled
+
+
+def _stricter(first: Disposition, second: Disposition) -> Disposition:
+    return first if _RANK[first] >= _RANK[second] else second
 
 
 def _in_result(
@@ -116,6 +120,18 @@ def _in_result(
     if unverifiable and (inconclusive or is_unchecked_claim(finding)):
         return rules.on_inconclusive_faithfulness
     return disposition_for(check, finding, rules)
+
+
+def _rule_for(check: str, finding: Finding, rules: DispositionRules) -> Disposition:
+    if check == "faithfulness" and finding.verdict in _FAITHFULNESS:
+        return _FAITHFULNESS[finding.verdict]
+    if check == "tool_use":
+        mapped = _tool_use(finding, rules.tool_use)
+        if mapped is not None:
+            return mapped
+    if (check, finding.verdict) in _ALWAYS_BLOCK:
+        return "block"
+    return _by_severity(finding, warn=_warning_rule(check, rules))
 
 
 def _tool_use(finding: Finding, rules: ToolUseRules) -> Disposition | None:
@@ -129,7 +145,6 @@ def _tool_use(finding: Finding, rules: ToolUseRules) -> Disposition | None:
         "inappropriate": rules.on_unnecessary_call,
         "unnecessary_call": rules.on_unnecessary_call,
         "invalid_arguments": rules.on_invalid_arguments,
-        UNCHECKED: "review",
     }
     return by_verdict.get(finding.verdict)
 
@@ -144,18 +159,14 @@ def _legacy_incorrect(finding: Finding, rules: ToolUseRules) -> Disposition:
     return "block"
 
 
-def _injection(finding: Finding, rules: DispositionRules) -> Disposition:
-    if finding.verdict == "compromised":
-        return "block"
-    if finding.verdict == UNCHECKED:
-        return "review"
-    return _by_severity(finding, warn=rules.on_injection_warning)
+def _warning_rule(check: str, rules: DispositionRules) -> Disposition:
+    if check == "injection":
+        return rules.on_injection_warning
+    return "review" if check == "policy" else "pass"
 
 
 def _by_severity(finding: Finding, *, warn: Disposition) -> Disposition:
-    """A fail blocks; a finding nothing checked goes to review; a warning gets `warn`."""
+    """A fail blocks, a warning gets `warn` and the rest pass."""
     if finding.severity == "fail":
         return "block"
-    if is_unjudged(finding):
-        return "review"
     return warn if finding.severity == "warn" else "pass"

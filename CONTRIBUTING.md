@@ -53,7 +53,8 @@ The package is layered. Imports only point down:
 - **Entry points:** `api.py` and `cli/`. The CLI prints only JSON.
 - **Features:** `checks/`, `code_review/`, `policy/`, `extraction/`, `scoring/` and `adapters/`.
 - **Foundation:** the data models (`trajectory.py`, `results.py`, `content.py`),
-  `providers.py`, `llm/` for model calls, caching and budgets, and `prompts/` for every prompt.
+  `disposition_rules.py` for how findings map to pass, review or block, `providers.py`, `llm/`
+  for model calls, caching and budgets, and `prompts/` for every prompt.
 - **Helpers:** `utils/`, small stateless helpers shared by several features.
 
 The foundation never imports from a feature package.

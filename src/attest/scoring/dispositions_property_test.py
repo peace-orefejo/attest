@@ -11,7 +11,7 @@ from attest.results import BlockingFinding, CheckResult, Finding, Report, Severi
 from attest.scoring.dispositions import apply_verdict_policy
 from attest.scoring.verdict_policy import ToolUsePolicy, VerdictPolicy
 
-CHECKS = ["faithfulness", "tool_use", "injection", "role", "policy", "custom"]
+CHECKS = ["faithfulness", "tool_use", "injection", "role", "policy", "custom", "code_injection"]
 VERDICTS = [
     "supported",
     "unsupported",
@@ -28,6 +28,7 @@ VERDICTS = [
     "clean",
     "out_of_scope_complied",
     "violated",
+    "unchecked",
     "anything",
 ]
 RANK = {"pass": 0, "review": 1, "block": 2}
@@ -44,6 +45,7 @@ findings = st.builds(
             "allowed": st.booleans(),
             "appropriate": st.booleans(),
             "error_handled": st.booleans(),
+            "checked": st.booleans(),
         },
     ),
     disposition=st.none() | dispositions,
@@ -55,6 +57,9 @@ results = st.builds(
     passed=st.booleans(),
     score=scores,
     findings=st.lists(findings, max_size=4),
+    metadata=st.fixed_dictionaries(
+        {}, optional={"claims_checked": st.integers(0, 5), "claims_total": st.integers(0, 5)}
+    ),
 )
 reports = st.builds(Report, results=st.lists(results, max_size=4))
 policies = st.builds(
@@ -69,6 +74,7 @@ policies = st.builds(
     on_inconclusive_faithfulness=dispositions,
     on_injection_warning=dispositions,
     min_score=st.dictionaries(st.sampled_from(CHECKS), st.floats(0.0, 1.0), max_size=2),
+    min_claim_coverage=st.none() | st.floats(0.0, 1.0),
 )
 
 
@@ -118,7 +124,7 @@ def _cleared(report: Report) -> Report:
 unassigned_findings = st.builds(
     Finding,
     severity=st.sampled_from(list(Severity)),
-    verdict=st.sampled_from([*VERDICTS, "unchecked"]),
+    verdict=st.sampled_from(VERDICTS),
     subject=st.text(max_size=8),
     metadata=st.fixed_dictionaries(
         {},
