@@ -300,6 +300,7 @@ def test_write_cases_replaces_each_file_atomically(
 ) -> None:
     path = datasets / "prompt_injection" / "dev.jsonl"
     before = path.read_text()
+    files_before = sorted(p.name for p in path.parent.iterdir())
     case = _cases(datasets)[CASE]
     confirmed = {
         CASE: case.model_copy(update={"label_status": "confirmed", "annotators": ["po", "vk"]})
@@ -313,11 +314,7 @@ def test_write_cases_replaces_each_file_atomically(
         write_cases(datasets, confirmed)
     monkeypatch.undo()
     assert path.read_text() == before
-    assert sorted(p.name for p in path.parent.iterdir()) == [
-        "dev.jsonl",
-        "heldout.jsonl",
-        "validation.jsonl",
-    ]
+    assert sorted(p.name for p in path.parent.iterdir()) == files_before  # no temp file left
 
     assert write_cases(datasets, confirmed) == 1
     assert _cases(datasets)[CASE].label_status == "confirmed"
