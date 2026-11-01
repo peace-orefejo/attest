@@ -21,6 +21,8 @@ All notable changes to `agent-attest` are documented here. This project follows
   invalid input (exit 2 on the command line, `ValueError` in Python).
 - `CheckResult.dispositions`: each finding's disposition, the assigned one or else the one the
   default `VerdictPolicy()` gives it.
+- Benchmark: 12 draft-labelled ToolBench cases (faithfulness, tool use, recovery) converted from
+  vendored, contact-redacted upstream samples by `benchmarks/converters/toolbench.py`.
 
 ### Changed
 - **Breaking:** `Report.passed` now means the run passed: `verdict == "pass"`. It used to mean
