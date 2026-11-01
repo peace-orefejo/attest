@@ -7,14 +7,12 @@ import json
 import re
 from pathlib import Path
 
-import agentdojo
 import pytest
 
-from bench_cases import Case
+import agentdojo
+from bench_cases import SEED_ORIGIN, Case
+from bench_load import load_datasets
 
-NEW_FIELDS = {"origin", "task_family", "origin_ref"}
-ORIGIN_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
-FAMILY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_./-]*$")
 LABEL_FIELDS = {"utility", "security", "duration"}
 
 
@@ -46,17 +44,36 @@ def test_every_case_validates() -> None:
     cases = _committed_cases()
     assert len(cases) == len(agentdojo.SELECTIONS)
     for split, case in cases:
-        Case.model_validate({k: v for k, v in case.items() if k not in NEW_FIELDS})
-        assert case["source"] == "community"
-        assert case["label_status"] == "draft"
-        assert case["annotators"] == []
-        assert str(case["notes"]).startswith("DRAFT label by the converter author;")
-        assert ORIGIN_PATTERN.fullmatch(str(case["origin"]))
-        assert case["origin"] == agentdojo.ORIGIN
-        assert FAMILY_PATTERN.fullmatch(str(case["task_family"]))
-        assert isinstance(case["origin_ref"], str)
-        assert (agentdojo.SOURCE_DIR / case["origin_ref"]).is_file()
+        model = Case.model_validate(case)
+        assert model.source == "community"
+        assert model.label_status == "draft"
+        assert model.annotators == []
+        assert model.notes.startswith("DRAFT label by the converter author;")
+        assert model.origin == agentdojo.ORIGIN
+        assert model.origin_ref is not None
+        assert (agentdojo.SOURCE_DIR / model.origin_ref).is_file()
         assert split in {"dev", "validation", "heldout"}
+
+
+def test_public_loader_reads_every_case() -> None:
+    every = [
+        (split, case)
+        for by_split in load_datasets().cases.values()
+        for split, cases in by_split.items()
+        for case in cases
+    ]
+    ours = {case.id: split for split, case in every if case.origin == agentdojo.ORIGIN}
+    assert ours == {str(case["id"]): split for split, case in _committed_cases()}
+    families = {case.task_family for _, case in every if case.origin == agentdojo.ORIGIN}
+    others = {case.task_family for _, case in every if case.origin != agentdojo.ORIGIN}
+    assert not families & others
+    assert not any(family.startswith(f"{SEED_ORIGIN}/") for family in families)
+
+
+def test_tool_use_notes_say_incorrect_needs_appropriate() -> None:
+    for _, case in _committed_cases():
+        if case["check"] == "tool_use":
+            assert "--appropriate" in str(case["notes"]), case["id"]
 
 
 def test_ids_are_unique_and_prefixed() -> None:
@@ -173,8 +190,6 @@ def test_error_calls_are_marked() -> None:
 
 def test_off_task_step_must_match_tool_name() -> None:
     selection = next(s for s in agentdojo.SELECTIONS if s.check == "tool_use")
-    wrong = agentdojo.Selection(
-        **{**selection.__dict__, "off_task_calls": {0: "send_money_not_here"}}
-    )
+    wrong = selection.model_copy(update={"off_task_calls": {0: "send_money_not_here"}})
     with pytest.raises(ValueError, match="step 0"):
         agentdojo.build_case(wrong)

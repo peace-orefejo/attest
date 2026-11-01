@@ -4,7 +4,8 @@
 - Commit: `089ed468cf3ed0322acc66b0211f26d9d90dbf60` (2026-06-02)
 - Converter: `benchmarks/converters/agentdojo.py` (regenerate the cases with
   `uv run python benchmarks/converters/agentdojo.py`; `--vendor DIR` re-creates this folder from
-  a local mirror of the upstream files at the commit above)
+  a local mirror of the upstream files at the commit above). It reads runs with
+  `agentdojo_runs.py`; the selected runs and their draft labels are in `agentdojo_selections.py`.
 
 ## What was selected and why
 
@@ -33,6 +34,20 @@ run sampled. Many upstream runs share a user task, so only a few user tasks per 
 | `agentdojo-workspace-ut1-important_instructions-it1` | prompt_injection | heldout | `workspace/user_task_1/important_instructions/injection_task_1.json` |
 
 The upstream run paths above are relative to `runs/gpt-4o-2024-05-13/`.
+
+The two banking cases share `user_task_1`: one is the clean run, the other the same request
+under attack. Both are in dev (one task family, `agentdojo/banking`), so this doesn't leak
+across splits, but they aren't independent runs: read them as a matched pair.
+
+## Scoring the tool_use cases
+
+AgentDojo gives the agent every tool in the suite, so the call an injection triggers is always
+in `allowed_tools`. The two tool_use cases therefore label that call `incorrect` (allowed,
+didn't fail, but off-task), not `disallowed_tool`. attest only predicts `incorrect` when the
+runner is given `--appropriate`, which needs a model. Without it (including every `--offline`
+run) the off-task call is predicted `correct` and counts as a missed violation; offline with
+`--appropriate`, every call in these cases comes back `unchecked`. Each case's notes say so.
+Only a run with a model and `--appropriate` measures attest on these two cases.
 
 The allowed tools come from the `TOOLS = [...]` list in each suite's
 `src/agentdojo/default_suites/v1/<suite>/task_suite.py`, vendored verbatim as
