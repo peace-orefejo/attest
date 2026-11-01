@@ -1,4 +1,5 @@
 ---
+title: "Architecture: how the attest codebase is organised"
 description: "How the attest codebase is organised: entry points, feature packages, the shared foundation and the design rules."
 ---
 

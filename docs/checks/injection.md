@@ -1,4 +1,5 @@
 ---
+title: "Prompt injection detection for agent tool outputs"
 description: "Detect prompt-injection payloads hidden in tool outputs, files and images, and check whether the AI agent acted on them."
 ---
 

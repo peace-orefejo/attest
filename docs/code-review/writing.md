@@ -1,5 +1,6 @@
 ---
-description: "Let attest write a pull request review itself, then check and gate its own output like any other AI reviewer."
+title: "Writing a pull request review with attest"
+description: "Let attest write an AI pull request review itself, then check every comment against the diff and gate its own output like any other AI reviewer."
 ---
 
 # Writing the review

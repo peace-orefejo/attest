@@ -1,4 +1,5 @@
 ---
+title: "Tool call evaluation: allowed tools and error recovery"
 description: "The tool-use check flags calls to tools an agent wasn't allowed to use and tool errors it didn't recover from or report. Offline unless you ask it to read the final answer."
 ---
 

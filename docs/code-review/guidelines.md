@@ -1,5 +1,6 @@
 ---
-description: "Give attest your team's code review rules in a markdown file, and drop AI review comments that break them."
+title: "Review guidelines for AI code review checks"
+description: "Give attest your team's code review rules in a markdown file, check AI code review comments against them, and drop the ones that break them."
 ---
 
 # Review guidelines
