@@ -186,7 +186,12 @@ class _FakeClient:
         fields = response_model.model_fields
         if "verdicts" in fields:
             return response_model.model_validate(
-                {"verdicts": [{"claim": 1, "verdict": "supported"}]}
+                {
+                    "verdicts": [
+                        {"claim": 1, "verdict": "supported"},
+                        {"claim": 2, "verdict": "unverifiable"},
+                    ]
+                }
             )
         if "outcome" in fields:
             return response_model.model_validate({"outcome": "failed"})

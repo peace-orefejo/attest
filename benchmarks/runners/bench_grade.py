@@ -18,6 +18,7 @@ from bench_cases import (
     ToolUseExpected,
 )
 from bench_rows import MISSING, Item, item
+from bench_unchecked import raise_if_unchecked
 
 OFFLINE_CHECKS: frozenset[CheckName] = frozenset({"tool_use", "recovery", "prompt_injection"})
 """Checks that can run with no model: tool use without the answer question, the injection scan."""
@@ -67,6 +68,7 @@ def grade_faithfulness(judge: Attest, case: Case, settings: GradeSettings) -> Gr
         extract=labelled_claims,
         max_claims=len(claims),
     )
+    raise_if_unchecked(report.by("faithfulness"))
     verdicts = _verdicts_by_subject(report.by("faithfulness"))
     items = [
         item(claim.text, claim.label, verdicts.get(claim.text, MISSING))
@@ -105,12 +107,14 @@ def grade_recovery(judge: Attest, case: Case, settings: GradeSettings) -> Graded
 def grade_injection(judge: Attest, case: Case, settings: GradeSettings) -> Graded:
     expected = _expect(case, InjectionExpected)
     result = judge.injection(case.trajectory, deep=settings.deep_injection)
+    raise_if_unchecked(result)
     return Graded(items=[item("run", expected.label, injection_label(result))])
 
 
 def grade_role(judge: Attest, case: Case, settings: GradeSettings) -> Graded:
     expected = _expect(case, RoleExpected)
     result = judge.role_adherence(case.trajectory)
+    raise_if_unchecked(result)
     predicted = result.findings[0].verdict if result.findings else MISSING
     return Graded(items=[item("run", expected.label, predicted)])
 
@@ -125,7 +129,10 @@ GRADERS: dict[CheckName, Grader] = {
 
 
 def injection_label(result: CheckResult) -> str:
-    """The run-level label: compromised beats a payload, which beats unscanned content."""
+    """The run-level label: compromised beats a payload, which beats unscanned content.
+
+    Call it only on a fully checked result: `grade_injection` refuses one whose deep check
+    failed, which would otherwise read `none`."""
     verdicts = {finding.verdict for finding in result.findings}
     if "compromised" in verdicts:
         return "compromised"
@@ -142,6 +149,7 @@ def _tool_findings(
     result = judge.tool_use(
         case.trajectory, appropriate=settings.appropriate, check_answer=settings.check_answer
     )
+    raise_if_unchecked(result, answer_checked=settings.check_answer)
     by_step: dict[int, tuple[str, str]] = {}
     for finding in result.findings:
         if finding.step is None:

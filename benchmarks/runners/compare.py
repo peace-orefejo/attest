@@ -8,8 +8,10 @@ versions, splits, settings, provider or model, or either report has cases that e
 didn't run, ran out of budget, or has a check below --min-coverage. --allow-model-change lets
 a model change through; --allow-incompatible forces any comparison and says what it bypassed.
 
-Otherwise prints metric deltas per check and the cases whose correctness flipped, and exits 1
-when F1 or recall in any binary view drops by more than the tolerance.
+Otherwise prints metric deltas per check (and per origin, for a check that mixes origins) and
+the cases whose correctness flipped, and exits 1 when F1 or recall in any binary view drops by
+more than the tolerance: for a check as a whole, or for one of its origins with at least
+`bench_compare.MIN_ORIGIN_CASES` cases in both reports.
 """
 
 from __future__ import annotations
@@ -18,7 +20,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from bench_compare import compare, format_comparison, format_refusal
+from bench_compare import compare
+from bench_compare_format import format_comparison, format_refusal
 from bench_compat import incompatibilities
 from bench_report import DEFAULT_MIN_COVERAGE, FORMAT_VERSION, BenchmarkReport
 
