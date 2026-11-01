@@ -53,10 +53,15 @@ def run_benchmark(
             except BudgetStop as exc:
                 stopped = str(exc)
                 rows[check].append(_not_run(case, stopped))
+    all_rows = [row for check_rows in rows.values() for row in check_rows]
     price = prices or Prices()
     metrics = {check: check_metrics(check, check_rows, price) for check, check_rows in rows.items()}
     blockers = publishability(
-        metrics, settings=settings, budget_exhausted=stopped is not None, min_coverage=min_coverage
+        metrics,
+        split=split,
+        settings=settings,
+        budget_exhausted=stopped is not None,
+        min_coverage=min_coverage,
     )
     return BenchmarkReport(
         dataset_version=datasets.version,
@@ -70,13 +75,13 @@ def run_benchmark(
         prices=price,
         min_coverage=min_coverage,
         budget_exhausted=stopped is not None,
-        all_cases_graded=all(row.graded for check_rows in rows.values() for row in check_rows),
+        all_cases_graded=bool(all_rows) and all(row.graded for row in all_rows),
         stopped_reason=stopped,
         publishable=not blockers,
         not_publishable_because=blockers,
         checks=metrics,
         skipped_checks=skipped,
-        cases=[row for check_rows in rows.values() for row in check_rows],
+        cases=all_rows,
     )
 
 

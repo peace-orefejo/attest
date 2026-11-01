@@ -2,8 +2,11 @@
 
 This pseudonymises; it doesn't anonymise. Case ids are hashed, so anyone who can guess an id
 can confirm it by hashing it, unless `ID_KEY_ENV` holds a secret key: then the hash is keyed
-(HMAC-SHA256) and can't be checked without the key. Categories, labels, predictions, timings
-and usage stay in the report.
+(HMAC-SHA256) and can't be checked without the key. Categories, origins, labels, predictions,
+timings and usage stay in the report: each row keeps its `origin`, `per_origin` breaks every
+check down by it and the summary counts cases by it. Origin and category names are chosen by
+the dataset's owner and are reported as written, so owners should choose neutral names that
+don't name a customer or person.
 """
 
 from __future__ import annotations

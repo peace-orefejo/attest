@@ -109,11 +109,13 @@ summary. The report holds:
   `prompt_version`, `provider`, `model` (null offline), `split`, `timestamp`, `settings`,
   `prices`, `skipped_checks`.
 - Run status: `budget_exhausted` (the call budget ran out, so some cases weren't run),
-  `all_cases_graded` (every case of every check that ran was graded: none errored, none was
-  skipped), `stopped_reason`, `min_coverage`, and `publishable` with
-  `not_publishable_because`. A report is publishable only when every check's coverage is at
-  least `min_coverage`, no case carries a draft label, the budget didn't run out and the run
-  wasn't offline.
+  `all_cases_graded` (at least one case ran and every case of every check that ran was graded:
+  none errored, none was skipped), `stopped_reason`, `min_coverage`, and `publishable` with
+  `not_publishable_because`. A report is publishable only when the run has cases, every
+  selected check has at least one case in the split (`no cases for <check> in <split>`
+  otherwise), every check's coverage is at least `min_coverage`, no case carries a draft
+  label, the budget didn't run out and the run wasn't offline. So a run of an empty split,
+  such as `validation` before validation cases are added, is never publishable.
 - `checks`: per check,
   - `coverage`: `attempted` (every case the run set out to grade), `graded`, `errored`,
     `not_run`, `coverage` (graded / attempted) and `operational_failure_rate`
@@ -245,10 +247,25 @@ One case per line in `datasets/<check>/<split>.jsonl` (seed cases) or
 
 The loader rejects malformed lines, duplicate ids, an id or a `task_family` in more than one
 split (across all checks), a `check` that doesn't match its folder, a case in a
-`<split>-<origin>.jsonl` file with another origin, any other `.jsonl` file name in a check
-folder, a missing `<split>.jsonl` (in the public datasets), tool labels that don't cover every
-tool call exactly once, duplicate claim texts, and a `confirmed` case with fewer than two
-annotators.
+`<split>-<origin>.jsonl` file with another origin, a case in a public `<split>.jsonl` whose
+origin isn't `attest-seed` (external cases go in `<split>-<origin>.jsonl`), a missing
+`<split>.jsonl` (in the public datasets), tool labels that don't cover every tool call exactly
+once, duplicate claim texts, and a `confirmed` case with fewer than two annotators.
+
+It also rejects any entry it wouldn't read, rather than skipping it silently, in the public
+datasets and in private folders alike:
+
+- at the top of the datasets folder, anything but the five check folders and an optional
+  `README.md` (for notes about the cases; it isn't read), such as a misspelt
+  `prompt-injection/` folder or a stray file;
+- inside a check folder, any subfolder, and any file not named exactly `<split>.jsonl` or
+  `<split>-<origin>.jsonl`: names are case-sensitive (`dev.JSONL` and `Dev.jsonl` are
+  rejected), the extension must be `.jsonl` (not `.json`), the split must be `dev`,
+  `validation` or `heldout`, and the origin may not itself be a split name
+  (`heldout-dev.jsonl` is rejected).
+
+Hidden entries, whose names start with `.` (`.DS_Store`, `.gitkeep`, a private folder's
+`.git`), are ignored everywhere.
 
 Every `<split>.jsonl` must exist in the public datasets, even when empty: the seed
 `validation.jsonl` files are empty until validation cases are added.
@@ -303,15 +320,22 @@ in any other folder with the same layout, `<check>/{dev,validation,heldout}.json
 uv run python benchmarks/runners/run.py --datasets ~/vera-cases --out vera.json
 ```
 
-A private folder may cover only some checks; missing files count as empty. `benchmarks/private/`
-is git-ignored if you'd rather keep the folder here.
+A private folder may cover only some checks; missing files count as empty. Pass `--check` for
+the checks it covers: a selected check with no cases in the split makes the report not
+publishable. Its `<split>.jsonl` files may hold cases of any origin (only the public
+`<split>.jsonl` files are kept to `attest-seed`), and the same file-name rules apply as in the
+public datasets. `benchmarks/private/` is git-ignored if you'd rather keep the folder here.
 
 Reports on a private folder keep every metric but withhold the cases' contents: case ids
 become hashes, claim texts become `item-1`, `item-2`…, and error messages are dropped. They are
 marked `dataset_visibility: "private"`, and `compare.py` won't compare them with public reports.
 
-This is pseudonymisation, not anonymisation. Categories, labels, predictions, timings and usage
-stay in the report, and anyone who can guess a case id can confirm it by hashing it. Set
+This is pseudonymisation, not anonymisation. Categories, origins, labels, predictions, timings
+and usage stay in the report: each row keeps its `origin`, each check its `per_origin`
+breakdown, and the summary its "Cases by origin" line and per-origin table. You choose the
+origin and category names, so choose neutral ones (`support-agent`, `billing`) that don't name
+a customer, a person or a product that isn't public. Anything else in those names ends up in
+the report as written, and anyone who can guess a case id can confirm it by hashing it. Set
 `ATTEST_BENCH_ID_KEY` to a secret kept outside the report to key the hash (HMAC-SHA256); use
 the same key across runs so their rows still match. A private run without the key prints a
 warning. Reports record a fingerprint of the key (never the key), and `compare.py` refuses to

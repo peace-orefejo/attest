@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 import annotate
+import bench_load
 from bench_cases import CHECKS, SPLITS, Case
 from bench_load import DatasetError, case_files, dataset_version, load_datasets
 from bench_write import write_cases
@@ -46,6 +47,7 @@ def _tree(root: Path, files: dict[str, list[dict[str, object]]] | None = None) -
         for split in SPLITS:
             (root / check / f"{split}.jsonl").write_text("")
     for name, rows in (files or {}).items():
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_text("".join(json.dumps(row) + "\n" for row in rows))
     return root
 
@@ -152,11 +154,91 @@ def test_external_file_must_hold_only_its_origin(tmp_path: Path) -> None:
         load_datasets(root)
 
 
-@pytest.mark.parametrize("name", ["valid-tau-bench.jsonl", "dev_tau.jsonl", "dev-Tau.jsonl"])
-def test_unrecognised_case_files_are_rejected(tmp_path: Path, name: str) -> None:
-    root = _tree(tmp_path, {f"prompt_injection/{name}": [_case()]})
-    with pytest.raises(DatasetError, match="unrecognised case file"):
+@pytest.mark.parametrize(
+    "name",
+    [
+        "prompt_injection/valid-tau-bench.jsonl",
+        "prompt_injection/dev_tau.jsonl",
+        "prompt_injection/dev-Tau.jsonl",
+        "prompt_injection/dev-tau-bench.JSONL",
+        "prompt_injection/Dev-tau-bench.jsonl",
+        "prompt_injection/dev-tau-bench.json",
+        "prompt_injection/heldout-dev.jsonl",
+        "prompt_injection/dev-validation.jsonl",
+        "prompt_injection/README.md",
+        "prompt_injection/sub/dev-tau-bench.jsonl",
+        "prompt-injection/dev-tau-bench.jsonl",
+        "notes.txt",
+        "dev.jsonl",
+    ],
+)
+@pytest.mark.parametrize("private", [False, True])
+def test_unrecognised_case_files_are_rejected(tmp_path: Path, name: str, private: bool) -> None:
+    root = _tree(tmp_path, {name: [_case()]})
+    with pytest.raises(DatasetError, match=r"unrecognised entries in the datasets folder"):
+        load_datasets(root, allow_missing=private)
+
+
+@pytest.mark.parametrize(
+    ("name", "problem"),
+    [
+        ("prompt-injection/dev-tau-bench.jsonl", r"prompt-injection: unknown folder"),
+        ("prompt_injection/sub/dev-tau-bench.jsonl", r"prompt_injection/sub: subfolders"),
+        ("prompt_injection/heldout-dev.jsonl", r"heldout-dev.jsonl: unrecognised case file"),
+        ("notes.txt", r"notes.txt: unknown file"),
+    ],
+)
+def test_each_unknown_entry_is_named(tmp_path: Path, name: str, problem: str) -> None:
+    root = _tree(tmp_path, {name: [_case()]})
+    with pytest.raises(DatasetError, match=problem):
         load_datasets(root)
+
+
+def test_hidden_entries_and_a_top_level_readme_are_allowed(tmp_path: Path) -> None:
+    root = _tree(tmp_path)
+    (root / "README.md").write_text("# cases\n")
+    (root / ".DS_Store").write_text("")
+    (root / ".git").mkdir()
+    (root / ".git" / "HEAD").write_text("ref")
+    (root / "prompt_injection" / ".gitkeep").write_text("")
+    (root / "prompt_injection" / ".DS_Store").write_text("")
+    (root / "prompt_injection" / ".cache").mkdir()
+    assert load_datasets(root).split("prompt_injection", "dev") == []
+
+
+def test_public_split_files_hold_only_seed_cases(tmp_path: Path) -> None:
+    root = _tree(tmp_path, {"prompt_injection/dev.jsonl": [_case("tau-1")]})
+    with pytest.raises(
+        DatasetError,
+        match=r"dev.jsonl:1: case 'tau-1' has origin 'tau-bench', but a public dev.jsonl holds "
+        r"only 'attest-seed' cases; put external cases in dev-<origin>.jsonl",
+    ):
+        load_datasets(root, public=True)
+    assert [c.id for c in load_datasets(root).split("prompt_injection", "dev")] == ["tau-1"]
+
+
+def test_the_public_datasets_default_to_the_seed_origin_rule(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _tree(tmp_path, {"prompt_injection/dev.jsonl": [_case("tau-1")]})
+    monkeypatch.setattr(bench_load, "DATASETS_DIR", root)
+    with pytest.raises(DatasetError, match="holds only 'attest-seed' cases"):
+        load_datasets(root)
+    assert len(load_datasets(root, public=False).split("prompt_injection", "dev")) == 1
+
+
+def test_private_split_files_may_hold_any_origin(tmp_path: Path) -> None:
+    root = tmp_path / "private"
+    (root / "prompt_injection").mkdir(parents=True)
+    rows = [_case("tau-1"), _case("own-1", origin="vera-support", task_family="vera/billing")]
+    (root / "prompt_injection" / "dev.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in rows)
+    )
+    datasets = load_datasets(root, allow_missing=True)
+    assert [c.origin for c in datasets.split("prompt_injection", "dev")] == [
+        "tau-bench",
+        "vera-support",
+    ]
 
 
 def test_a_task_family_may_not_span_splits_across_checks(tmp_path: Path) -> None:

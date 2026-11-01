@@ -10,10 +10,12 @@ from pydantic import BaseModel
 import run
 from attest import Attest, Budget
 from bench_cases import CHECKS, SPLITS
+from bench_check_metrics import Prices, check_metrics
 from bench_grade import GRADERS, Graded, GradeSettings
 from bench_load import Datasets, load_datasets
-from bench_report import BenchmarkReport
+from bench_report import BenchmarkReport, publishability
 from bench_run import run_benchmark
+from bench_summary import markdown_summary
 
 
 def test_offline_run_over_seed_dev_set(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -67,13 +69,82 @@ def test_heldout_runs_with_flag(tmp_path: Path) -> None:
 
 
 def test_validation_runs_without_the_heldout_flag(tmp_path: Path) -> None:
+    calls = [{"tool_call": {"name": "pay", "output": "paid"}}]
+    tool = {"calls": [{"step": 0, "verdict": "correct"}]}
+    root = _write_tree(tmp_path / "datasets", {})
+    case = _case("t-val", "tool_use", tool, calls)
+    case["task_family"] = "fam-validation"
+    (root / "tool_use" / "validation.jsonl").write_text(json.dumps(case) + "\n")
     out = tmp_path / "validation.json"
-    assert run.main(["--offline", "--split", "validation", "--out", str(out)]) == 0
+    argv = ["--offline", "--split", "validation", "--datasets", str(root), "--out", str(out)]
+    assert run.main(argv) == 0
+
     report = BenchmarkReport.model_validate_json(out.read_text())
     assert report.split == "validation"
-    assert report.dataset_version == load_datasets().version
-    expected = len(load_datasets().split("tool_use", "validation"))
-    assert report.checks["tool_use"].coverage.attempted == expected
+    assert report.checks["tool_use"].coverage.attempted == 1
+    assert report.checks["tool_use"].coverage.graded == 1
+    assert [row.status for row in report.cases] == ["graded"]
+
+    public_out = tmp_path / "public-validation.json"
+    assert run.main(["--offline", "--split", "validation", "--out", str(public_out)]) == 0
+    public = BenchmarkReport.model_validate_json(public_out.read_text())
+    assert public.split == "validation" and public.dataset_version == load_datasets().version
+
+
+def test_an_empty_split_is_not_publishable(tmp_path: Path) -> None:
+    empty = check_metrics("tool_use", [], Prices())
+    blockers = publishability(
+        {"tool_use": empty, "recovery": empty},
+        split="validation",
+        settings=GradeSettings(offline=False),
+        budget_exhausted=False,
+        min_coverage=0.95,
+    )
+    assert blockers == [
+        "the run has no cases in validation",
+        "no cases for tool_use in validation",
+        "no cases for recovery in validation",
+    ]
+
+    report = run_benchmark(
+        Attest(client=_FakeClient()),
+        _datasets(tmp_path),
+        checks=["faithfulness", "role_adherence"],
+        split="validation",
+        settings=GradeSettings(),
+    )
+    assert not report.publishable and not report.all_cases_graded
+    assert report.not_publishable_because == [
+        "the run has no cases in validation",
+        "no cases for faithfulness in validation",
+        "no cases for role_adherence in validation",
+    ]
+    summary = markdown_summary(report)
+    assert "NOT PUBLISHABLE" in summary and "no cases for faithfulness in validation" in summary
+    assert "n/a (0 cases)" in summary
+
+
+def test_a_check_with_no_cases_blocks_an_otherwise_publishable_run(tmp_path: Path) -> None:
+    datasets = _datasets(tmp_path)
+    confirmed = {
+        check: {
+            split: [
+                c.model_copy(update={"label_status": "confirmed", "annotators": ["a", "b"]})
+                for c in cases
+            ]
+            for split, cases in by_split.items()
+        }
+        for check, by_split in datasets.cases.items()
+    }
+    report = run_benchmark(
+        Attest(client=_FakeClient()),
+        datasets.model_copy(update={"cases": confirmed}),
+        checks=["role_adherence", "tool_use"],
+        split="dev",
+        settings=GradeSettings(),
+    )
+    assert report.not_publishable_because == ["no cases for tool_use in dev"]
+    assert not report.publishable
 
 
 def test_report_breaks_down_a_mixed_dataset_by_origin(

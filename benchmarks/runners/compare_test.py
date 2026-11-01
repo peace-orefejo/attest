@@ -96,6 +96,7 @@ def test_like_for_like_reports_are_compatible() -> None:
         ({"provider": "openai"}, "providers differ"),
         ({"model": "other"}, "models differ"),
         ({"all_cases_graded": False}, "cases that errored or didn't run"),
+        ({"all_cases_graded": False, "cases": []}, "the new report has no cases"),
         ({"budget_exhausted": True, "stopped_reason": "spent"}, "ran out of budget: spent"),
     ],
 )

@@ -2,23 +2,23 @@
 
 Each check folder holds one file per split, `<split>.jsonl` (the seed cases, or a private
 dataset's own), plus any number of external files `<split>-<origin>.jsonl`, each holding only
-cases of that origin. Every file of a split is loaded into that split.
+cases of that origin. Every file of a split is loaded into that split. Any other entry is
+rejected (see `bench_layout`).
 """
 
 from __future__ import annotations
 
 import hashlib
-import re
 from collections import defaultdict
 from collections.abc import Callable
 from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
-from bench_cases import CHECKS, SPLITS, Case, CheckName, Split
+from bench_cases import CHECKS, SEED_ORIGIN, SPLITS, Case, CheckName, Split
+from bench_layout import layout_problems, parse_case_file_name
 
 DATASETS_DIR = Path(__file__).resolve().parent.parent / "datasets"
-_EXTERNAL = re.compile(r"(?P<split>[a-z]+)-(?P<origin>[a-z0-9][a-z0-9_-]*)\.jsonl")
 
 CaseTree = dict[CheckName, dict[Split, list[Case]]]
 
@@ -48,10 +48,10 @@ def external_files(root: Path, check: CheckName, split: Split) -> dict[str, Path
     if not folder.is_dir():
         return {}
     found: dict[str, Path] = {}
-    for path in sorted(folder.glob(f"{split}-*.jsonl")):
-        match = _EXTERNAL.fullmatch(path.name)
-        if match is not None and match["split"] == split:
-            found[match["origin"]] = path
+    for path in sorted(folder.iterdir()):
+        name = parse_case_file_name(path.name)
+        if name is not None and name.split == split and name.origin is not None and path.is_file():
+            found[name.origin] = path
     return found
 
 
@@ -61,21 +61,30 @@ def case_files(root: Path, check: CheckName, split: Split) -> list[Path]:
     return [*([own] if own.is_file() else []), *external_files(root, check, split).values()]
 
 
-def load_datasets(root: Path = DATASETS_DIR, *, allow_missing: bool = False) -> Datasets:
+def load_datasets(
+    root: Path = DATASETS_DIR, *, allow_missing: bool = False, public: bool | None = None
+) -> Datasets:
     """Load every case file under `root`, rejecting anything that breaks a dataset rule.
 
     Each `<split>.jsonl` must exist (an empty file is fine) unless `allow_missing`, which a
     private dataset covering only some checks uses; external `<split>-<origin>.jsonl` files are
     optional. Case ids are unique across all files, no id and no `task_family` appears in two
     splits (across every check), each case's `check` must match its folder, every case in an
-    external file must have that file's origin, and any other `.jsonl` file is rejected.
+    external file must have that file's origin, and any entry the loader wouldn't read is
+    rejected. In the public datasets (`public`, which defaults to whether `root` is
+    `DATASETS_DIR`), every case in a `<split>.jsonl` must have origin `SEED_ORIGIN`; a private
+    dataset's `<split>.jsonl` may hold any origin.
     """
     if not root.is_dir():
         raise DatasetError(f"{root}: datasets folder not found")
-    for check in CHECKS:
-        _reject_unknown_files(root, check)
+    _reject_unknown_entries(root)
+    if public is None:
+        public = root.resolve() == DATASETS_DIR.resolve()
+    own_origin = SEED_ORIGIN if public else None
     cases: CaseTree = {
-        check: {split: _load_split(root, check, split, allow_missing) for split in SPLITS}
+        check: {
+            split: _load_split(root, check, split, allow_missing, own_origin) for split in SPLITS
+        }
         for check in CHECKS
     }
     _reject_split_leaks(cases)
@@ -84,8 +93,11 @@ def load_datasets(root: Path = DATASETS_DIR, *, allow_missing: bool = False) -> 
     return Datasets(cases=cases, version=dataset_version(root))
 
 
-def _load_split(root: Path, check: CheckName, split: Split, allow_missing: bool) -> list[Case]:
-    cases = load_file(case_file(root, check, split), check, allow_missing=allow_missing)
+def _load_split(
+    root: Path, check: CheckName, split: Split, allow_missing: bool, own_origin: str | None
+) -> list[Case]:
+    own = case_file(root, check, split)
+    cases = load_file(own, check, allow_missing=allow_missing, origin=own_origin)
     for origin, path in external_files(root, check, split).items():
         cases.extend(load_file(path, check, origin=origin))
     return cases
@@ -95,7 +107,8 @@ def load_file(
     path: Path, check: CheckName, *, allow_missing: bool = False, origin: str | None = None
 ) -> list[Case]:
     """Parse one JSONL case file; every error names the file and line. With `origin` (an
-    external `<split>-<origin>.jsonl` file), every case must have that origin."""
+    external `<split>-<origin>.jsonl` file, or a public `<split>.jsonl`, which holds only seed
+    cases), every case must have that origin."""
     if not path.is_file():
         if allow_missing:
             return []
@@ -114,12 +127,20 @@ def load_file(
                 f"but lives in the {check!r} folder"
             )
         if origin is not None and case.origin != origin:
-            raise DatasetError(
-                f"{path}:{number}: case {case.id!r} has origin {case.origin!r} "
-                f"but lives in the {origin!r} file"
-            )
+            raise DatasetError(f"{path}:{number}: {_origin_mismatch(path, case, origin)}")
         cases.append(case)
     return cases
+
+
+def _origin_mismatch(path: Path, case: Case, origin: str) -> str:
+    found = f"case {case.id!r} has origin {case.origin!r}"
+    name = parse_case_file_name(path.name)
+    if name is not None and name.origin is None:
+        return (
+            f"{found}, but a public {path.name} holds only {origin!r} cases; put external "
+            f"cases in {name.split}-<origin>.jsonl"
+        )
+    return f"{found} but lives in the {origin!r} file"
 
 
 def dataset_version(root: Path = DATASETS_DIR) -> str:
@@ -139,21 +160,12 @@ def dataset_version(root: Path = DATASETS_DIR) -> str:
     return digest.hexdigest()
 
 
-def _reject_unknown_files(root: Path, check: CheckName) -> None:
-    """A `.jsonl` file the loader wouldn't read is a mistake (a misspelt split or origin), so
-    it is rejected rather than silently skipped."""
-    folder = root / check
-    if not folder.is_dir():
-        return
-    known = {f"{split}.jsonl" for split in SPLITS} | {
-        path.name for split in SPLITS for path in external_files(root, check, split).values()
-    }
-    unknown = sorted(path.name for path in folder.glob("*.jsonl") if path.name not in known)
-    if unknown:
-        raise DatasetError(
-            f"{folder}: unrecognised case file(s) {', '.join(unknown)}; name them "
-            f"<split>.jsonl or <split>-<origin>.jsonl, with split one of {', '.join(SPLITS)}"
-        )
+def _reject_unknown_entries(root: Path) -> None:
+    """An entry the loader wouldn't read is a mistake (a misspelt check, split or origin, a
+    nested folder), so it is rejected rather than silently skipped."""
+    problems = layout_problems(root)
+    if problems:
+        raise DatasetError("unrecognised entries in the datasets folder:\n" + "\n".join(problems))
 
 
 def _leaks(cases: CaseTree, key: Callable[[Case], str]) -> str:
