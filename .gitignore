@@ -32,3 +32,6 @@ site/
 
 # Private benchmark datasets (e.g. runs from your own agents); never commit them
 benchmarks/private/
+
+# Hugging Face export (benchmarks/runners/export_hf.py build); rebuilt before each upload
+benchmarks/hf-build/

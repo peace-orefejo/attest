@@ -30,6 +30,10 @@ All notable changes to `agent-attest` are documented here. This project follows
   supersedes it, so the adjudication log stays append-only.
 - Benchmark: `compare.py` reports deltas per origin and fails on a regression in any origin
   with at least 10 cases in both reports, not only on the aggregate.
+- Benchmark: `benchmarks/runners/export_hf.py` builds a Hugging Face dataset from the public
+  cases (one config per check, a generated card with the draft-label status, provenance,
+  licences and citations, and a manifest with the `dataset_version`) and uploads it with
+  `huggingface_hub`, installed by the new optional `hf` dependency group.
 
 ### Changed
 - **Breaking:** `Report.passed` now means the run passed: `verdict == "pass"`. It used to mean
