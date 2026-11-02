@@ -1,5 +1,10 @@
 # attest benchmark
 
+> **Licensing.** The benchmark's data and labels (the attest-seed cases, and the labels, notes
+> and conversion work on every case) are licensed
+> [CC-BY-4.0](datasets/LICENSE). The code is AGPL-3.0, like the rest of attest. Vendored
+> upstream content keeps its own licence: see each `sources/<origin>/LICENSE`.
+
 This folder measures how accurate attest's own checks are. It lives outside the package and is
 never shipped in the wheel or the sdist.
 
@@ -365,6 +370,38 @@ The withholding covers the report only. Don't commit or upload the case files, a
 that the provider sees each case while grading it. The response cache (`--cache-dir`) quotes
 the cases too, so keep it private; `.bench-cache/` and `.cache/` are git-ignored.
 
+## Publishing to Hugging Face
+
+`runners/export_hf.py` exports the public cases as a Hugging Face dataset: one config per
+check, with its dev, validation and held-out splits, a generated dataset card (with the
+draft-label status, counts, provenance, licences and citations), the CC-BY-4.0 notice for the
+benchmark's own data, the upstream licence files and
+a `manifest.json` recording the `dataset_version`. The upload tags the revision
+`dv-<first 12 characters of dataset_version>`, so a published report can be matched to the
+exact dataset it ran on.
+
+```bash
+uv sync --group hf                                       # installs huggingface_hub
+uv run --group hf hf auth login                          # paste a token with write access
+uv run python benchmarks/runners/export_hf.py build      # writes benchmarks/hf-build/
+uv run --group hf python benchmarks/runners/export_hf.py upload --repo pandorasBoxee/attest-benchmark
+```
+
+Add `--private` to create the dataset repository private (it has no effect on a repository that
+already exists). The upload reads the token saved by `hf auth login`, or `HF_TOKEN`; there is no
+option to pass a token. It refuses when `benchmarks/hf-build/` is missing, when the folder was
+built for another repository (`build --repo`), or when the folder differs from a fresh build of
+the current checkout, so rebuild after any change or commit.
+
+Things to know before uploading:
+
+- **Held-out labels become public.** Anyone can read them once uploaded, so a held-out score
+  only means something for a system that wasn't tuned on them.
+- **Private datasets are never exported.** The build reads only `benchmarks/datasets/`, through
+  the same loader and rules as the runner; there is no option to point it anywhere else.
+- **Every label is still a draft.** The card says so prominently; don't publish numbers from it
+  as attest's accuracy until the cases are confirmed.
+
 ## Layout
 
 ```
@@ -374,13 +411,15 @@ benchmarks/
 │   ├── guidelines.md            labelling rules (draft)
 │   ├── labels/<annotator>/      each annotator's label files, one per case
 │   └── adjudications.jsonl      how each disagreement was settled
+├── datasets/LICENSE             CC-BY-4.0 notice for the benchmark's data and labels
 ├── datasets/<check>/
 │   ├── {dev,validation,heldout}.jsonl          seed cases (origin attest-seed)
 │   └── <split>-<origin>.jsonl                  external cases, written by a converter
 ├── converters/                  <origin>.py: public dataset runs -> case files
 ├── sources/<origin>/            vendored upstream inputs, LICENSE, NOTICE, SOURCE.md
 ├── private/                     your own cases (git-ignored)
+├── hf-build/                    the Hugging Face export (git-ignored, rebuilt by export_hf.py)
 ├── runners/                     case model, loading, grading, metrics, reports, compare,
-│                                annotate (templates, agreement, settle, merge)
+│                                annotate (templates, agreement, settle, merge), export_hf
 └── reports/                     run output; published reports are committed on purpose
 ```

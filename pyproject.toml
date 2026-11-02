@@ -92,6 +92,8 @@ dev = [
     "ruff>=0.17.3",
 ]
 
+hf = ["huggingface_hub>=0.34"]
+
 docs = [
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.26",

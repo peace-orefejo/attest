@@ -194,9 +194,10 @@ def test_each_unknown_entry_is_named(tmp_path: Path, name: str, problem: str) ->
         load_datasets(root)
 
 
-def test_hidden_entries_and_a_top_level_readme_are_allowed(tmp_path: Path) -> None:
+def test_hidden_entries_and_a_top_level_readme_and_licence_are_allowed(tmp_path: Path) -> None:
     root = _tree(tmp_path)
     (root / "README.md").write_text("# cases\n")
+    (root / "LICENSE").write_text("CC-BY-4.0\n")
     (root / ".DS_Store").write_text("")
     (root / ".git").mkdir()
     (root / ".git" / "HEAD").write_text("ref")

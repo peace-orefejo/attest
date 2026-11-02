@@ -1,6 +1,7 @@
 """The file layout of a datasets folder: which names the loader reads and which it rejects.
 
-A datasets folder holds one folder per check and, optionally, a top-level `README.md`. A check
+A datasets folder holds one folder per check and, optionally, a top-level `README.md` and
+`LICENSE`. A check
 folder holds only case files named exactly `<split>.jsonl` or `<split>-<origin>.jsonl`, where
 the origin isn't itself a split name. Hidden entries (names starting with `.`, such as
 `.DS_Store`, `.gitkeep` or a private folder's `.git`) are ignored everywhere. Anything else
@@ -16,7 +17,7 @@ from pydantic import BaseModel
 
 from bench_cases import CHECKS, SPLITS, Split
 
-ROOT_FILES = frozenset({"README.md"})
+ROOT_FILES = frozenset({"README.md", "LICENSE"})
 """Files allowed at the top of a datasets folder, beside the check folders."""
 
 _NAME = re.compile(r"(?P<split>[a-z]+)(?:-(?P<origin>[a-z0-9][a-z0-9_-]*))?\.jsonl")
