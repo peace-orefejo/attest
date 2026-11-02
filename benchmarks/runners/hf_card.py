@@ -17,7 +17,14 @@ from hf_card_text import (
     loading_text,
 )
 from hf_manifest import Manifest
-from hf_origins import ATTEST_BIBTEX, ORIGINS, licence_name, notice_name
+from hf_origins import (
+    ATTEST_BIBTEX,
+    DATA_HUB_LICENCE,
+    DATA_LICENCE,
+    ORIGINS,
+    licence_name,
+    notice_name,
+)
 
 PRETTY_NAME = "attest benchmark: labelled agent runs"
 TAGS = (
@@ -58,9 +65,7 @@ def front_matter(manifest: Manifest) -> str:
     configs = [_config(manifest, check) for check in CHECKS if manifest.check_total(check)]
     header: dict[str, object] = {
         "pretty_name": PRETTY_NAME,
-        "license": "other",
-        "license_name": "attest-benchmark-mixed",
-        "license_link": "README.md#licenses",
+        "license": hub_licences(manifest),
         "language": ["en"],
         "size_categories": [_size_category(manifest.total())],
         "task_categories": ["text-classification"],
@@ -68,6 +73,16 @@ def front_matter(manifest: Manifest) -> str:
         "configs": configs,
     }
     return yaml.safe_dump(header, sort_keys=False, allow_unicode=True, width=1000)
+
+
+def hub_licences(manifest: Manifest) -> list[str]:
+    """Every licence in the export as Hugging Face identifiers: the benchmark's own licence,
+    which covers the labels, notes and conversion on every case, then each upstream licence."""
+    found = [DATA_HUB_LICENCE]
+    for origin in manifest.origins():
+        if (licence := ORIGINS[origin].hub_licence) not in found:
+            found.append(licence)
+    return found
 
 
 def _config(manifest: Manifest, check: CheckName) -> dict[str, object]:
@@ -161,16 +176,25 @@ def _provenance(manifest: Manifest) -> str:
         if info.upstream_url is not None:
             lines.append(f"- Upstream: {info.upstream_url} at commit `{info.upstream_commit}`")
             lines.append(f"- What was selected, stripped and why: [SOURCE.md]({info.source_link})")
-        lines.append(f"- Licence: {info.licence}, full text in `LICENSES/{licence_name(origin)}`")
+        licence_file = f"`LICENSES/{licence_name(origin)}`"
+        if info.upstream_url is None:
+            lines.append(f"- Licence: {info.licence}, see {licence_file}")
+        else:
+            lines.append(f"- Upstream run content: {info.licence}, full text in {licence_file}")
+            lines.append(f"- Labels, notes and conversion: {DATA_LICENCE}")
         if info.notice_file is not None:
             lines.append(f"- Notice: `LICENSES/{notice_name(origin)}`")
         blocks.append("\n".join(lines))
+    upstream = sorted({ORIGINS[o].licence for o in manifest.origins()} - {DATA_LICENCE})
     blocks.append(
-        "The dataset as a whole is under several licences, hence `license: other`. Each "
-        "converted case keeps its upstream run data under that origin's licence; the labels, "
-        "notes and conversion that attest added, and the seed cases, are part of the attest "
-        "repository and licensed like it (AGPL-3.0-only). The licence and notice files are "
-        "copied verbatim from the repository."
+        f"The benchmark's own data is licensed {DATA_LICENCE}: the attest seed cases, and the "
+        "labels, notes and conversion work on every case, converted ones included. The "
+        "upstream run content of a converted case keeps its upstream "
+        f"licence ({', '.join(upstream) or 'none in this export'}), as listed for each origin "
+        f"above; the card's `license` field lists all of them. The {DATA_LICENCE} notice is "
+        "`LICENSES/attest-seed.txt`; the upstream licence and notice files are copied "
+        "verbatim from the repository. attest's code is separately licensed AGPL-3.0 and is "
+        "not part of this dataset."
     )
     return "\n\n".join(blocks)
 

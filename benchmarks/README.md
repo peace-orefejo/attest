@@ -1,5 +1,10 @@
 # attest benchmark
 
+> **Licensing.** The benchmark's data and labels (the attest-seed cases, and the labels, notes
+> and conversion work on every case) are licensed
+> [CC-BY-4.0](datasets/LICENSE). The code is AGPL-3.0, like the rest of attest. Vendored
+> upstream content keeps its own licence: see each `sources/<origin>/LICENSE`.
+
 This folder measures how accurate attest's own checks are. It lives outside the package and is
 never shipped in the wheel or the sdist.
 
@@ -369,7 +374,8 @@ the cases too, so keep it private; `.bench-cache/` and `.cache/` are git-ignored
 
 `runners/export_hf.py` exports the public cases as a Hugging Face dataset: one config per
 check, with its dev, validation and held-out splits, a generated dataset card (with the
-draft-label status, counts, provenance, licences and citations), the upstream licence files and
+draft-label status, counts, provenance, licences and citations), the CC-BY-4.0 notice for the
+benchmark's own data, the upstream licence files and
 a `manifest.json` recording the `dataset_version`. The upload tags the revision
 `dv-<first 12 characters of dataset_version>`, so a published report can be matched to the
 exact dataset it ran on.
@@ -405,6 +411,7 @@ benchmarks/
 │   ├── guidelines.md            labelling rules (draft)
 │   ├── labels/<annotator>/      each annotator's label files, one per case
 │   └── adjudications.jsonl      how each disagreement was settled
+├── datasets/LICENSE             CC-BY-4.0 notice for the benchmark's data and labels
 ├── datasets/<check>/
 │   ├── {dev,validation,heldout}.jsonl          seed cases (origin attest-seed)
 │   └── <split>-<origin>.jsonl                  external cases, written by a converter

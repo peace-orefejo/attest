@@ -18,6 +18,10 @@ BLOB_URL = f"{REPO_URL}/blob/main"
 BENCHMARKS_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = BENCHMARKS_DIR.parent
 SOURCES_DIR = BENCHMARKS_DIR / "sources"
+DATA_LICENCE = "CC-BY-4.0"
+"""The licence of the benchmark's own data: the seed cases and every case's labels, notes and
+conversion. The code is AGPL-3.0; upstream run content keeps its upstream licence."""
+DATA_HUB_LICENCE = "cc-by-4.0"
 
 
 class OriginInfo(BaseModel):
@@ -28,6 +32,8 @@ class OriginInfo(BaseModel):
     name: str
     title: str
     licence: str
+    hub_licence: str
+    """The licence's identifier in Hugging Face card metadata."""
     upstream_url: str | None = None
     upstream_commit: str | None = None
     licence_file: Path
@@ -46,17 +52,19 @@ ORIGINS: dict[str, OriginInfo] = {
     SEED_ORIGIN: OriginInfo(
         name=SEED_ORIGIN,
         title="attest seed cases",
-        licence="AGPL-3.0-only",
-        licence_file=REPO_ROOT / "LICENSE",
+        licence=DATA_LICENCE,
+        hub_licence=DATA_HUB_LICENCE,
+        licence_file=BENCHMARKS_DIR / "datasets" / "LICENSE",
         description=(
-            "Short synthetic runs written for attest by the benchmark author. Licensed like the "
-            "attest repository (GNU AGPL v3.0 only)."
+            "Short synthetic runs written for attest by the benchmark author, licensed under "
+            "CC BY 4.0 like the rest of the benchmark's own data."
         ),
     ),
     "tau-bench": OriginInfo(
         name="tau-bench",
         title="τ-bench",
         licence="MIT",
+        hub_licence="mit",
         upstream_url="https://github.com/sierra-research/tau-bench",
         upstream_commit="59a200c6d575d595120f1cb70fea53cef0632f6b",
         licence_file=SOURCES_DIR / "tau-bench" / "LICENSE",
@@ -80,6 +88,7 @@ ORIGINS: dict[str, OriginInfo] = {
         name="agentdojo",
         title="AgentDojo",
         licence="MIT",
+        hub_licence="mit",
         upstream_url="https://github.com/ethz-spylab/agentdojo",
         upstream_commit="089ed468cf3ed0322acc66b0211f26d9d90dbf60",
         licence_file=SOURCES_DIR / "agentdojo" / "LICENSE",
@@ -102,6 +111,7 @@ ORIGINS: dict[str, OriginInfo] = {
         name="toolbench",
         title="ToolBench",
         licence="Apache-2.0",
+        hub_licence="apache-2.0",
         upstream_url="https://github.com/OpenBMB/ToolBench",
         upstream_commit="d56fdd89faf8c91fa135090b212bb9057ee5cfc2",
         licence_file=SOURCES_DIR / "toolbench" / "LICENSE",

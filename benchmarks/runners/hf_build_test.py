@@ -95,8 +95,8 @@ def test_export_reloads_with_attests_loader(built: Path) -> None:
 
 def test_card_yaml_parses_and_lists_exactly_the_data_files(built: Path) -> None:
     header = _card_header(built)
-    assert header["license"] == "other"
-    assert header["license_link"] == "README.md#licenses"
+    assert header["license"] == ["cc-by-4.0", "mit", "apache-2.0"]
+    assert "license_name" not in header
     listed = {entry["path"] for config in header["configs"] for entry in config["data_files"]}
     existing = {name for name in _files(built) if name.startswith("data/")}
     assert listed == existing
@@ -138,10 +138,39 @@ def test_licences_and_notices_are_copied_verbatim(built: Path) -> None:
         if info.notice_file is not None:
             notice = built / "LICENSES" / notice_name(origin)
             assert notice.read_bytes() == info.notice_file.read_bytes()
-    assert (built / "LICENSES" / "attest-seed.txt").read_bytes() == (
-        REPO_ROOT / "LICENSE"
-    ).read_bytes()
+    seed = (built / "LICENSES" / "attest-seed.txt").read_bytes()
+    assert seed == (DATASETS_DIR / "LICENSE").read_bytes()
+    assert seed != (REPO_ROOT / "LICENSE").read_bytes()
+    assert b"CC-BY-4.0" in seed
+    assert b"https://creativecommons.org/licenses/by/4.0/" in seed
     assert (built / "LICENSES" / "toolbench-NOTICE.txt").is_file()
+
+
+def test_card_licences_labels_cc_by_and_upstream_runs_under_their_own(built: Path) -> None:
+    card = (built / "README.md").read_text(encoding="utf-8")
+    licences = card.split('<a id="licenses"></a>', 1)[1].split("## Citation", 1)[0]
+    assert "AGPL-3.0-only" not in licences
+    assert "labels, notes and conversion work on every case" in licences
+    assert "keeps its upstream licence (Apache-2.0, MIT)" in licences
+    assert licences.count("- Labels, notes and conversion: CC-BY-4.0") == 3
+    assert "- Upstream run content: MIT, full text in `LICENSES/tau-bench.txt`" in licences
+    assert "- Upstream run content: Apache-2.0, full text in `LICENSES/toolbench.txt`" in licences
+    assert "- Licence: CC-BY-4.0, see `LICENSES/attest-seed.txt`" in licences
+
+
+def test_card_licence_list_holds_only_the_licences_present() -> None:
+    counts = {check: {split: {} for split in SPLITS} for check in CHECKS}
+    counts["tool_use"]["dev"] = {"attest-seed": 2, "agentdojo": 1}
+    manifest = Manifest.model_validate(
+        {
+            "dataset_version": "0" * 64,
+            "attest_commit": None,
+            "hf_repo": "someone/attest-benchmark",
+            "counts": counts,
+            "label_status": {"confirmed": 0, "draft": 3},
+        }
+    )
+    assert yaml.safe_load(front_matter(manifest))["license"] == ["cc-by-4.0", "mit"]
 
 
 def test_build_reads_only_public_files_never_private(
@@ -161,9 +190,8 @@ def test_build_reads_only_public_files_never_private(
     out = tmp_path / "export"
     build(out)
     allowed = (DATASETS_DIR.resolve(), (BENCHMARKS_DIR / "sources").resolve(), out.resolve())
-    reads = [p for p in touched if p != (REPO_ROOT / "LICENSE").resolve()]
     assert (DATASETS_DIR / "tool_use" / "dev.jsonl").resolve() in touched
-    assert all(any(p.is_relative_to(root) for root in allowed) for p in reads), reads
+    assert all(any(p.is_relative_to(root) for root in allowed) for p in touched), touched
     assert not any(p.is_relative_to((BENCHMARKS_DIR / "private").resolve()) for p in touched)
 
 
@@ -193,7 +221,9 @@ def test_origins_match_their_source_files() -> None:
         if info.upstream_commit is not None:
             source = (BENCHMARKS_DIR / "sources" / origin / "SOURCE.md").read_text(encoding="utf-8")
             assert info.upstream_commit in source
-    assert "GNU AFFERO GENERAL PUBLIC LICENSE" in (REPO_ROOT / "LICENSE").read_text()
+    assert ORIGINS["attest-seed"].licence == "CC-BY-4.0"
+    assert ORIGINS["attest-seed"].licence_file == DATASETS_DIR / "LICENSE"
+    assert "CC-BY-4.0" in (DATASETS_DIR / "LICENSE").read_text(encoding="utf-8")
 
 
 def test_card_lists_every_open_guideline_question() -> None:
