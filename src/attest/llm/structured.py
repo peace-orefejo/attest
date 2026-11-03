@@ -74,7 +74,7 @@ def call(
     """
     reasoning = reasoning_for(site)
     store = response_cache.get()
-    key = cache_key(system, user, output, sample, prefix) if store is not None else ""
+    key = cache_key(system, user, output, sample, prefix, reasoning) if store is not None else ""
     if store is not None and key in store:
         record_cache_hit()
         hit = store[key]

@@ -39,6 +39,8 @@ All notable changes to `agent-attest` are documented here. This project follows
   per check or call site (`{"faithfulness": "medium", "default": "auto"}`, or
   `ReasoningPolicy`). Each report records the level each call site used in
   `metadata["reasoning"]`. See [reasoning](https://peace-orefejo.github.io/attest/providers/#reasoning).
+  The response cache key includes the level, so cached answers are never reused across levels
+  (answers cached before this release are not reused either).
 - `TruncatedOutput`, raised by `attest.llm.call` when the model stops at its output limit
   before finishing the answer. It isn't retried, since the same request would stop in the same
   place.
