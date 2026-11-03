@@ -28,7 +28,7 @@ Keys are read from the environment or from a `.env` file in the working director
 You can also pass the chosen provider's key as `key=` to `Attest`.
 
 Each provider defaults to a small, fast model, so grading a run costs cents. A stronger model
-catches subtler errors. Compare models on your own labeled runs before you switch, and use
+may judge subtler cases better, but that isn't measured yet. Compare models on your own labeled runs before you switch, and use
 [`difference_is_real`](concepts.md#pass-rates-and-confidence) to check that the gap isn't noise.
 
 ## Reasoning
@@ -47,7 +47,7 @@ Attest(reasoning={"faithfulness": "medium", "default": "auto"})
 |---|---|
 | `auto` (default) | The provider's adaptive thinking decides, at low effort. An easy claim gets little or no reasoning; a hard one gets more. |
 | `off` | Turns reasoning off where the model allows it, otherwise uses its lowest level. Cheapest; least careful on hard claims. |
-| `low`, `medium`, `high` | Sets the reasoning effort. Higher levels can catch subtler errors and cost more. |
+| `low`, `medium`, `high` | Sets the reasoning effort. Higher levels cost more; whether they judge better isn't measured yet. |
 
 A mapping sets a level per check (`faithfulness`, `tool_use`, `injection`, `role`, `policy`,
 `guidelines`, `writer`, `judge`) or per call site, such as `faithfulness.verify` or
