@@ -21,8 +21,8 @@ A run has four parts worth checking separately, because each fails in its own wa
 | **The agent left its job** | A support agent wrote code, or was talked into ignoring its system prompt. | Compare what the agent did with the job its system prompt describes. |
 
 Other things matter too, such as latency, cost and whether the user's task was done at all.
-Those are usually measured from traces and outcomes; this guide is about correctness against
-evidence.
+Those are usually measured from traces and outcomes; this guide is about whether the run is
+supported by its evidence.
 
 ## Why ground the evaluation in evidence
 
@@ -129,8 +129,9 @@ than on a single noisy run.
 
 attest trusts that the recorded run is authentic and complete: a faked tool output backs a faked
 claim, and a claim that rests on an unrecorded call comes back `unverifiable`. Its own accuracy
-hasn't been measured on a labelled benchmark yet. Read [Limitations](../limitations.md) before
-you gate releases on it, and check its results on your own labelled runs first.
+hasn't been measured on a labelled [benchmark](../benchmark.md) yet. Read
+[Limitations](../limitations.md) before you gate releases on it, and check its results on your
+own labelled runs first.
 
 ## Next
 

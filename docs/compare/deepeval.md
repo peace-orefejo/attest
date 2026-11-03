@@ -53,7 +53,7 @@ DeepEval's features below come from its
 
 attest reads a plain `Trajectory`, and DeepEval reads its own test cases, so the same recorded
 run can go through both. A common split is DeepEval for broad quality metrics and attest as a
-gate on tool-grounded correctness:
+gate on whether the answer is supported by the tool outputs:
 
 ```python
 from attest import Attest

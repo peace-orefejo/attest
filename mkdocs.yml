@@ -1,5 +1,5 @@
 site_name: attest
-site_description: attest is an open-source AI agent evaluation tool for Python. It checks agent answers against what their tools actually returned, catching made-up facts, misused tools and prompt injection.
+site_description: attest is an open-source AI agent evaluation tool for Python. It checks agent answers against what their tools actually returned, and flags claims the tool outputs don't support, misused tools and prompt injection.
 site_url: https://peace-orefejo.github.io/attest/
 repo_url: https://github.com/peace-orefejo/attest
 repo_name: peace-orefejo/attest
@@ -126,6 +126,7 @@ nav:
       - AI agent evaluation tools: compare/index.md
       - attest vs DeepEval: compare/deepeval.md
   - Limitations: limitations.md
+  - Benchmark: benchmark.md
   - Architecture: architecture.md
   - API reference:
       - attest: reference/attest.md

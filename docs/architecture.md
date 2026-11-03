@@ -48,7 +48,7 @@ as an unknown option, as the same JSON error envelope.
 ## Design rules
 
 - **Tool outputs are the only evidence.** No check reads the agent's `thought` text when
-  deciding whether a claim is true.
+  deciding whether a claim is supported.
 - **Untrusted text is data.** Anything an attacker could write reaches a judge only inside a
   bounded, escaped, clearly delimited block, framed as content to judge.
 - **Prompts live in one place.** All prompt text is in `prompts/`. Each answer kind has its own

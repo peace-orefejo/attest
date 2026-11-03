@@ -8,8 +8,12 @@ description: "What attest assumes, what it can't establish, and how to use its r
 attest evaluates a recorded run against the evidence in that record. It is an evaluation
 toolkit, not a guarantee: its own accuracy hasn't been measured on a labelled benchmark yet, and
 several of its checks rest on assumptions you should know before you rely on a result.
-That accuracy will be measured, per check, by the labelled benchmark in
-[`benchmarks/`](https://github.com/peace-orefejo/attest/tree/main/benchmarks).
+That accuracy will be measured, per check, by the labelled [benchmark](benchmark.md), whose
+labels are all still drafts.
+
+attest checks whether an answer's claims are supported by the run's recorded tool outputs. It
+doesn't establish that a claim is true: a claim backed by a wrong tool output comes back
+`supported`, and a true claim no tool output mentions comes back `unverifiable`.
 
 ## What attest assumes
 
@@ -71,7 +75,8 @@ No failure and no missing input turns into a `pass`.
 | Control characters, markup or odd arguments | Treated as data: escaped in prompts and printed as valid JSON. |
 | A file that isn't valid UTF-8 or valid JSON | The CLI prints an `invalid_input` error and exits 2. |
 
-A malformed or empty model response is retried twice, then fails like any other call. In
+A malformed, empty or wrongly typed model response is retried twice, then fails like any other
+call. In
 `evaluate()`, a failed call never stops the other checks: only the affected findings are
 inconclusive. The exceptions are a budget stop and a provider configuration error, which stop
 the evaluation.
