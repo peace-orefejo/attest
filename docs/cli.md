@@ -162,7 +162,12 @@ file out:
   Windows treat `Secrets/k.env`, `secrets/k.env` and a decomposed `café.env` as the same file,
   so attest does too, on every platform. A `!` pattern re-includes a file only if both forms
   agree.
-- A path over 4,096 characters or 1,024 segments is always excluded.
+- A path over 4,096 characters or 1,024 segments is always excluded, since it can't be
+  checked. So is a read argument with a line break, and a grep line whose candidate file
+  name is that deep.
+- A read argument or grep file name is also matched with symlinks resolved, relative to the
+  current directory when it lies inside it, so `docs/k.env` is excluded when `docs` links
+  to an excluded `secrets/` directory.
 
 **What an exclusion covers.** In [code review](code-review/index.md#leaving-files-out), excluded
 files' diffs and reads are replaced by a one-line note everywhere: in the grading evidence,
@@ -170,8 +175,12 @@ attest's own reviewer, the guideline check and the injection scan. A read is hid
 its path-like arguments (`path`, `file_path`, a `paths` list, any string but the search text)
 names an excluded file or directory. A grep whose output names an excluded file anywhere (a
 `path:line:` prefix, a ripgrep heading line, a NUL-separated name, absolute or relative) is
-withheld whole, since its other lines may belong to that file. A grep too long to check
-(50,000 path segments' worth of candidate names) keeps only the lines checked so far. In
+withheld whole, since its other lines may belong to that file. Because that check fails
+closed, a diff whose header lines, or a grep whose line text, only mention an excluded file
+is hidden too; `warnings` lists such cases separately, since no pattern matches the file
+itself, so you can check them by hand. A grep too long to check (50,000 path segments'
+worth of candidate names) keeps only the lines checked so far, and the output's decision
+lists it as a `truncated` omission. In
 `attest run`, an artifact whose `path` or `name` matches is replaced by a one-line note before
 any check runs: it is never read, scanned or sent to a model, and its location is listed in
 `metadata["artifacts_excluded"]`. Its `path` is matched as written and with symlinks resolved,
@@ -188,9 +197,13 @@ excluded; it can't bring back a generated file or lockfile attest leaves out by 
 ### In CI: read patterns from the base branch
 
 A pull request that edits `.attestignore` could hide its own changes from the review. So
-`attest review` refuses with `invalid_input` (exit 2) when the pull request's diffs or
-changed-file list touch `.attestignore` or any `--exclude-file` it read, matched against the
-current directory and every directory above it. Read the patterns from the base branch instead:
+`attest review` refuses with `invalid_input` (exit 2) when the change set touches
+`.attestignore` or any `--exclude-file` it read. The change set is the pull request's and
+every output's diffs and changed-file lists, including the files diff headers name, such as
+a rename's new name. attest can't know where the repository starts, so a pattern file counts
+as changed when its path, as given or with symlinks resolved, ends with a changed path. This
+fails safe: a same-named file at the same depth elsewhere also triggers it. Read the
+patterns from the base branch instead:
 
 ```bash
 git show origin/main:.attestignore > "$RUNNER_TEMP/base.attestignore"

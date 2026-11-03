@@ -160,3 +160,28 @@ def test_the_writer_sees_notes_and_its_outputs_about_excluded_files_are_dropped(
     assert [d.text for d in result.decisions if d.keep] == ["Sets y to 1."]
     assert all(SECRET not in evidence for evidence in grader.evidence)
     assert SECRET not in result.model_dump_json()
+
+
+def test_a_grep_cut_at_the_check_budget_is_reported_as_truncated():
+    line = "src/" + "a/" * 99 + "x.py:1:y = 1"
+    output = "\n".join(line.replace("x.py", f"x{i}.py") for i in range(600))
+    grep = FileRead(tool="grep", arguments={"pattern": "y = 1"}, output=output)
+    outputs = [ReviewOutput(output_type="issue", text="y is set to 1.", reads=[grep])]
+    result = review(PR, outputs, evaluate=_Grader(), deep=False, exclude=["*.pem"])
+    omissions = result.decisions[0].omissions
+    assert [(o.path, o.reason) for o in omissions] == [("y = 1", "truncated")]
+
+
+def test_hiding_caused_only_by_text_naming_an_excluded_file_gets_its_own_warning():
+    forged = _diff("db/m.sql", "select 1;") + "--- x.env\n+++ y\n@@ -9,1 +9,1 @@\n-a\n+b\n"
+    pr = PullRequest(diffs={"app/main.py": _diff("app/main.py", "y = 1"), "db/m.sql": forged})
+    mention = "src/config.py:3:# load x.env"
+    grep = FileRead(tool="grep", arguments={"pattern": "env"}, output=mention)
+    outputs = [ReviewOutput(output_type="issue", text="y is set to 1.", reads=[grep])]
+    result = review(pr, outputs, evaluate=_Grader(), deep=False, exclude=["*.env"])
+    assert result.excluded_files == ["db/m.sql", mention]
+    [warning] = [w for w in result.warnings if "only because" in w]
+    assert "db/m.sql" in warning and mention in warning
+    direct = review(PR, outputs, evaluate=_Grader(), deep=False, exclude=["secrets/"])
+    assert direct.excluded_files == ["secrets/prod.env"]
+    assert not any("only because" in w for w in direct.warnings)

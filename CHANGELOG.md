@@ -19,9 +19,14 @@ All notable changes to `agent-attest` are documented here. This project follows
   `./`, `..`), absolute paths match from any segment, case-folded and NFC forms count as the same
   file, a read is hidden when any path-like argument names an excluded file, a grep naming one
   anywhere is withheld whole, and a diff whose key or header lines name one is hidden. Matching
-  makes one pass per rule over the path, so a deep path or hostile grep output can't make it
-  slow. `attest review` refuses (exit 2) when the pull request changes `.attestignore` or an
-  `--exclude-file` it read; `--allow-pr-attestignore` overrides. `Attest(exclude=...)` takes a
+  makes one pass per rule over the path, so the time a deep path or hostile grep output
+  takes is bounded. Reads and grep file names are also matched with symlinks resolved. A read
+  argument too long or with a line break, and a grep file name too deep to check, count as
+  excluded. Hiding caused only by text naming an excluded file (a header-like diff line, a
+  grep line's content) gets its own warning, and a grep cut short by the check is a
+  `truncated` omission. `attest review` refuses (exit 2) when the pull request or any output
+  changes `.attestignore` or an `--exclude-file` it read, matched by path suffix and
+  including rename and copy targets; `--allow-pr-attestignore` overrides. `Attest(exclude=...)` takes a
   list of patterns or a `Path` to a pattern file; a bare string raises `TypeError`. An
   unreadable pattern file, one over 1 MB, or more than 1,000 patterns is `invalid_input`
   (exit 2), or `ExclusionError` in Python.

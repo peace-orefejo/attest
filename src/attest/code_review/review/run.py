@@ -72,6 +72,7 @@ def review(
     filled = [item.output for item in hidden]
     injection = _scan(visible, filled, exclusions, deep=deep)
     excluded = _union(hidden_pr.excluded, *(item.excluded for item in hidden))
+    named_only = _union(hidden_pr.named_only, *(item.named_only for item in hidden))
     decisions: list[OutputDecision] = []
     unchecked: list[int] = []
     for index, output in enumerate(filled):
@@ -100,7 +101,7 @@ def review(
             *guideline_warnings(rules, pr),
             *unchecked_guideline_warnings(unchecked, rules),
             *injection_warnings(injection),
-            *exclusion_warnings(excluded, exclusions, pr),
+            *exclusion_warnings(excluded, exclusions, pr, named_only),
         ],
         excluded_files=excluded,
         outputs=list(source),

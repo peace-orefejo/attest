@@ -167,3 +167,54 @@ def test_the_override_flag_or_untouched_files_let_the_review_run(tmp_path, monke
     assert runner.invoke(app, other).exit_code == 0
     no_discovery = ["review", _review_changing(tmp_path, ".attestignore"), "--no-attestignore"]
     assert runner.invoke(app, no_discovery).exit_code == 0
+
+
+def _write_review(tmp_path, data: dict[str, object]) -> str:
+    review = tmp_path / "review.json"
+    review.write_text(json.dumps(data))
+    return str(review)
+
+
+def test_a_pattern_file_edited_while_attest_runs_above_the_repo_is_refused(
+    tmp_path, monkeypatch, seen
+):
+    repo = tmp_path / "repo"
+    (repo / "ci").mkdir(parents=True)
+    (repo / "ci" / "team.ignore").write_text("src/evil.py\n")
+    monkeypatch.chdir(tmp_path)
+    review = _review_changing(tmp_path, "ci/team.ignore")
+    args = ["review", review, "--no-attestignore", "--exclude-file", "repo/ci/team.ignore"]
+    result = runner.invoke(app, args)
+    assert result.exit_code == 2
+    assert "could hide its own changes" in _error(result)
+
+
+def test_an_output_only_diff_of_the_pattern_file_is_refused(tmp_path, monkeypatch, seen):
+    (tmp_path / ".attestignore").write_text("src/evil.py\n")
+    monkeypatch.chdir(tmp_path)
+    pr = {"diffs": {"src/evil.py": "+x\n"}}
+    edit = "--- a/.attestignore\n+++ b/.attestignore\n@@ -0,0 +1 @@\n+src/evil.py\n"
+    output = {"output_type": "issue", "text": "t", "diffs": {".attestignore": edit}}
+    result = runner.invoke(
+        app, ["review", _write_review(tmp_path, {"pr": pr, "outputs": [output]})]
+    )
+    assert result.exit_code == 2
+    assert "could hide its own changes" in _error(result)
+    listed = {"output_type": "issue", "text": "t", "changed_files": [".attestignore"]}
+    review = _write_review(tmp_path, {"pr": pr, "outputs": [listed]})
+    assert runner.invoke(app, ["review", review]).exit_code == 2
+
+
+def test_a_rename_onto_the_pattern_file_keyed_by_its_old_name_is_refused(
+    tmp_path, monkeypatch, seen
+):
+    (tmp_path / ".attestignore").write_text("src/evil.py\n")
+    monkeypatch.chdir(tmp_path)
+    rename = (
+        "diff --git a/x.txt b/.attestignore\nsimilarity index 100%\n"
+        "rename from x.txt\nrename to .attestignore\n"
+    )
+    review = _write_review(tmp_path, {"pr": {"diffs": {"src/evil.py": "+x\n", "x.txt": rename}}})
+    result = runner.invoke(app, ["review", review])
+    assert result.exit_code == 2
+    assert "could hide its own changes" in _error(result)

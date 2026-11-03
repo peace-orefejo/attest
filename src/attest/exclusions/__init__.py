@@ -18,6 +18,7 @@ from .loading import (
     load_exclusions,
     read_pattern_file,
 )
+from .resolved import cwd_roots, path_forms, within_cwd
 from .rules import (
     EXCLUDED_REASON,
     MAX_PATH_CHARS,
@@ -42,10 +43,13 @@ __all__ = [
     "ExclusionsInput",
     "as_exclusions",
     "changed_sources",
+    "cwd_roots",
     "exclude_artifacts",
     "excluded_note",
     "is_excluded_artifact",
     "load_exclusions",
+    "path_forms",
     "read_pattern_file",
     "record_excluded",
+    "within_cwd",
 ]

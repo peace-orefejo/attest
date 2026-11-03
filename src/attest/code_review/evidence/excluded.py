@@ -16,6 +16,7 @@ __all__ = [
     "HiddenRead",
     "changed_files_listing",
     "diff_excluded",
+    "diff_file_names",
     "excluded_diff",
     "hide_output",
     "hide_pull_request",
@@ -31,11 +32,15 @@ _DIFF_SIDES = ("a/", "b/")
 class HiddenOutput(BaseModel):
     output: ReviewOutput
     excluded: list[str] = Field(default_factory=list[str])
+    named_only: list[str] = Field(default_factory=list[str])
+    """Entries of `excluded` hidden only because their text names an excluded file."""
 
 
 class HiddenPullRequest(BaseModel):
     pr: PullRequest
     excluded: list[str] = Field(default_factory=list[str])
+    named_only: list[str] = Field(default_factory=list[str])
+    """Diffs hidden only because a header line in them names an excluded file."""
 
 
 def excluded_diff(path: str) -> RenderedDiff:
@@ -57,7 +62,22 @@ def diff_excluded(path: str, text: str, exclusions: Exclusions) -> bool:
         return False
     if text == excluded_note(path):
         return True
-    return any(exclusions.excludes(name) for name in _diff_names(path, text))
+    return any(exclusions.excludes(name) for name in diff_file_names(path, text))
+
+
+def diff_file_names(path: str, text: str) -> list[str]:
+    """Every file a diff's key and header lines name, with and without an `a/`/`b/` side."""
+    names = [path]
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith(_GIT_HEADER):
+            rest = line[len(_GIT_HEADER) :]
+            names.extend([rest, *rest.split(" ")])
+        elif line.startswith(_FILE_HEADERS):
+            names.append(line.split(" ", 2)[-1])
+        elif _is_file_header(lines, index):
+            names.extend([_header_name(line), _header_name(lines[index + 1])])
+    return list(dict.fromkeys(name for found in names for name in _with_and_without_side(found)))
 
 
 def changed_files_listing(paths: list[str], exclusions: Exclusions | None) -> list[str]:
@@ -74,7 +94,11 @@ def hide_pull_request(pr: PullRequest, exclusions: Exclusions) -> HiddenPullRequ
     if not excluded:
         return HiddenPullRequest(pr=pr)
     diffs = _swap_diffs(pr.diffs, hidden)
-    return HiddenPullRequest(pr=pr.model_copy(update={"diffs": diffs}), excluded=excluded)
+    return HiddenPullRequest(
+        pr=pr.model_copy(update={"diffs": diffs}),
+        excluded=excluded,
+        named_only=_named_only(hidden, exclusions),
+    )
 
 
 def without_excluded_diffs(pr: PullRequest, exclusions: Exclusions) -> PullRequest:
@@ -99,29 +123,25 @@ def hide_output(output: ReviewOutput, exclusions: Exclusions) -> HiddenOutput:
         return HiddenOutput(output=output)
     diffs = _swap_diffs(output.diffs, hidden)
     updated = output.model_copy(update={"diffs": diffs, "reads": [read.read for read in reads]})
-    return HiddenOutput(output=updated, excluded=excluded)
+    named_only = _union(_named_only(hidden, exclusions), *(read.named_only for read in reads))
+    return HiddenOutput(output=updated, excluded=excluded, named_only=named_only)
 
 
 def _excluded_diffs(diffs: dict[str, str], exclusions: Exclusions) -> list[str]:
     return [path for path, text in diffs.items() if diff_excluded(path, text, exclusions)]
 
 
+def _named_only(hidden: list[str], exclusions: Exclusions) -> list[str]:
+    """The hidden diffs whose key no pattern matches: a header line named an excluded file."""
+    return [
+        path
+        for path in hidden
+        if not any(exclusions.excludes(name) for name in _with_and_without_side(path))
+    ]
+
+
 def _swap_diffs(diffs: dict[str, str], hidden: list[str]) -> dict[str, str]:
     return {path: excluded_note(path) if path in hidden else text for path, text in diffs.items()}
-
-
-def _diff_names(path: str, text: str) -> list[str]:
-    names = [path]
-    lines = text.splitlines()
-    for index, line in enumerate(lines):
-        if line.startswith(_GIT_HEADER):
-            rest = line[len(_GIT_HEADER) :]
-            names.extend([rest, *rest.split(" ")])
-        elif line.startswith(_FILE_HEADERS):
-            names.append(line.split(" ", 2)[-1])
-        elif _is_file_header(lines, index):
-            names.extend([_header_name(line), _header_name(lines[index + 1])])
-    return list(dict.fromkeys(name for found in names for name in _with_and_without_side(found)))
 
 
 def _is_file_header(lines: list[str], index: int) -> bool:

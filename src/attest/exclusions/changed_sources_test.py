@@ -15,28 +15,37 @@ def repo(tmp_path):
     return tmp_path
 
 
-def test_a_changed_source_is_found_from_the_root_or_a_subdirectory(repo):
+def test_a_changed_source_is_found_wherever_the_repository_starts(repo, monkeypatch):
     sources = [str(repo / ".attestignore"), str(repo / "ci" / "team.ignore")]
-    assert changed_sources(sources, ["ci/team.ignore"], root=repo) == [sources[1]]
-    assert changed_sources(sources, ["./.attestignore"], root=repo / "ci") == [sources[0]]
+    assert changed_sources(sources, ["ci/team.ignore"]) == [sources[1]]
+    assert changed_sources(sources, ["./.attestignore"]) == [sources[0]]
+    monkeypatch.chdir(repo.parent)
+    relative = [f"{repo.name}/ci/team.ignore"]
+    assert changed_sources(relative, ["ci/team.ignore"]) == relative
 
 
-@pytest.mark.parametrize("changed", ["b/.attestignore", ".ATTESTIGNORE", "ci/../.attestignore"])
+@pytest.mark.parametrize(
+    "changed", ["b/.attestignore", ".ATTESTIGNORE", "ci/../.attestignore", "/.attestignore"]
+)
 def test_odd_forms_of_the_changed_path_still_match(repo, changed):
     source = str(repo / ".attestignore")
-    assert changed_sources([source], [changed], root=repo) == [source]
+    assert changed_sources([source], [changed]) == [source]
 
 
 def test_a_symlinked_source_matches_the_file_it_points_to(repo):
     link = repo / "linked.ignore"
     os.symlink(repo / "ci" / "team.ignore", link)
-    assert changed_sources([str(link)], ["ci/team.ignore"], root=repo) == [str(link)]
+    assert changed_sources([str(link)], ["ci/team.ignore"]) == [str(link)]
 
 
-def test_unrelated_changes_and_outside_sources_do_not_match(repo, tmp_path_factory):
-    outside = tmp_path_factory.mktemp("elsewhere") / "team.ignore"
-    outside.write_text("x\n")
-    sources = [str(repo / ".attestignore"), str(outside)]
-    changed = ["docs/.attestignore", "team.ignore", "/abs/.attestignore"]
-    assert changed_sources(sources, changed, root=repo) == []
-    assert changed_sources([], [".attestignore"], root=repo) == []
+def test_a_same_named_file_elsewhere_fails_safe(repo):
+    source = str(repo / "ci" / "team.ignore")
+    assert changed_sources([source], ["team.ignore"]) == [source]
+
+
+def test_unrelated_changes_do_not_match(repo):
+    sources = [str(repo / ".attestignore"), str(repo / "ci" / "team.ignore")]
+    changed = ["docs/.attestignore", "other/team.ignore", "team.ignore.bak", "i/team.ignore"]
+    assert changed_sources(sources, changed) == []
+    assert changed_sources([], [".attestignore"]) == []
+    assert changed_sources(sources, ["", "."]) == []

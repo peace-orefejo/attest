@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import typer
 
-from ..code_review.models import PullRequest
+from ..code_review.evidence.excluded import diff_file_names
+from ..code_review.models import PullRequest, ReviewOutput
 from ..exclusions import ExclusionError, Exclusions, changed_sources, load_exclusions
 
 EXCLUDE_OPTION = typer.Option(
@@ -42,9 +44,19 @@ def cli_exclusions(patterns: list[str], files: list[Path], discover: bool) -> Ex
         raise typer.BadParameter(str(exc)) from exc
 
 
-def refuse_pr_edited_exclusions(exclusions: Exclusions, pr: PullRequest, *, allowed: bool) -> None:
-    """Refuse (exit 2) when the pull request changes a file the patterns were read from."""
-    edited = changed_sources(exclusions.sources, [*pr.diffs, *pr.changed_files])
+def refuse_pr_edited_exclusions(
+    exclusions: Exclusions,
+    pr: PullRequest,
+    outputs: Sequence[ReviewOutput] = (),
+    *,
+    allowed: bool,
+) -> None:
+    """Refuse (exit 2) when the change set may edit a file the patterns were read from.
+
+    The change set is the pull request's and every output's diffs and changed-file lists,
+    including the files diff header lines name, such as a rename's new name.
+    """
+    edited = changed_sources(exclusions.sources, _changed_paths(pr, outputs))
     if not edited or allowed:
         return
     names = ", ".join(edited)
@@ -55,3 +67,15 @@ def refuse_pr_edited_exclusions(exclusions: Exclusions, pr: PullRequest, *, allo
         "--no-attestignore --exclude-file base.attestignore), or pass --allow-pr-attestignore "
         "to use the pull request's patterns anyway."
     )
+
+
+def _changed_paths(pr: PullRequest, outputs: Sequence[ReviewOutput]) -> list[str]:
+    paths: list[str] = []
+    for diffs, changed in [
+        (pr.diffs, pr.changed_files),
+        *((output.diffs, output.changed_files or []) for output in outputs),
+    ]:
+        for path, text in diffs.items():
+            paths.extend(diff_file_names(path, text))
+        paths.extend(changed)
+    return list(dict.fromkeys(paths))

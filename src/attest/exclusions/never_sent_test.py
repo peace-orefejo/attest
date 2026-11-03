@@ -2,6 +2,8 @@
 
 import base64
 import json
+from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 from pydantic import BaseModel, ValidationError
@@ -171,6 +173,34 @@ def test_every_path_form_is_excluded_and_recorded(form):
     _assert_never_sent(recorder)
     assert result.excluded_files
     assert any("not reviewed" in warning for warning in result.warnings)
+    assert MARKER not in result.model_dump_json()
+
+
+_SYMLINKED: dict[str, Callable[[Path], FileRead]] = {
+    "read through a linked directory": lambda _: _read({"path": "docs/k.env"}),
+    "read of a linked file": lambda _: _read({"file_path": "notes.txt"}),
+    "read of the linked directory itself": lambda _: _read({"path": "docs"}),
+    "absolute read through a linked directory": lambda cwd: _read({"path": f"{cwd}/docs/k.env"}),
+    "grep through a linked directory": lambda _: _grep(f"docs/k.env:1:TOKEN={MARKER}"),
+    "grep of a linked file": lambda _: _grep(f"notes.txt:1:TOKEN={MARKER}"),
+    "grep heading through a linked directory": lambda _: _grep(f"docs/k.env\n1:TOKEN={MARKER}"),
+}
+
+
+@pytest.mark.parametrize("form", list(_SYMLINKED))
+def test_reads_and_greps_through_symlinks_are_excluded(form, tmp_path, monkeypatch):
+    (tmp_path / "secrets").mkdir()
+    (tmp_path / "secrets" / "k.env").write_text(f"TOKEN={MARKER}\n")
+    (tmp_path / "docs").symlink_to("secrets")
+    (tmp_path / "notes.txt").symlink_to("secrets/k.env")
+    monkeypatch.chdir(tmp_path)
+    read = _SYMLINKED[form](tmp_path)
+    recorder = _Recorder()
+    pr = PullRequest(diffs={"app/main.py": _diff("app/main.py", ["y = 1"])})
+    output = ReviewOutput(output_type="issue", text="y is set to 1.", reads=[read])
+    result = Attest(client=recorder, exclude=["secrets/"]).review(pr, [output], deep=True)
+    _assert_never_sent(recorder)
+    assert result.excluded_files
     assert MARKER not in result.model_dump_json()
 
 

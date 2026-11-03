@@ -4,48 +4,56 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterable, Sequence
-from pathlib import Path
 
 from ..utils.ignore_paths import split_path
 
 _DIFF_SIDES = ("a", "b")
 
 
-def changed_sources(
-    sources: Sequence[str], changed: Iterable[str], *, root: str | os.PathLike[str] | None = None
-) -> list[str]:
-    """The pattern files among `sources` that one of the `changed` repo-relative paths edits.
+def changed_sources(sources: Sequence[str], changed: Iterable[str]) -> list[str]:
+    """The pattern files among `sources` that one of the `changed` paths may edit.
 
-    The repository root may be `root` (the current directory by default) or any directory
-    above it, so each changed path is tried against all of them. A source matches by its
-    path as given or with symlinks resolved, compared case-insensitively to fail safe.
+    attest can't know where the repository starts, so a source counts as edited when its
+    absolute path, as given or with symlinks resolved, ends with a changed path, compared on
+    whole segments and case-insensitively. This fails safe: it also matches a same-named file
+    at the same depth below another directory.
     """
     if not sources:
         return []
-    start = Path(os.path.abspath(root or Path.cwd()))
-    bases = [start, *start.parents]
-    edited: list[str] = []
-    candidates = {_key(path) for path in _changed_paths(changed, bases)}
-    for source in sources:
-        forms = {_key(os.path.abspath(source)), _key(os.path.realpath(source))}
-        if forms & candidates:
-            edited.append(source)
-    return edited
+    suffixes = _changed_suffixes(changed)
+    if not suffixes:
+        return []
+    return [source for source in sources if _edited(source, suffixes)]
 
 
-def _changed_paths(changed: Iterable[str], bases: list[Path]) -> list[str]:
-    paths: list[str] = []
-    for path in changed:
-        split = split_path(path)
-        if not split.parts or split.floating:
+def _edited(source: str, suffixes: set[tuple[str, ...]]) -> bool:
+    for form in (os.path.abspath(source), _resolved(source)):
+        if form is None:
             continue
-        forms = [split.parts]
-        if len(split.parts) > 1 and split.parts[0] in _DIFF_SIDES:
-            forms.append(split.parts[1:])
-        for parts in forms:
-            paths.extend(os.path.join(base, *parts) for base in bases)
-    return paths
+        parts = _parts(form)
+        if any(parts[-len(suffix) :] == suffix for suffix in suffixes if len(suffix) <= len(parts)):
+            return True
+    return False
 
 
-def _key(path: str) -> str:
-    return os.path.normpath(path).casefold()
+def _changed_suffixes(changed: Iterable[str]) -> set[tuple[str, ...]]:
+    suffixes: set[tuple[str, ...]] = set()
+    for path in changed:
+        parts = _parts(path)
+        if not parts:
+            continue
+        suffixes.add(parts)
+        if len(parts) > 1 and parts[0] in _DIFF_SIDES:
+            suffixes.add(parts[1:])
+    return suffixes
+
+
+def _parts(path: str) -> tuple[str, ...]:
+    return tuple(part.casefold() for part in split_path(path).parts)
+
+
+def _resolved(path: str) -> str | None:
+    try:
+        return os.path.realpath(path)
+    except (OSError, ValueError):
+        return None

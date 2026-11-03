@@ -78,7 +78,9 @@ def review(
     rules = _load_rules(guidelines)
     require_max_claims(max_claims)
     exclusions = cli_exclusions(exclude, exclude_file, attestignore)
-    refuse_pr_edited_exclusions(exclusions, request.pr, allowed=allow_pr_attestignore)
+    refuse_pr_edited_exclusions(
+        exclusions, request.pr, request.outputs or [], allowed=allow_pr_attestignore
+    )
     policy = require_reasoning(reasoning)
     require_key(provider)
     try:

@@ -156,7 +156,10 @@ changed-file list keeps every path, marking excluded ones, so it stays complete.
 Matching fails closed, because paths arrive in many forms. A path is normalized (`\`, `//`,
 `./` and `..`), an absolute path is matched from every segment, and case and Unicode variants
 count as the same file. A read is hidden when any path-like argument names an excluded file,
-and a grep whose output names one anywhere is withheld whole. The
+as written or through a symlink, and a grep whose output names one anywhere is withheld
+whole. When only text names an excluded file (a header-like line in a diff, or a grep line
+that mentions one), the diff or grep is hidden too, and a separate warning lists it so you
+can check it by hand. The
 [command line page](../cli.md#excluding-files) has the details.
 
 Key each diff in `PullRequest.diffs` (and an output's `diffs`) by one repo-relative file, as

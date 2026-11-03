@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import os
-from pathlib import Path, PurePath
-
 from pydantic import BaseModel, Field
 
 from ..content import Artifact
 from ..results import CheckResult, Report
 from ..trajectory import Step, Trajectory
+from .resolved import path_forms
 from .rules import Exclusions, excluded_note
 
 ARTIFACTS_EXCLUDED = "artifacts_excluded"
@@ -95,33 +93,6 @@ def _note(artifact: Artifact) -> Artifact:
 
 def _candidates(artifact: Artifact) -> list[str]:
     candidates = [artifact.name] if artifact.name else []
-    if not artifact.path:
-        return candidates
-    for path in (artifact.path, _resolved(artifact.path)):
-        if path is not None:
-            candidates.append(_within_cwd(path))
+    if artifact.path:
+        candidates.extend(path_forms(artifact.path))
     return list(dict.fromkeys(candidates))
-
-
-def _resolved(path: str) -> str | None:
-    try:
-        return os.path.realpath(path)
-    except (OSError, ValueError):
-        return None
-
-
-def _within_cwd(path: str) -> str:
-    if not PurePath(path).is_absolute():
-        return path
-    absolute = Path(os.path.normpath(path))
-    for root in _cwd_forms():
-        try:
-            return absolute.relative_to(root).as_posix()
-        except ValueError:
-            continue
-    return path
-
-
-def _cwd_forms() -> list[Path]:
-    cwd = Path.cwd()
-    return list(dict.fromkeys([cwd, cwd.resolve()]))

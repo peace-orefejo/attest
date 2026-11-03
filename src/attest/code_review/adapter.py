@@ -57,7 +57,8 @@ def to_run_with_omissions(
 
     `guidelines`, when given, are added as a read_guidelines step so claims citing a rule
     can be checked. Files that `exclude` names appear only as one-line notes, with an
-    `excluded` omission each.
+    `excluded` omission each, and a grep too long to check against them is cut, with a
+    `truncated` omission.
     """
     limits = limits or EvidenceLimits()
     scope = scope_evidence(output)
@@ -104,9 +105,11 @@ def _evidence_steps(scope: Scope, limits: EvidenceLimits, exclusions: Exclusions
         hidden = hide_read(original, exclusions)
         read = hidden.read
         omissions.extend(Omission(path=path, reason="excluded") for path in hidden.excluded)
+        if hidden.cut:
+            omissions.append(Omission(path=read_label(read), reason="truncated"))
         bounded = _bounded_read(read, limits)
         steps.append(_step(read.tool, dict(read.arguments), bounded.text))
-        if bounded.omission is not None:
+        if bounded.omission is not None and not hidden.cut:
             omissions.append(bounded.omission)
     return _Steps(steps=steps, omissions=omissions)
 
