@@ -34,8 +34,56 @@ All notable changes to `agent-attest` are documented here. This project follows
   cases (one config per check, a generated card with the draft-label status, provenance,
   licences and citations, and a manifest with the `dataset_version`) and uploads it with
   `huggingface_hub`, installed by the new optional `hf` dependency group.
+- `Attest(reasoning=...)` and `--reasoning` on every command that uses a model choose how much
+  the grading model may reason: `auto` (default), `off`, `low`, `medium` or `high`, or a level
+  per check or call site (`{"faithfulness": "medium", "default": "auto"}`, or
+  `ReasoningPolicy`). Each report records the level each call site was sent in
+  `metadata["reasoning"]`, and `Attest.review()` records its call sites (writer, injection,
+  guidelines and faithfulness) in the new `ReviewResult.reasoning`; a site whose model or
+  client takes no reasoning setting is recorded as `null`. See [reasoning](https://peace-orefejo.github.io/attest/providers/#reasoning).
+  The response cache key includes the level, so cached answers are never reused across levels
+  (answers cached before this release are not reused either).
+- `TruncatedOutput`, raised by `attest.llm.call` and `Attest().write_review()` when the model
+  stops at its output limit before finishing the answer (Anthropic's `max_tokens`, OpenAI's
+  `length`, Gemini's `MAX_TOKENS`), whether the answer is partial JSON or missing. It is sent
+  once, not retried, since the same request would stop in the same place. Its `completion` is
+  the provider's response, and its tokens count in `usage` and against a `Budget`.
+- `ReviewResult.writer_failure`: why attest's own reviewer wrote nothing, or `None`.
+- `attest demo` outcomes `inconclusive` (attest found nothing false but left claims unchecked)
+  and `judge_unchecked` (the plain judge's call failed or was cut off; `judge` is `null` and
+  the new `judge_error` says why).
+- Benchmark: `run.py --reasoning` sets the judge's reasoning and records the setting it was
+  sent in the report settings (`null` for a model that takes none), so `compare.py` refuses to
+  compare runs at different levels, or a new run with a report written before the setting
+  existed. Equivalent settings, such as `auto` and `default=auto,role=auto`, are recorded the
+  same way, so they compare.
 
 ### Changed
+- **Breaking (CLI JSON):** in `attest demo`, a comparison's `judge` can now be `null`, when the
+  plain judge's call failed or was cut off; `judge_error` then says why. `outcome` gains
+  `inconclusive` and `judge_unchecked`. Code that reads `judge.passed` must check for `null`.
+- A Claude response that stops with `refusal` is never read as an answer, even when its text
+  is valid JSON; the call is reported as unchecked.
+- attest now sends a reasoning setting to the models it knows (Claude Haiku, Sonnet and Opus 5.5,
+  OpenAI `gpt-6` models, Gemini 3.8 Flash, 3.5 Flash-Lite and 4 Argon). The default, `auto`, is
+  the provider's adaptive thinking at low effort; before, each provider's own default applied
+  (medium effort on Claude Haiku 5.5). Other models receive no reasoning setting, as before.
+- Calls that may reason get extra output-token room for it (4,096 tokens at `auto`), so small
+  caps such as the 300-token injection confirmations can no longer be used up by reasoning.
+- Reasoning tokens Gemini reports separately (`thoughts_token_count`) now count as output tokens
+  in `usage`. Anthropic and OpenAI already included them.
+- Every response a provider billed now counts in `usage` and against a `Budget`, including one
+  that was cut off or couldn't be parsed. Failed calls used to count as a call with no tokens.
+- The Anthropic client validates the structured answer itself (`messages.create` with the same
+  JSON-schema output format) instead of through the SDK's `messages.parse`, so a cut-off answer
+  keeps its stop reason and usage. The request sent is unchanged.
+- OpenAI and Gemini calls send one request per attempt: instructor's own re-asking is off, so
+  each retry goes through attest's retry loop, budget and usage. A Gemini answer cut off at
+  `MAX_TOKENS` used to be re-asked up to three times inside instructor, then retried by attest.
+- Code review: with your own review rules, an output whose guideline check failed or was cut
+  off, or with a reported break whose confirmation failed, is dropped in every gate mode, and
+  `ReviewResult.warnings` names it. Under the built-in general standard such findings stay
+  notes.
 - **Breaking:** `Report.passed` now means the run passed: `verdict == "pass"`. It used to mean
   every check passed, so a run needing review could read `passed: true`. The old meaning is
   `Report.checks_passed`. In `attest run`'s JSON, `passed` counts runs whose verdict is `pass`
@@ -86,6 +134,15 @@ All notable changes to `agent-attest` are documented here. This project follows
   `CheckResult.dispositions` or `Report.verdict`.
 
 ### Fixed
+- A failed or cut-off guideline check, guideline confirmation or review-writing call no longer
+  stops `Attest.review()`: the guideline check reports `unchecked` (a reported break that couldn't
+  be confirmed is `unchecked` too, not silently discarded) and drops the output, and a review
+  attest couldn't write has no decisions, a `writer_failure` and a warning saying why.
+  `attest review` still prints a `command_failed` error and exits 1 when the review couldn't be
+  written, so CI never reads it as a clean review. `BudgetExceeded` and `ProviderConfigError`
+  still stop it.
+- `attest demo` no longer shows an answer attest couldn't check as `both_passed`, and no longer
+  fails the whole command when the plain judge's call is cut off.
 - A usage error, such as an unknown option, a missing argument or `--max-claims abc`, prints the
   JSON `invalid_input` error on stdout (exit 2) for every command, instead of Click's usage box
   on stderr.

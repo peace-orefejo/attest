@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import contextlib
-from contextlib import AbstractContextManager
+from collections.abc import Generator
 
-from ..llm import using
+from ..llm import ReasoningPolicy, using, using_reasoning
 from ..providers import build_client, resolve_key
 from .json_output import EXIT_ERROR, CommandError
 
@@ -18,9 +18,16 @@ def require_key(provider: str) -> None:
     )
 
 
+@contextlib.contextmanager
 def llm_context(
-    provider: str, model: str | None, *, enabled: bool = True
-) -> AbstractContextManager[None]:
+    provider: str,
+    model: str | None,
+    *,
+    enabled: bool = True,
+    reasoning: ReasoningPolicy | None = None,
+) -> Generator[None]:
     if not enabled:
-        return contextlib.nullcontext()
-    return using(build_client(provider, model))
+        yield
+        return
+    with using(build_client(provider, model)), using_reasoning(reasoning or ReasoningPolicy()):
+        yield

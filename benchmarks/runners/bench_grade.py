@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from attest import Attest, CheckResult
+from attest.llm.reasoning import describe_reasoning, parse_reasoning
 from bench_cases import (
     Case,
     CheckName,
@@ -33,6 +34,16 @@ class GradeSettings(BaseModel):
     offline: bool = False
     answer_kind: str = "factual"
     appropriate: bool = False
+    reasoning: str | None = None
+    """The reasoning setting the judge was sent, in `--reasoning` form such as "auto" or
+    "default=auto,faithfulness=medium", written the same way for equivalent policies. None when
+    no setting was sent: an offline run, a model that takes none, or a report written before
+    the setting existed (each ran at the provider's own default)."""
+
+    @field_validator("reasoning")
+    @classmethod
+    def _normalized(cls, reasoning: str | None) -> str | None:
+        return None if reasoning is None else describe_reasoning(parse_reasoning(reasoning))
 
     @property
     def check_answer(self) -> bool:

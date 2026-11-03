@@ -16,7 +16,15 @@ from .checks.tool_use import check_tool_use
 from .checks.verify import extract_claims, grounded_verifier, judge_trajectory, verify_claims
 from .content import Artifact, Detection, TextSegment
 from .extraction import ExtractionLimits, ExtractionOutcome, extract_artifact
-from .llm import Budget, BudgetExceeded, DiskCache, LLMClient, ProviderConfigError, Usage
+from .llm import (
+    Budget,
+    BudgetExceeded,
+    DiskCache,
+    LLMClient,
+    ProviderConfigError,
+    ReasoningPolicy,
+    Usage,
+)
 from .policy import EvaluationPolicy, EvaluationRule, check_policy, load_policy
 from .providers import default_model, list_models
 from .providers import providers as list_providers
@@ -45,6 +53,7 @@ __all__ = [
     "LLMClient",
     "Proportion",
     "ProviderConfigError",
+    "ReasoningPolicy",
     "RegexDetector",
     "RegexPattern",
     "Report",

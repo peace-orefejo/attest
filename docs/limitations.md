@@ -65,7 +65,9 @@ No failure and no missing input turns into a `pass`.
 | The role, deep injection, tool-choice or policy (`evidence`, `rubric`) model call fails | An `unchecked` finding with the error. Verdict `review`. |
 | The tool-error answer question fails | The error's `recovery` is `unchecked`, so the call is `error_silent`. Verdict `review`. |
 | A code review injection confirmation fails | The hit stays unconfirmed and coverage is incomplete, so the scan is never `clean`. |
-| A code review guideline check or writer call fails | Raised. The CLI prints a `command_failed` error and exits 1. |
+| A code review guideline check, or the confirmation of a reported break, fails or is cut off | An `unchecked` finding. With your own rules the output is dropped in every gate mode, and `ReviewResult.warnings` names it. |
+| attest's own review writer fails or is cut off | `Attest.review()` returns no decisions, `writer_failure` says why and a warning says nothing was checked. `attest review` prints a `command_failed` error and exits 1. A direct `write_review()` call raises the error (`TruncatedOutput` for a cut-off). |
+| A judge call stops at its output-token limit | `TruncatedOutput`, not retried. Checks report the call `unchecked`; `attest.llm.call` and `write_review()` raise it. Its tokens still count in `usage` and against a budget. |
 | No steps | Claims have no evidence, so they're `unverifiable` (`review`). Tool use and injection have nothing to flag. |
 | An empty final answer, or one with no claims | Faithfulness has nothing to check and passes. Unrecovered tool errors are still checked. |
 | No system prompt | Role is `unchecked` (`review`), with no model call. |

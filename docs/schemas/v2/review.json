@@ -344,12 +344,45 @@
           "title": "Written",
           "type": "boolean"
         },
+        "writer_failure": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Writer Failure"
+        },
         "warnings": {
           "items": {
             "type": "string"
           },
           "title": "Warnings",
           "type": "array"
+        },
+        "reasoning": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "off",
+                  "low",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Reasoning",
+          "type": "object"
         },
         "kept": {
           "items": {

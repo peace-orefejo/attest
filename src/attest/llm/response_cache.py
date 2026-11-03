@@ -30,9 +30,19 @@ def using_cache(store: ResponseStore | None) -> Generator[None]:
         response_cache.reset(token)
 
 
-def cache_key(system: str, user: str, output: type[BaseModel], sample: int, prefix: str) -> str:
+def cache_key(
+    system: str,
+    user: str,
+    output: type[BaseModel],
+    sample: int,
+    prefix: str,
+    reasoning: str = "auto",
+) -> str:
+    """A key for one prompt. The reasoning level is part of it, so a run at one level never
+    reuses an answer cached at another, or one cached before levels existed."""
     parts: list[str | int] = [system, user, output.__name__, sample]
     if prefix:
         parts.append(prefix)
+    parts.append(f"reasoning={reasoning}")
     payload = json.dumps(parts, ensure_ascii=False)
     return hashlib.sha256(payload.encode()).hexdigest()

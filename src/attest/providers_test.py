@@ -153,7 +153,11 @@ def test_dotenv_only_loads_provider_keys(real_dotenv, monkeypatch):
 
 class _Parsed:
     def __init__(self, parsed_output, stop_reason="end_turn"):
-        self.parsed_output = parsed_output
+        self.content = (
+            []
+            if parsed_output is None
+            else [types.SimpleNamespace(type="text", text=parsed_output.model_dump_json())]
+        )
         self.stop_reason = stop_reason
 
 
@@ -162,7 +166,7 @@ class _FakeMessages:
         self.result = result
         self.kwargs = None
 
-    def parse(self, **kwargs):
+    def create(self, **kwargs):
         self.kwargs = kwargs
         return self.result
 
@@ -188,8 +192,8 @@ def test_anthropic_client_uses_structured_outputs_without_tool_choice():
     got = client.create(
         response_model=VerdictOut, messages=_messages(), max_tokens=64, temperature=0
     )
-    assert got is out
-    assert fake.kwargs["output_format"] is VerdictOut
+    assert got == out
+    assert fake.kwargs["output_config"]["format"]["schema"]["title"] == "VerdictOut"
     assert fake.kwargs["system"] == "judge"
     assert fake.kwargs["messages"] == [{"role": "user", "content": "claim"}]
     assert "tool_choice" not in fake.kwargs and "tools" not in fake.kwargs

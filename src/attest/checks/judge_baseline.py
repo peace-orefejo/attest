@@ -17,4 +17,4 @@ class JudgeVerdict(BaseModel):
 
 
 def naive_judge(traj: Trajectory) -> JudgeVerdict:
-    return call(system=JUDGE_SYSTEM, user=judge_user(traj), output=JudgeVerdict)
+    return call(system=JUDGE_SYSTEM, user=judge_user(traj), output=JudgeVerdict, site="judge")

@@ -48,3 +48,21 @@ def guideline_warnings(rules: ReviewGuidelines, pr: PullRequest) -> list[str]:
 def injection_warnings(injection: CheckResult) -> list[str]:
     """Warn when the injection scan could not cover the whole pull request."""
     return [INCOMPLETE_SCAN_WARNING] if injection.metadata.get("coverage_incomplete") else []
+
+
+def writer_warnings(failure: str | None) -> list[str]:
+    """Warn when attest's own reviewer wrote nothing, so there was no output to check."""
+    if failure is None:
+        return []
+    return [f"attest's reviewer wrote no review, so nothing was checked or kept. {failure}"]
+
+
+def unchecked_guideline_warnings(indexes: list[int], rules: ReviewGuidelines) -> list[str]:
+    """Warn when the check against the team's rules couldn't run for some outputs."""
+    if not indexes:
+        return []
+    listed = ", ".join(str(index) for index in indexes)
+    return [
+        f"The check against {rules.name} couldn't run for output(s) {listed} (a failed or cut-off "
+        "call, or a reported break that couldn't be confirmed), so they were dropped."
+    ]

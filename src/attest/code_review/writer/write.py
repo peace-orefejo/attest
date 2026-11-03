@@ -34,7 +34,11 @@ def write_review(
         raise ValueError("The pull request has no diffs to review.")
     rules = load_guidelines(guidelines)
     written = call(
-        system=WRITE_PROMPT, user=_user(pr, rules, limits), output=WrittenReview, max_tokens=8192
+        system=WRITE_PROMPT,
+        user=_user(pr, rules, limits),
+        output=WrittenReview,
+        max_tokens=8192,
+        site="writer",
     )
     return to_outputs(written, pr)
 

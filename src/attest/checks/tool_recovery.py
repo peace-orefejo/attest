@@ -86,4 +86,5 @@ def _ask_answer(traj: Trajectory, step: int, tool_call: ToolCall) -> _AnswerRepo
         prefix=error_answer_prefix(traj.final_answer),
         user=error_answer_user(step, tool_call.name, tool_call.output),
         output=_AnswerReport,
+        site="tool_use.recovery",
     )

@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from ...llm import call
+from ...llm import BudgetExceeded, ProviderConfigError, call
 from ...prompts.code_review.guidelines import CHECK_PROMPT, check_user
 from ...results import CheckResult, Finding, Severity
+from ...utils.failures import failure_reason
 from ..models import ReviewOutput
-from .confirm import confirm_break
+from .confirm import ConfirmOut, confirm_break
 from .evidence import fit_evidence
 from .models import ReviewGuidelines
+from .unchecked import UNCHECKED, unchecked_result, unconfirmed_break
 from .violations import Accepted, Violation, ViolationsOut, accept, normalize
 
 GUIDELINES_CHECK = "guidelines"
@@ -37,10 +39,21 @@ def check_guidelines(
     A quote must be at least three words, or the whole output. A break hides a miss of the
     same rule.
     Each break is confirmed by a second call; an unconfirmed break is discarded.
+    If a judge call fails (anything but `BudgetExceeded` or `ProviderConfigError`), what it
+    covered is reported `unchecked`, never as following the rules, and the gate drops the output.
     """
-    answer = call(
-        system=CHECK_PROMPT, user=_user(output, guidelines, evidence), output=ViolationsOut
-    )
+    try:
+        answer = call(
+            system=CHECK_PROMPT,
+            user=_user(output, guidelines, evidence),
+            output=ViolationsOut,
+            site="guidelines.check",
+        )
+    except (BudgetExceeded, ProviderConfigError):
+        raise
+    except Exception as error:
+        reason = failure_reason("The guideline check", error)
+        return unchecked_result(GUIDELINES_CHECK, guidelines, reason)
     accepted = accept(answer.violations, guidelines, normalize(output.text))
     findings: list[Finding] = []
     unconfirmed = 0
@@ -51,16 +64,18 @@ def check_guidelines(
             continue
         findings.append(finding)
     broken = sum(f.severity is Severity.FAIL for f in findings)
+    failed_confirms = sum(f.verdict == UNCHECKED for f in findings)
     return CheckResult(
         check=GUIDELINES_CHECK,
         passed=not broken,
-        summary=_summary(findings, broken, guidelines),
+        summary=_summary(findings, broken, failed_confirms, guidelines),
         findings=findings,
         metadata={
             "guidelines": guidelines.name,
             "rules": len(guidelines.rules),
             "discarded": len(answer.violations) - len(accepted),
             "unconfirmed": unconfirmed,
+            "confirm_failed": failed_confirms,
             "builtin": guidelines.builtin,
         },
     )
@@ -82,7 +97,9 @@ def _confirmed_finding(
 ) -> Finding | None:
     violation = item.violation
     if violation.kind == "breaks":
-        verdict = confirm_break(item.rule, output, violation.quote)
+        verdict = _confirm(item, output)
+        if isinstance(verdict, Finding):
+            return verdict
         if not verdict.breaks:
             return None
         violation = violation.model_copy(update={"reason": verdict.reason or violation.reason})
@@ -102,10 +119,27 @@ def _confirmed_finding(
     )
 
 
-def _summary(findings: list[Finding], broken: int, guidelines: ReviewGuidelines) -> str:
+def _confirm(item: Accepted, output: ReviewOutput) -> ConfirmOut | Finding:
+    quote = item.violation.quote
+    try:
+        return confirm_break(item.rule, output, quote)
+    except (BudgetExceeded, ProviderConfigError):
+        raise
+    except Exception as error:
+        reason = failure_reason("Confirming this break", error)
+        return unconfirmed_break(item.rule, quote, reason)
+
+
+def _summary(
+    findings: list[Finding], broken: int, unchecked: int, guidelines: ReviewGuidelines
+) -> str:
     count = len(guidelines.rules)
-    if not findings:
+    missed = len(findings) - broken - unchecked
+    not_confirmed = f" {unchecked} reported break(s) could not be checked." if unchecked else ""
+    if not (broken or missed):
+        if unchecked:
+            return f"No confirmed break of the {count} rules in {guidelines.name}.{not_confirmed}"
         return f"Follows all {count} rules in {guidelines.name}."
-    missed = len(findings) - broken
     parts = [f"breaks {broken}"] * bool(broken) + [f"misses {missed}"] * bool(missed)
-    return f"{' and '.join(parts).capitalize()} of {count} rules in {guidelines.name}."
+    joined = " and ".join(parts).capitalize()
+    return f"{joined} of {count} rules in {guidelines.name}.{not_confirmed}"

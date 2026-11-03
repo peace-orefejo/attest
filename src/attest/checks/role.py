@@ -51,6 +51,7 @@ def check_role_adherence(traj: Trajectory, *, samples: int = 3) -> CheckResult:
             output=_RoleOut,
             key=lambda result: result.verdict,
             samples=samples,
+            site="role",
         )
     except (BudgetExceeded, ProviderConfigError):
         raise

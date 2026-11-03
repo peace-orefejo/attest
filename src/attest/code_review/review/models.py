@@ -4,6 +4,7 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel, Field, computed_field
 
+from ...llm import Reasoning
 from ...results import CheckResult, Finding
 from ..evidence import Omission
 from ..guidelines import ReviewGuidelines
@@ -30,7 +31,14 @@ class ReviewResult(BaseModel):
     injection: CheckResult
     guidelines: ReviewGuidelines | None = None
     written: bool = False
+    writer_failure: str | None = None
+    """Why attest's own reviewer wrote nothing (a failed or cut-off call), or None. When set,
+    there are no decisions: nothing was checked or kept."""
     warnings: list[str] = Field(default_factory=list[str])
+    reasoning: dict[str, Reasoning | None] = Field(default_factory=dict[str, Reasoning | None])
+    """The reasoning level each call site was sent (writer, injection, guidelines and
+    faithfulness), or None where the model takes no reasoning setting. Filled by
+    `Attest.review()`."""
     outputs: list[ReviewOutput] = Field(default_factory=list[ReviewOutput], exclude=True)
 
     @computed_field

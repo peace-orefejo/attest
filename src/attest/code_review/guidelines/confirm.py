@@ -34,4 +34,10 @@ def confirm_break(rule: Guideline, output: ReviewOutput, quote: str) -> ConfirmO
         text=output.text,
         quote=quote,
     )
-    return call(system=CONFIRM_PROMPT, user=user, output=ConfirmOut, max_tokens=512)
+    return call(
+        system=CONFIRM_PROMPT,
+        user=user,
+        output=ConfirmOut,
+        max_tokens=512,
+        site="guidelines.confirm",
+    )

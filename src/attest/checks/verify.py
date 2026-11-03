@@ -114,7 +114,13 @@ def extract_claims(
     system = get_profile(answer_kind).extract_prompt
     if not final_answer.strip():
         return []
-    return call(system=system, user=extract_user(final_answer, task), output=ClaimsOut).claims
+    out = call(
+        system=system,
+        user=extract_user(final_answer, task),
+        output=ClaimsOut,
+        site="faithfulness.extract",
+    )
+    return out.claims
 
 
 def grounded_verifier(claim: str, evidence: str, *, answer_kind: str = "factual") -> Finding:
@@ -126,6 +132,7 @@ def grounded_verifier(claim: str, evidence: str, *, answer_kind: str = "factual"
         system=system,
         user=verify_user(claim, evidence),
         output=VerdictOut,
+        site="faithfulness.verify",
     )
     return verdict_finding(claim, out.verdict, out.reason, out.evidence_quote)
 
@@ -183,5 +190,6 @@ def _batch_verdicts(
         output=_BatchOut,
         max_tokens=8192,
         reuse="prefix" if shared else None,
+        site="faithfulness.verify",
     )
     return {verdict.claim: verdict for verdict in out.verdicts}

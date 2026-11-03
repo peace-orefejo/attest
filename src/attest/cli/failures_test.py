@@ -57,7 +57,7 @@ def test_control_characters_in_tool_output_still_print_valid_json(tmp_path):
 def test_a_failing_role_judge_prints_an_unchecked_result(tmp_path, monkeypatch):
     module = sys.modules["attest.cli.commands.role"]
     monkeypatch.setattr("attest.cli.context.resolve_key", lambda provider: "sk-test")
-    monkeypatch.setattr(module, "llm_context", lambda provider, model: using(_TimingOut()))
+    monkeypatch.setattr(module, "llm_context", lambda provider, model, **_: using(_TimingOut()))
     result = runner.invoke(app, ["role", _file(tmp_path, json.dumps(RUN).encode())])
     assert result.exit_code == 0
     finding = _payload(result)["data"]["trajectories"][0]["result"]["findings"][0]
@@ -92,7 +92,7 @@ class _Rejected:
 def test_a_rejected_api_key_is_a_json_provider_config_error(tmp_path, monkeypatch):
     module = sys.modules["attest.cli.commands.role"]
     monkeypatch.setattr("attest.cli.context.resolve_key", lambda provider: "sk-test")
-    monkeypatch.setattr(module, "llm_context", lambda provider, model: using(_Rejected()))
+    monkeypatch.setattr(module, "llm_context", lambda provider, model, **_: using(_Rejected()))
     result = runner.invoke(app, ["role", _file(tmp_path, json.dumps(RUN).encode())])
     assert result.exit_code == 1
     error = _payload(result)["error"]

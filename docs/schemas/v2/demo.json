@@ -55,6 +55,7 @@
       "type": "object"
     },
     "DemoComparison": {
+      "description": "One run graded by both. `judge` is None when the naive judge call failed or was cut off,\nand `judge_error` says why; `outcome` is then `judge_unchecked`. `inconclusive` means attest\nfound nothing false but left some claims unchecked.",
       "properties": {
         "task": {
           "title": "Task",
@@ -65,7 +66,26 @@
           "type": "string"
         },
         "judge": {
-          "$ref": "#/$defs/JudgeVerdict"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JudgeVerdict"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "judge_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Judge Error"
         },
         "attest": {
           "$ref": "#/$defs/CheckResult"
@@ -75,7 +95,9 @@
             "caught",
             "both_caught",
             "both_passed",
-            "judge_only"
+            "judge_only",
+            "inconclusive",
+            "judge_unchecked"
           ],
           "title": "Outcome",
           "type": "string"

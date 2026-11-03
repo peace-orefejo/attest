@@ -27,7 +27,9 @@ EXIT_INVALID_INPUT = 2
 EXIT_BUDGET_EXCEEDED = 3
 
 ErrorCode = Literal["invalid_input", "missing_api_key", "provider_config", "command_failed"]
-DemoOutcome = Literal["caught", "both_caught", "both_passed", "judge_only"]
+DemoOutcome = Literal[
+    "caught", "both_caught", "both_passed", "judge_only", "inconclusive", "judge_unchecked"
+]
 
 DataT = TypeVar("DataT", bound=BaseModel)
 P = ParamSpec("P")
@@ -58,9 +60,14 @@ class CheckData(BaseModel):
 
 
 class DemoComparison(BaseModel):
+    """One run graded by both. `judge` is None when the naive judge call failed or was cut off,
+    and `judge_error` says why; `outcome` is then `judge_unchecked`. `inconclusive` means attest
+    found nothing false but left some claims unchecked."""
+
     task: str
     answer: str
-    judge: JudgeVerdict
+    judge: JudgeVerdict | None
+    judge_error: str | None = None
     attest: CheckResult
     outcome: DemoOutcome
 
