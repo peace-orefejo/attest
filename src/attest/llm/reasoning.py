@@ -132,10 +132,11 @@ def describe_reasoning(policy: ReasoningPolicy) -> str:
 
 def normalized(policy: ReasoningPolicy) -> ReasoningPolicy:
     """The same policy without overrides that change nothing."""
-    by_check = {k: v for k, v in policy.checks.items() if "." not in k and v != policy.default}
-    by_site = {
-        k: v
-        for k, v in policy.checks.items()
-        if "." in k and v != by_check.get(k.split(".")[0], policy.default)
+    checks: dict[str, Reasoning] = {
+        k: v for k, v in policy.checks.items() if "." not in k and v != policy.default
     }
-    return ReasoningPolicy(default=policy.default, checks={**by_check, **by_site})
+    parents = dict(checks)
+    for site, level in policy.checks.items():
+        if "." in site and level != parents.get(site.split(".")[0], policy.default):
+            checks[site] = level
+    return ReasoningPolicy(default=policy.default, checks=checks)
