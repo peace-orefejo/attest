@@ -5,7 +5,7 @@ description: "Open-source AI agent evaluation tool for Python: checks agent answ
 
 # attest: open-source AI agent evaluation
 
-**A reality-checker for AI agents.** attest is an open-source Python tool for evaluating AI
+**An evidence checker for AI agents.** attest is an open-source Python tool for evaluating AI
 agents. It grades an agent's answer against what its tools actually returned, and flags claims
 the tool outputs don't support, misused tools and prompt-injection slips that a "does this look
 good?" grader can wave through. It checks whether claims are supported by the recorded evidence,

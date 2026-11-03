@@ -8,7 +8,7 @@
 <br>
 <br>
 
-**A reality-checker for AI agents.**<br>
+**An evidence checker for AI agents.**<br>
 Grade an agent's answer against what its tools actually returned.
 
 <br>
