@@ -6,12 +6,13 @@ from collections.abc import Mapping, Sequence
 
 from pydantic import BaseModel, Field
 
+from ...disposition_rules import is_unjudged
 from ...llm import BudgetExceeded, ProviderConfigError
 from ...utils.failures import failure_reason
 from ..evidence import EvidenceLimits
 from ..gate import gate
 from ..gate.defaults import DEFAULT_MODES
-from ..guidelines import GuidelinesInput, ReviewGuidelines, load_guidelines
+from ..guidelines import GUIDELINES_CHECK, GuidelinesInput, ReviewGuidelines, load_guidelines
 from ..injection import check_code_injection
 from ..models import GateDecision, GateMode, PullRequest, ReviewOutput
 from ..writer import write_review
@@ -20,6 +21,7 @@ from .models import OutputDecision, ReviewResult
 from .pr_evidence import (
     guideline_warnings,
     injection_warnings,
+    unchecked_guideline_warnings,
     with_pr_evidence,
     writer_warnings,
 )
@@ -46,6 +48,8 @@ def review(
     for faithfulness only. Outputs without their own diffs or
     changed-file list use the pull request's. `evaluate` turns a run into a Report with a
     faithfulness result, and `modes` overrides the default gate mode per output type.
+    An output whose check against your rules couldn't run, or with a reported break that couldn't
+    be confirmed, is dropped in every mode, and a warning names it.
     """
     chosen: dict[str, GateMode] = dict(modes) if modes else {}
     _check_modes(chosen)
@@ -55,8 +59,11 @@ def review(
     filled = [with_pr_evidence(output, pr) for output in source]
     injection = check_code_injection(pr, filled, deep=deep)
     decisions: list[OutputDecision] = []
+    unchecked: list[int] = []
     for index, output in enumerate(filled):
         graded = grade(output, evaluate, rules, follow=follow_guidelines, limits=limits)
+        if _rules_unchecked(graded):
+            unchecked.append(index)
         decision = gate(
             graded.report,
             output.output_type,
@@ -74,6 +81,7 @@ def review(
         warnings=[
             *writer_warnings(written.failure if written else None),
             *guideline_warnings(rules, pr),
+            *unchecked_guideline_warnings(unchecked, rules),
             *injection_warnings(injection),
         ],
         outputs=list(source),
@@ -95,6 +103,11 @@ def _write(pr: PullRequest, rules: ReviewGuidelines, limits: EvidenceLimits | No
         raise
     except Exception as error:
         return _Written(failure=failure_reason("Writing the review", error))
+
+
+def _rules_unchecked(graded: Graded) -> bool:
+    result = graded.report.by(GUIDELINES_CHECK)
+    return result is not None and any(is_unjudged(f) for f in result.findings)
 
 
 def _check_modes(modes: Mapping[str, GateMode]) -> None:

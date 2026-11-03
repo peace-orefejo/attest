@@ -11,6 +11,7 @@ from attest.code_review import PullRequest, ReviewOutput, ReviewResult, review
 from attest.code_review.guidelines import parse_guidelines
 from attest.code_review.review import with_pr_evidence
 from attest.code_review.tool_names import READ_GUIDELINES
+from attest.llm import TruncatedOutput
 from attest.scoring.report import evaluate
 
 RUN = importlib.import_module("attest.code_review.review.run")
@@ -380,3 +381,57 @@ def test_a_higher_claim_cap_keeps_the_longer_output():
     outputs = [ReviewOutput(output_type="issue", text="41 claims")]
     result = review(CLEAN_PR, outputs, evaluate=_claims_grader(max_claims=41), deep=False)
     assert result.kept == [0]
+
+
+CHECK = importlib.import_module("attest.code_review.guidelines.check")
+CONFIRM = importlib.import_module("attest.code_review.guidelines.confirm")
+ISSUE = ReviewOutput(output_type="issue", text="The loop in cart_total reads items by index.")
+
+
+def _cut_off(**kwargs):
+    raise TruncatedOutput("stopped at max_tokens")
+
+
+def _reported_break(**kwargs):
+    quote = "reads items by index"
+    return CHECK.ViolationsOut(violations=[CHECK.Violation(rule="G1", quote=quote)])
+
+
+@pytest.mark.parametrize("mode", ["lenient", "strict"])
+def test_a_cut_off_guideline_check_drops_the_output_in_every_mode(monkeypatch, mode):
+    monkeypatch.setattr(GRADE, "check_guidelines", CHECK.check_guidelines)
+    monkeypatch.setattr(CHECK, "call", _cut_off)
+    grader = _grader({ISSUE.text: _report("supported")})
+    result = review(
+        CLEAN_PR, [ISSUE], evaluate=grader, guidelines=RULES, modes={"issue": mode}, deep=False
+    )
+    assert result.kept == []
+    [reason] = result.decisions[0].reasons
+    assert reason.verdict == "unchecked"
+    assert "TruncatedOutput" in reason.reason
+    assert any("couldn't run for output(s) 0" in warning for warning in result.warnings)
+
+
+@pytest.mark.parametrize("mode", ["lenient", "strict"])
+def test_a_break_that_could_not_be_confirmed_drops_the_output_in_every_mode(monkeypatch, mode):
+    monkeypatch.setattr(GRADE, "check_guidelines", CHECK.check_guidelines)
+    monkeypatch.setattr(CHECK, "call", _reported_break)
+    monkeypatch.setattr(CONFIRM, "call", _cut_off)
+    grader = _grader({ISSUE.text: _report("supported")})
+    result = review(
+        CLEAN_PR, [ISSUE], evaluate=grader, guidelines=RULES, modes={"issue": mode}, deep=False
+    )
+    assert result.kept == []
+    [reason] = result.decisions[0].reasons
+    assert reason.verdict == "unchecked"
+    assert reason.evidence == "reads items by index"
+    assert any("couldn't run for output(s) 0" in warning for warning in result.warnings)
+
+
+def test_a_guideline_check_that_ran_adds_no_warning(monkeypatch):
+    monkeypatch.setattr(GRADE, "check_guidelines", CHECK.check_guidelines)
+    monkeypatch.setattr(CHECK, "call", lambda **kwargs: CHECK.ViolationsOut())
+    grader = _grader({ISSUE.text: _report("supported")})
+    result = review(CLEAN_PR, [ISSUE], evaluate=grader, guidelines=RULES, deep=False)
+    assert result.kept == [0]
+    assert result.warnings == []

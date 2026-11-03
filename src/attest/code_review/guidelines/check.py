@@ -40,7 +40,7 @@ def check_guidelines(
     same rule.
     Each break is confirmed by a second call; an unconfirmed break is discarded.
     If a judge call fails (anything but `BudgetExceeded` or `ProviderConfigError`), what it
-    covered is reported `unchecked`, never as following the rules.
+    covered is reported `unchecked`, never as following the rules, and the gate drops the output.
     """
     try:
         answer = call(

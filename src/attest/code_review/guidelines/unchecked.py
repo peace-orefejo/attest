@@ -34,7 +34,8 @@ def unchecked_result(check: str, guidelines: ReviewGuidelines, reason: str) -> C
 
 
 def unconfirmed_break(rule: Guideline, quote: str, reason: str) -> Finding:
-    """A reported break whose confirmation call failed: neither dropped nor silently discarded."""
+    """A reported break whose confirmation call failed: never silently discarded, and the gate
+    drops the output for it, as it does for a check that couldn't run."""
     return Finding(
         severity=Severity.WARN,
         verdict=UNCHECKED,
