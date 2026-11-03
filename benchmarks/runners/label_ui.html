@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>attest labelling</title>
+<link rel="icon" href="data:,">
+<style nonce="{{NONCE}}">/*STYLE*/</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the case</a>
+<header class="topbar">
+  <h1>attest labelling</h1>
+  <span id="who" class="who"></span>
+  <div id="progress" class="progress" aria-live="polite"></div>
+  <nav class="actions" aria-label="Views">
+    <button type="button" id="show-progress">Progress</button>
+    <button type="button" id="toggle-help" aria-expanded="false" aria-controls="help">Guidelines</button>
+    <button type="button" id="show-keys">Keys</button>
+  </nav>
+</header>
+<div class="layout">
+  <aside class="sidebar" aria-label="Your cases">
+    <div class="filters">
+      <label>Check <select id="filter-check"></select></label>
+      <label>Status <select id="filter-status"></select></label>
+    </div>
+    <p id="list-count" class="muted small"></p>
+    <ul id="case-list" class="case-list"></ul>
+  </aside>
+  <main id="main" tabindex="-1">
+    <div id="view" class="view"></div>
+  </main>
+</div>
+<aside id="help" class="help" hidden aria-label="Labelling guidelines">
+  <div class="help-head">
+    <h2>Guidelines</h2>
+    <button type="button" id="close-help" aria-label="Close the guidelines">Close</button>
+  </div>
+  <p class="muted small">From benchmarks/annotations/guidelines.md, read when the server started.</p>
+  <div id="help-body"></div>
+</aside>
+<dialog id="keys" aria-labelledby="keys-title">
+  <h2 id="keys-title">Keyboard</h2>
+  <dl class="keys-list">
+    <dt><kbd>1</kbd> to <kbd>6</kbd></dt><dd>Pick that option for the focused item</dd>
+    <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous item</dd>
+    <dt><kbd>n</kbd></dt><dd>Next unfinished case</dd>
+    <dt><kbd>s</kbd> or <kbd>Ctrl</kbd>+<kbd>Enter</kbd></dt><dd>Save</dd>
+    <dt><kbd>/</kbd></dt><dd>Search the tool outputs</dd>
+    <dt><kbd>Esc</kbd></dt><dd>Leave a text box, close a panel</dd>
+  </dl>
+  <form method="dialog"><button type="submit">Close</button></form>
+</dialog>
+<script nonce="{{NONCE}}">/*SCRIPT*/</script>
+</body>
+</html>
