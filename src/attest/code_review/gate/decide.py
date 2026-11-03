@@ -61,7 +61,5 @@ def _guideline_findings(report: Report) -> FindingSplit:
         return FindingSplit(notes=[f for f in result.findings if f.severity is not Severity.PASS])
     return FindingSplit(
         drops=[f for f in result.findings if f.severity is Severity.FAIL or is_unjudged(f)],
-        notes=[
-            f for f in result.findings if f.severity is Severity.WARN and not is_unjudged(f)
-        ],
+        notes=[f for f in result.findings if f.severity is Severity.WARN and not is_unjudged(f)],
     )

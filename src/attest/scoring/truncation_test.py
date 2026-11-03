@@ -27,7 +27,11 @@ RULES = parse_guidelines("- Never approve a change without tests.\n", "REVIEW.md
 
 class _Response:
     def __init__(self, parsed_output, stop_reason):
-        self.parsed_output = parsed_output
+        self.content = (
+            []
+            if parsed_output is None
+            else [types.SimpleNamespace(type="text", text=parsed_output.model_dump_json())]
+        )
         self.stop_reason = stop_reason
         self.usage = types.SimpleNamespace(input_tokens=100, output_tokens=4396)
 
@@ -37,8 +41,8 @@ class _Messages:
         self.answers = answers
         self.sent: list[str] = []
 
-    def parse(self, **kwargs):
-        name = kwargs["output_format"].__name__
+    def create(self, **kwargs):
+        name = kwargs["output_config"]["format"]["schema"]["title"]
         self.sent.append(name)
         if name in self.answers:
             return _Response(self.answers[name], "end_turn")
@@ -179,4 +183,5 @@ def test_a_whole_review_finishes_when_every_call_is_cut_off():
     grader, _ = _grader()
     result = grader.review(PR, [OUTPUT], guidelines=RULES)
     assert result.kept == []
-    assert {f.verdict for f in result.decisions[0].notes} == {"unchecked"}
+    assert "unchecked" in {f.verdict for f in result.decisions[0].reasons}
+    assert result.decisions[0].notes == []

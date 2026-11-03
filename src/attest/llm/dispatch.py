@@ -1,4 +1,8 @@
-"""Send one structured request to a client, with a reasoning level when the client takes one."""
+"""Send one structured request to a client, with a reasoning level when the client takes one.
+
+Every response the provider billed is counted in `Usage`, including one that failed: a cut-off
+or unparseable answer still used its tokens, so a `Budget` must see them.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +11,7 @@ from typing import TYPE_CHECKING, Literal, Protocol, TypeGuard, TypeVar
 from pydantic import BaseModel
 
 from .budget import record_completion
+from .errors import failed_completions
 from .protocol import LLMClient
 from .reasoning import Reasoning
 
@@ -44,23 +49,37 @@ def create(
     messages: list[ChatCompletionMessageParam],
     reasoning: Reasoning,
 ) -> T:
+    try:
+        result, completion = _send(client, output, max_tokens, messages, reasoning)
+    except Exception as error:
+        for billed in failed_completions(error):
+            record_completion(billed)
+        raise
+    record_completion(completion)
+    return result
+
+
+def _send(
+    client: LLMClient,
+    output: type[T],
+    max_tokens: int,
+    messages: list[ChatCompletionMessageParam],
+    reasoning: Reasoning,
+) -> tuple[T, object]:
     if takes_reasoning(client):
-        result, completion = client.create_with_completion(
+        return client.create_with_completion(
             response_model=output,
             max_tokens=max_tokens,
             temperature=0,
             messages=messages,
             reasoning=reasoning,
         )
-        record_completion(completion)
-        return result
     with_completion = getattr(client, "create_with_completion", None)
     if with_completion is None:
-        return client.create(
+        answer = client.create(
             response_model=output, max_tokens=max_tokens, temperature=0, messages=messages
         )
-    result, completion = with_completion(
+        return answer, None
+    return with_completion(
         response_model=output, max_tokens=max_tokens, temperature=0, messages=messages
     )
-    record_completion(completion)
-    return result

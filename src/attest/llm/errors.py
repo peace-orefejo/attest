@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from typing import Literal
+from collections.abc import Iterator, Sequence
+from typing import Literal, cast
 
 from pydantic import ValidationError
+
+from .stop_reasons import stopped_at_limit
 
 _INSTRUCTOR_TRUNCATED = "IncompleteOutputException"
 _EMPTY_MARKERS = ("has no attribute 'parts'", "'NoneType' object is not iterable")
@@ -29,7 +31,25 @@ class TruncatedOutput(RuntimeError):
 
     Often the model spent its output budget reasoning. It is not retried, since the same
     request would stop in the same place; checks report the call as `unchecked`.
+    `completion` is the provider's response when there is one: its tokens were billed, and
+    they count in `Usage` and against a `Budget`.
     """
+
+    def __init__(self, message: str, *, completion: object | None = None) -> None:
+        super().__init__(message)
+        self.completion = completion
+
+
+class UnreadableOutput(RuntimeError):
+    """The model finished, but its answer isn't the structured output asked for.
+
+    Retried like an empty answer when the text failed validation. `completion` is the billed
+    response.
+    """
+
+    def __init__(self, message: str, *, completion: object | None = None) -> None:
+        super().__init__(message)
+        self.completion = completion
 
 
 class ProviderConfigError(RuntimeError):
@@ -67,11 +87,39 @@ def api_error(err: Exception) -> BaseException | None:
 
 
 def is_truncated(err: Exception) -> bool:
-    """The output was cut off at the token limit (`TruncatedOutput`, or instructor's equivalent)."""
-    return any(
+    """The output was cut off at the token limit: `TruncatedOutput`, instructor's equivalent, or
+    a failed attempt whose response stopped at the limit (Gemini's `MAX_TOKENS`)."""
+    if any(
         isinstance(cause, TruncatedOutput) or type(cause).__name__ == _INSTRUCTOR_TRUNCATED
         for cause in _cause_chain(err)
-    )
+    ):
+        return True
+    billed = failed_completions(err)
+    return bool(billed) and stopped_at_limit(billed[-1])
+
+
+def failed_completions(err: BaseException) -> list[object]:
+    """The provider responses a failed call was billed for, oldest first, so usage counts them.
+
+    Read from attest's own errors, or from instructor's failed attempts or last completion.
+    """
+    for cause in _cause_chain(err):
+        if isinstance(cause, TruncatedOutput | UnreadableOutput):
+            return [] if cause.completion is None else [cause.completion]
+        attempts = _attempt_completions(getattr(cause, "failed_attempts", None))
+        if attempts:
+            return attempts
+        last = getattr(cause, "last_completion", None)
+        if last is not None:
+            return [last]
+    return []
+
+
+def _attempt_completions(attempts: object) -> list[object]:
+    if not isinstance(attempts, Sequence) or isinstance(attempts, str):
+        return []
+    found = (getattr(attempt, "completion", None) for attempt in cast("Sequence[object]", attempts))
+    return [completion for completion in found if completion is not None]
 
 
 def is_empty_response(err: Exception) -> bool:

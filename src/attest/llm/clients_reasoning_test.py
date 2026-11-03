@@ -18,7 +18,11 @@ OUT = VerdictOut(verdict="supported")
 
 class _Parsed:
     def __init__(self, parsed_output, stop_reason="end_turn"):
-        self.parsed_output = parsed_output
+        self.content = (
+            []
+            if parsed_output is None
+            else [types.SimpleNamespace(type="text", text=parsed_output.model_dump_json())]
+        )
         self.stop_reason = stop_reason
         self.usage = types.SimpleNamespace(input_tokens=10, output_tokens=7)
 
@@ -29,7 +33,7 @@ class _FakeMessages:
         self.kwargs = {}
         self.calls = 0
 
-    def parse(self, **kwargs):
+    def create(self, **kwargs):
         self.calls += 1
         self.kwargs = kwargs
         return self.result
@@ -58,9 +62,10 @@ def _send(client, reasoning, max_tokens=300):
 
 def test_haiku_auto_sends_adaptive_thinking_at_low_effort_with_room():
     client, fake = _claude("claude-haiku-5-5")
-    assert _send(client, "auto") is OUT
+    assert _send(client, "auto") == OUT
     assert fake.kwargs["thinking"] == {"type": "adaptive"}
-    assert fake.kwargs["output_config"] == {"effort": "low"}
+    assert fake.kwargs["output_config"]["effort"] == "low"
+    assert fake.kwargs["output_config"]["format"]["schema"]["title"] == "VerdictOut"
     assert fake.kwargs["max_tokens"] == 300 + REASONING_ALLOWANCE["auto"]
     assert fake.kwargs["extra_body"] is None
 
@@ -76,14 +81,14 @@ def test_sonnet_off_sends_between_tools_in_the_body():
     client, fake = _claude("claude-sonnet-5-5")
     _send(client, "off")
     assert fake.kwargs["extra_body"] == {"thinking": {"type": "between_tools"}}
-    assert fake.kwargs["output_config"] == {"effort": "low"}
+    assert fake.kwargs["output_config"]["effort"] == "low"
     assert isinstance(fake.kwargs["thinking"], Omit)
 
 
 def test_opus_gets_only_an_effort_and_room_even_when_off():
     client, fake = _claude("claude-opus-5-5")
     _send(client, "off")
-    assert fake.kwargs["output_config"] == {"effort": "low"}
+    assert fake.kwargs["output_config"]["effort"] == "low"
     assert fake.kwargs["extra_body"] is None
     assert fake.kwargs["max_tokens"] == 300 + REASONING_ALLOWANCE["low"]
 
@@ -93,7 +98,7 @@ def test_an_older_claude_model_gets_no_reasoning_setting():
     _send(client, "high")
     assert fake.kwargs["max_tokens"] == 300
     assert fake.kwargs["extra_body"] == {"temperature": 0}
-    assert isinstance(fake.kwargs["output_config"], Omit)
+    assert "effort" not in fake.kwargs["output_config"]
 
 
 def test_a_max_tokens_stop_with_no_output_is_truncated_output():
@@ -114,7 +119,7 @@ def test_call_sends_the_policy_level_for_its_site_and_records_it():
     policy = ReasoningPolicy(checks={"guidelines.confirm": "high"})
     with using_reasoning(policy), recording_reasoning() as used:
         llm.call(system="s", user="u", output=VerdictOut, client=client, site="guidelines.confirm")
-    assert fake.kwargs["output_config"] == {"effort": "high"}
+    assert fake.kwargs["output_config"]["effort"] == "high"
     assert used == {"guidelines.confirm": "high"}
 
 
@@ -190,7 +195,14 @@ def test_gemini_auto_sends_dynamic_thinking():
 def test_an_unlisted_instructor_model_is_called_as_before():
     client, inner = _instructor("openai", "gpt-4o")
     _send(client, "high")
-    assert set(inner.kwargs) == {"response_model", "messages", "max_tokens", "temperature"}
+    assert set(inner.kwargs) == {
+        "response_model",
+        "messages",
+        "max_tokens",
+        "temperature",
+        "max_retries",
+    }
+    assert inner.kwargs["max_retries"] == 0
 
 
 def test_gemini_thought_tokens_count_as_output():

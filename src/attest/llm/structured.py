@@ -17,6 +17,7 @@ from .errors import (
     TruncatedOutput,
     api_error,
     config_error,
+    failed_completions,
     is_empty_response,
     is_transient,
     is_truncated,
@@ -70,7 +71,8 @@ def call(
 
     `site` names the call site (see `attest.llm.reasoning.CALL_SITES`); the active reasoning
     policy picks its level, and attest's own provider clients add room for that reasoning to
-    `max_tokens`. An answer cut off at the token limit raises `TruncatedOutput` at once.
+    `max_tokens`. An answer cut off at the token limit raises `TruncatedOutput` at once. Every
+    response the provider billed counts in usage and against the budget, even one that failed.
     """
     reasoning = reasoning_for(site)
     store = response_cache.get()
@@ -98,7 +100,10 @@ def call(
             if isinstance(error, TruncatedOutput):
                 raise
             if is_truncated(error):
-                raise TruncatedOutput(_TRUNCATED_MESSAGE) from error
+                billed = failed_completions(error)
+                raise TruncatedOutput(
+                    _TRUNCATED_MESSAGE, completion=billed[-1] if billed else None
+                ) from error
             if is_transient(error):
                 last_error = error
                 continue

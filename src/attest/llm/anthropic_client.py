@@ -1,4 +1,4 @@
-"""Structured output through Anthropic's native `messages.parse`, without forced tool use."""
+"""Structured output through Anthropic's native JSON-schema outputs, without forced tool use."""
 
 from __future__ import annotations
 
@@ -7,18 +7,18 @@ from collections.abc import Mapping, Sequence
 from typing import Literal, TypeVar
 
 import instructor
-from anthropic import Anthropic, Omit, omit
+from anthropic import Anthropic, Omit, omit, transform_schema
 from anthropic.types import (
     CacheControlEphemeralParam,
+    Message,
     MessageParam,
     OutputConfigParam,
     TextBlockParam,
     ThinkingConfigParam,
 )
-from anthropic.types.parsed_message import ParsedMessage
 from pydantic import BaseModel
 
-from .errors import TruncatedOutput
+from .anthropic_answer import structured_answer
 from .reasoning import Reasoning, answer_room
 from .thinking import ClaudePlan, claude_plan
 
@@ -35,11 +35,13 @@ def accepts_temperature(model: str) -> bool:
 
 
 class AnthropicClient:
-    """Structured output through Anthropic's native `messages.parse` (no forced tool use).
+    """Structured output through Anthropic's native JSON-schema outputs (no forced tool use).
 
     Claude 5.5-generation models reject forced `tool_choice`, `anthropic` 1.x dropped the
     `temperature` keyword, and Claude Opus 4.7+ rejects sampling parameters outright, so this
     path uses JSON-schema structured outputs and only sends `temperature` to models that take it.
+    The answer is validated here rather than by the SDK's `messages.parse`, so a cut-off answer
+    raises `TruncatedOutput` carrying the billed message instead of a bare validation error.
     A `reasoning` level becomes `thinking` and `output_config.effort` for the models listed in
     `attest.llm.thinking`, with room for the thinking added to `max_tokens`.
     """
@@ -77,26 +79,19 @@ class AnthropicClient:
         max_tokens: int,
         temperature: float | None = None,
         reasoning: Reasoning | None = None,
-    ) -> tuple[T, ParsedMessage[T]]:
+    ) -> tuple[T, Message]:
         system = system_text(messages)
         plan = claude_plan(self.model, reasoning) if reasoning is not None else None
-        response = self.client.messages.parse(
+        response = self.client.messages.create(
             model=self.model,
             max_tokens=answer_room(max_tokens, plan.room) if plan else max_tokens,
             messages=conversation_turns(messages),
-            output_format=response_model,
             system=system or omit,
             thinking=_thinking(plan),
-            output_config=_output_config(plan),
+            output_config=_output_config(response_model, plan),
             extra_body=self._body(temperature, plan),
         )
-        if response.parsed_output is None:
-            error = TruncatedOutput if response.stop_reason == "max_tokens" else RuntimeError
-            raise error(
-                f"{self.model} returned no structured output (stop_reason="
-                f"{response.stop_reason!r}). Try a larger max_tokens or a different model."
-            )
-        return response.parsed_output, response
+        return structured_answer(response, response_model, self.model), response
 
     def _body(self, temperature: float | None, plan: ClaudePlan | None) -> dict[str, object] | None:
         body: dict[str, object] = {}
@@ -115,8 +110,13 @@ def _thinking(plan: ClaudePlan | None) -> ThinkingConfigParam | Omit:
     return {"type": "adaptive"}
 
 
-def _output_config(plan: ClaudePlan | None) -> OutputConfigParam | Omit:
-    return {"effort": plan.effort} if plan is not None else omit
+def _output_config(output: type[BaseModel], plan: ClaudePlan | None) -> OutputConfigParam:
+    config: OutputConfigParam = {
+        "format": {"type": "json_schema", "schema": transform_schema(output.model_json_schema())}
+    }
+    if plan is not None:
+        config["effort"] = plan.effort
+    return config
 
 
 class _TextPart(BaseModel):

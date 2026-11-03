@@ -24,21 +24,20 @@ RUN = Trajectory(
 )
 
 
+ANSWERS = {"ClaimsOut": {"claims": ["Paris is the capital."]}, "_RoleOut": {"verdict": "in_scope"}}
+
+
 class _Messages:
     def __init__(self):
         self.efforts: dict[str, str] = {}
 
-    def parse(self, **kwargs):
-        self.efforts[kwargs["output_format"].__name__] = kwargs["output_config"]["effort"]
-        answer = VerdictOut(verdict="supported")
-        model = kwargs["output_format"]
-        parsed = (
-            model(claims=["Paris is the capital."]) if model.__name__ == "ClaimsOut" else answer
-        )
-        if model.__name__ == "_RoleOut":
-            parsed = model(verdict="in_scope")
+    def create(self, **kwargs):
+        name = kwargs["output_config"]["format"]["schema"]["title"]
+        self.efforts[name] = kwargs["output_config"]["effort"]
+        answer = ANSWERS.get(name, VerdictOut(verdict="supported").model_dump())
+        text = types.SimpleNamespace(type="text", text=json.dumps(answer))
         usage = types.SimpleNamespace(input_tokens=1, output_tokens=1)
-        return types.SimpleNamespace(parsed_output=parsed, stop_reason="end_turn", usage=usage)
+        return types.SimpleNamespace(content=[text], stop_reason="end_turn", usage=usage)
 
 
 def _grader(reasoning) -> tuple[Attest, _Messages]:
