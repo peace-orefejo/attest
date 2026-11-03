@@ -78,12 +78,10 @@ judge's false-positive rate by up to 90%
 attest checks each claim against the recorded tool outputs instead. Its grading model sees only
 the claim and the evidence, never the agent's reasoning.
 
-attest is an evaluation toolkit, not a guarantee. It checks whether claims are supported by the
-run's recorded tool outputs, not whether they are true; it trusts that the recorded run is
-authentic and complete; and its accuracy hasn't been measured on a labelled benchmark yet. See
-[Limitations](https://peace-orefejo.github.io/attest/limitations/). The benchmark that will
-measure it, per check, is being built in [`benchmarks/`](benchmarks/); all its labels are still
-drafts ([overview](https://peace-orefejo.github.io/attest/benchmark/)).
+attest checks whether claims are supported by the run's recorded tool outputs, and trusts that
+the recorded run is authentic and complete. See
+[Limitations](https://peace-orefejo.github.io/attest/limitations/) for what it assumes, and the
+[benchmark](https://peace-orefejo.github.io/attest/benchmark/) for how each check is measured.
 
 <br>
 

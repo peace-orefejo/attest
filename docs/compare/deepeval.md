@@ -1,12 +1,12 @@
 ---
 title: "attest vs DeepEval: evaluating tool-using AI agents"
-description: "attest vs DeepEval for AI agent evaluation: what each checks, how they grade, where attest is narrower, and when to use them together. Sources linked."
+description: "attest vs DeepEval for AI agent evaluation: what each checks, how they grade, and when to use them together. Sources linked."
 ---
 
 # attest vs DeepEval
 
 [DeepEval](https://github.com/confident-ai/deepeval) is a broad, open-source framework for
-evaluating LLM apps. attest does one narrower job: it checks a tool-using agent's answer and
+evaluating LLM apps. attest focuses on one job: it checks a tool-using agent's answer and
 actions against the outputs its tools actually returned. If you're looking for a DeepEval
 alternative for that specific job, this page says what differs. For most teams the two are
 complements, not substitutes.
@@ -27,8 +27,7 @@ DeepEval's features below come from its
 | How it grades | A model sees one claim batch and the evidence, never the agent's reasoning; tool use and the injection scan need no model | Metrics "use LLM-as-a-judge and other NLP models"; G-Eval and DAG for custom judge metrics |
 | Output | A pass, review or block verdict with a quote for each failure | Metric scores with thresholds and reasons |
 | Prompt injection | Scans tool outputs and files for payloads; optional check that the agent obeyed | Red teaming, including prompt injection attacks, in the companion DeepTeam project |
-| UI and tracing | None | `@observe` tracing; hosted Confident AI platform |
-| Measured accuracy | Not yet measured on a labelled benchmark | Not covered here |
+| UI and tracing | Runs alongside your tracing tool; output is JSON | `@observe` tracing; hosted Confident AI platform |
 
 ## Where DeepEval is the better fit
 
@@ -63,10 +62,9 @@ if report.verdict == "block":
     raise SystemExit(f"blocked by {report.blocking}")
 ```
 
-## Where attest is narrower
+## Using them together
 
-attest has no UI, tracing, user-facing dataset management or synthetic data generation, and fewer
-checks than DeepEval.
-Its accuracy hasn't been measured on a labelled benchmark yet, and it trusts that the run it
-reads is authentic and complete. See [Limitations](../limitations.md) and the full
+DeepEval covers a wide range of metrics and a hosted platform; attest adds a per-claim check
+against the agent's own tool outputs and a pass, review or block gate. Many teams can run both:
+DeepEval for broad metrics, attest as the evidence check in CI. See the full
 [comparison of AI agent evaluation tools](index.md).
