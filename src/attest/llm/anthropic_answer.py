@@ -17,8 +17,15 @@ def structured_answer(response: Message, output: type[T], model: str) -> T:
     """The first text block as an `output`, or an error that carries the billed `response`.
 
     A message stopped at `max_tokens` raises `TruncatedOutput`, whether its JSON is partial or
-    missing, so it is never retried. Any other unreadable answer raises `UnreadableOutput`.
+    missing, so it is never retried. A refusal raises `UnreadableOutput` even when its text
+    happens to validate, so a declined call is never read as a verdict. Any other unreadable
+    answer raises `UnreadableOutput`.
     """
+    if response.stop_reason == "refusal":
+        raise UnreadableOutput(
+            f"{model} declined to answer (stop_reason='refusal'); the answer is not used.",
+            completion=response,
+        )
     cut_off = response.stop_reason == ANTHROPIC_LIMIT
     error_type = TruncatedOutput if cut_off else UnreadableOutput
     message = (

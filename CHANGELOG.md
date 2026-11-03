@@ -59,6 +59,11 @@ All notable changes to `agent-attest` are documented here. This project follows
   same way, so they compare.
 
 ### Changed
+- **Breaking (CLI JSON):** in `attest demo`, a comparison's `judge` can now be `null`, when the
+  plain judge's call failed or was cut off; `judge_error` then says why. `outcome` gains
+  `inconclusive` and `judge_unchecked`. Code that reads `judge.passed` must check for `null`.
+- A Claude response that stops with `refusal` is never read as an answer, even when its text
+  is valid JSON; the call is reported as unchecked.
 - attest now sends a reasoning setting to the models it knows (Claude Haiku, Sonnet and Opus 5.5,
   OpenAI `gpt-6` models, Gemini 3.8 Flash, 3.5 Flash-Lite and 4 Argon). The default, `auto`, is
   the provider's adaptive thinking at low effort; before, each provider's own default applied
