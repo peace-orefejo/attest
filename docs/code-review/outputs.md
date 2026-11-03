@@ -26,7 +26,7 @@ ReviewOutput(
 | `output_type` | `issue`, `diff_summary`, `group_summary` or `canvas_answer`. |
 | `text` | What the reviewer said. |
 | `diffs` | Unified diff for each file the output talks about, keyed by path. |
-| `changed_files` | The whole pull request's list of changed files, not just this output's. Lets attest catch a wrong "this PR also changes X". Usually left out: `review()` copies it from the pull request. |
+| `changed_files` | The whole pull request's list of changed files, not just this output's. Lets attest flag a wrong "this PR also changes X". Usually left out: `review()` copies it from the pull request. |
 | `reads` | Other code the reviewer looked at. Each `FileRead` has a `tool` (`read_file`, the default, or `grep`), its `arguments` and its `output`. |
 | `question` | The question, for a `canvas_answer`. |
 | `group_name` | The group's name, for a `group_summary`. |

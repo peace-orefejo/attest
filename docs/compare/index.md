@@ -60,8 +60,8 @@ other NLP models". That is flexible: one judge prompt can score almost anything.
 attest also uses a model, but gives it a narrower job. It splits the answer into claims and asks,
 for each one, whether the recorded tool outputs support it. The grading model never sees the
 agent's reasoning, and every finding quotes the tool output it rests on. Tool use and the
-injection scan don't use a model at all. The trade-off is scope: attest grades tool-grounded
-correctness and little else. It doesn't score tone, helpfulness, relevance or retrieval
+injection scan don't use a model at all. The trade-off is scope: attest grades whether the
+answer and actions are supported by the tool outputs, and little else. It doesn't score tone, helpfulness, relevance or retrieval
 quality, and it can't check a claim the tools never spoke to.
 
 Several of the tools above also have groundedness or faithfulness metrics (DeepEval's
@@ -81,8 +81,8 @@ and whether the answer claimed success for a call that failed.
 - **A small set of checks.** No RAG retrieval metrics, no conversational metrics, no synthetic
   data generation, no red-teaming attack generation.
 - **Accuracy not yet measured.** attest's own accuracy hasn't been measured on a labelled
-  benchmark; the benchmark that will measure it per check is
-  [being built](https://github.com/peace-orefejo/attest/tree/main/benchmarks). Some other tools
+  benchmark; the [benchmark](../benchmark.md) that will measure it per check is being built,
+  and all its labels are still drafts. Some other tools
   publish results for their judges (TruLens's README, for example, reports groundedness results
   on LLM-AggreFact); attest doesn't have any yet.
 - **Trusts the record.** A fabricated tool output backs a fabricated claim. See

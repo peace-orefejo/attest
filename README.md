@@ -51,7 +51,8 @@ export ANTHROPIC_API_KEY=sk-ant-...
 attest run your-run.json
 ```
 
-Every command prints JSON. A false claim comes back with the tool output that contradicts it:
+Every command prints JSON. A claim the evidence contradicts comes back with the tool output that
+contradicts it:
 
 ```json
 {
@@ -74,13 +75,15 @@ even when a detail inside it is wrong; rewriting an agent's reasoning alone can 
 judge's false-positive rate by up to 90%
 ([Khalifa et al., 2026](https://arxiv.org/abs/2601.14691)).
 
-attest checks each claim against the real tool outputs instead. Its grading model sees only the
-claim and the evidence, never the agent's reasoning.
+attest checks each claim against the recorded tool outputs instead. Its grading model sees only
+the claim and the evidence, never the agent's reasoning.
 
-attest is an evaluation toolkit, not a guarantee: it trusts that the recorded run is authentic
-and complete, and its accuracy hasn't been measured on a labelled benchmark yet. See
+attest is an evaluation toolkit, not a guarantee. It checks whether claims are supported by the
+run's recorded tool outputs, not whether they are true; it trusts that the recorded run is
+authentic and complete; and its accuracy hasn't been measured on a labelled benchmark yet. See
 [Limitations](https://peace-orefejo.github.io/attest/limitations/). The benchmark that will
-measure it, per check, is being built in [`benchmarks/`](benchmarks/).
+measure it, per check, is being built in [`benchmarks/`](benchmarks/); all its labels are still
+drafts ([overview](https://peace-orefejo.github.io/attest/benchmark/)).
 
 <br>
 

@@ -1,15 +1,16 @@
 ---
 title: "attest: open-source AI agent evaluation tool for Python"
-description: "Open-source AI agent evaluation tool for Python: checks agent answers against real tool outputs to catch hallucinations, tool misuse and prompt injection."
+description: "Open-source AI agent evaluation tool for Python: checks agent answers against recorded tool outputs and flags hallucinations, tool misuse and prompt injection."
 ---
 
 # attest: open-source AI agent evaluation
 
 **A reality-checker for AI agents.** attest is an open-source Python tool for evaluating AI
-agents. It grades an agent's answer against what its tools actually returned, and it's built to
-catch made-up facts, misused tools and prompt-injection slips that a "does this look good?"
-grader waves through. Its accuracy hasn't been measured on a labelled benchmark yet;
-[Limitations](limitations.md) says what it assumes.
+agents. It grades an agent's answer against what its tools actually returned, and flags claims
+the tool outputs don't support, misused tools and prompt-injection slips that a "does this look
+good?" grader can wave through. It checks whether claims are supported by the recorded evidence,
+not whether they are true, and its own accuracy hasn't been measured on a labelled
+[benchmark](benchmark.md) yet; [Limitations](limitations.md) says what it assumes.
 
 attest grades a **run**: a JSON record of one task, with the question, each tool call and what
 it returned, and the agent's final answer.
@@ -20,7 +21,7 @@ attest run your-run.json      # prints JSON
 ```
 
 Every command prints [JSON](json-output.md). Here the agent said Paris is larger than Berlin,
-and attest quotes the tool output that shows it isn't:
+and attest quotes the tool output that contradicts it:
 
 ```json
 {
@@ -41,8 +42,8 @@ even when a detail inside it is wrong; rewriting an agent's reasoning alone can 
 judge's false-positive rate by up to 90%
 ([Khalifa et al., 2026](https://arxiv.org/abs/2601.14691)).
 
-attest never trusts what the agent says it did. Every tool call produced a real output, and
-those outputs are the only evidence attest accepts.
+attest doesn't take the agent's word for what it did. The tool outputs recorded in the run are
+the only evidence it accepts.
 
 ![How attest checks an answer](assets/diagrams/how-it-works.svg){ .diagram }
 
@@ -83,3 +84,4 @@ kept or dropped before people see it. See [Code review mode](code-review/index.m
 - The checks, starting with [Faithfulness](checks/faithfulness.md).
 - [Command line](cli.md) and [JSON output](json-output.md).
 - [Integrations](integrations.md): LangGraph, Haystack, your own logs, and CI.
+- [Benchmark](benchmark.md): how attest's own accuracy will be measured.

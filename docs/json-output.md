@@ -26,8 +26,23 @@ an error the checks don't absorb stopped the command, such as a provider error d
 `attest review`; `message` names the error.
 
 A usage error, such as an unknown option, a missing argument or `--max-claims abc`, is
-`invalid_input` too. When the command itself is missing or unknown, `command` is `attest`.
-Only `--help` prints plain text.
+`invalid_input` too, printed on stdout with exit code 2 like any other error:
+
+```bash
+$ attest run run.json --max-claims abc
+{
+  "schema_version": "2",
+  "command": "run",
+  "ok": false,
+  "error": {
+    "code": "invalid_input",
+    "message": "Invalid value for '--max-claims': 'abc' is not a valid integer."
+  }
+}
+```
+
+When the command itself is missing or unknown, `command` is `attest`. Only `--help` prints plain
+text.
 
 ## Exit codes
 
@@ -47,7 +62,7 @@ The exit code says whether the command ran, not whether the agent passed.
 | `run` | `trajectories`: one entry per graded run, each a `task` and its `report`. Then `total` (runs in the file), `evaluated` (runs graded), `verdicts` (how many runs got each verdict: `pass`, `review`, `block`), `passed` (runs whose verdict is `pass`), `checks_passed` (runs whose checks all passed, including runs that still need review), `mean_overall_score`, `usage` (calls and tokens), and `budget_exceeded`: why a budget stopped the run, or `null`. |
 | `tools`, `injection`, `role` | `trajectories`: one entry per run, each a `task` and its `result` |
 | `review` | A [`ReviewResult`](code-review/outputs.md#reviewresult) |
-| `demo` | `comparisons`: one per run, with `task`, `answer`, the plain LLM judge's verdict (`judge`), attest's faithfulness result (`attest`), and `outcome`: `caught` (attest caught a false claim the judge passed), `both_caught`, `both_passed` or `judge_only` |
+| `demo` | `comparisons`: one per run, with `task`, `answer`, the plain LLM judge's verdict (`judge`), attest's faithfulness result (`attest`), and `outcome`: `caught` (attest flagged a claim the evidence contradicts, and the judge passed it), `both_caught`, `both_passed` or `judge_only` |
 | `stats` | `rate`, `low`, `high`, `n` |
 | `models` | `provider`, `source` (`live` or `curated`), `models` |
 
@@ -87,3 +102,9 @@ published as `schemas/v2/<command>.json` on this site, for example
 Within a `schema_version`, fields may be added but never removed or redefined. Version `"2"`
 changed what `passed` means (see the [changelog](changelog.md)); the
 [v1 schemas](schemas/v1/run.json) are still published.
+
+**Moving from version 1.** In a `report`, `passed` used to mean every check passed, so a run
+that needed review could read `passed: true`; that meaning is now `checks_passed`, and `passed`
+means the verdict is `pass`. In `attest run`'s `data`, `passed` now counts runs whose verdict is
+`pass`, and `checks_passed` counts runs whose checks all passed. If you gated on `passed`, a run
+that needs review now fails that gate; use `checks_passed` only if you need the old behaviour.
