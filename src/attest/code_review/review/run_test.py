@@ -225,7 +225,7 @@ def test_follow_guidelines_false_skips_the_check(guideline_calls):
 def test_no_outputs_means_attest_writes_the_review(monkeypatch):
     seen = {}
 
-    def fake_write(pr, *, guidelines, limits):
+    def fake_write(pr, *, guidelines, limits, exclude=None):
         seen["guidelines"] = guidelines.name
         return [ReviewOutput(output_type="issue", text="written", diffs=dict(pr.diffs))]
 

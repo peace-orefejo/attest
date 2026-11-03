@@ -10,6 +10,12 @@ from ...results import Disposition
 from ...scoring.report import DEFAULT_CHECKS, validate_evaluation_options
 from ..context import require_key
 from ..evaluation import EvaluationSettings, evaluate_all
+from ..exclusions import (
+    ATTESTIGNORE_OPTION,
+    EXCLUDE_FILE_OPTION,
+    EXCLUDE_OPTION,
+    cli_exclusions,
+)
 from ..json_output import EXIT_BUDGET_EXCEEDED, RunData, emit, json_command
 from ..loading import load_trajectories
 from ..options import (
@@ -49,10 +55,14 @@ def run(
     cache_dir: Path | None = typer.Option(
         None, "--cache-dir", help="Reuse judge verdicts from this directory across runs."
     ),
+    exclude: list[str] = EXCLUDE_OPTION,
+    exclude_file: list[Path] = EXCLUDE_FILE_OPTION,
+    attestignore: bool = ATTESTIGNORE_OPTION,
 ) -> None:
     """Full report on a trajectory (or JSONL): runs the chosen checks + an overall score."""
     selected = _selected_checks(checks, kind)
     require_max_claims(max_claims)
+    exclusions = cli_exclusions(exclude, exclude_file, attestignore)
     policy = require_reasoning(reasoning)
     require_key(provider)
     trajectories = load_trajectories(path)
@@ -62,6 +72,7 @@ def run(
         model=model,
         budget=_budget(max_calls, max_tokens),
         cache=cache_dir or False,
+        exclude=exclusions,
         reasoning=policy,
     )
     settings = EvaluationSettings(

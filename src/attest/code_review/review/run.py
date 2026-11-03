@@ -7,15 +7,19 @@ from collections.abc import Mapping, Sequence
 from pydantic import BaseModel, Field
 
 from ...disposition_rules import is_unjudged
+from ...exclusions import Exclusions, ExclusionsInput, as_exclusions
 from ...llm import BudgetExceeded, ProviderConfigError
+from ...results import CheckResult
 from ...utils.failures import failure_reason
 from ..evidence import EvidenceLimits
+from ..evidence.excluded import hide_output, hide_pull_request, without_excluded_diffs
 from ..gate import gate
 from ..gate.defaults import DEFAULT_MODES
 from ..guidelines import GUIDELINES_CHECK, GuidelinesInput, ReviewGuidelines, load_guidelines
 from ..injection import check_code_injection
 from ..models import GateDecision, GateMode, PullRequest, ReviewOutput
 from ..writer import write_review
+from .excluded import exclusion_warnings
 from .grade import FAITHFULNESS_CHECK, Evaluator, Graded, grade
 from .models import OutputDecision, ReviewResult
 from .pr_evidence import (
@@ -37,6 +41,7 @@ def review(
     modes: Mapping[str, GateMode] | None = None,
     deep: bool = True,
     limits: EvidenceLimits | None = None,
+    exclude: ExclusionsInput = None,
 ) -> ReviewResult:
     """Scan the pull request for injection once, then grade and gate each output on its evidence.
 
@@ -50,18 +55,30 @@ def review(
     faithfulness result, and `modes` overrides the default gate mode per output type.
     An output whose check against your rules couldn't run, or with a reported break that couldn't
     be confirmed, is dropped in every mode, and a warning names it.
+
+    `exclude` takes gitignore-style patterns (or an `Exclusions`). Excluded files' contents
+    never reach a model or the injection scan; each appears as a one-line note, and an output
+    about excluded files only is dropped as unchecked. `excluded_files` lists them.
     """
     chosen: dict[str, GateMode] = dict(modes) if modes else {}
     _check_modes(chosen)
+    exclusions = as_exclusions(exclude)
     rules = load_guidelines(guidelines)
-    written = _write(pr, rules, limits) if outputs is None else None
+    hidden_pr = hide_pull_request(pr, exclusions)
+    visible = hidden_pr.pr
+    written = _write(visible, rules, limits, exclusions) if outputs is None else None
     source = written.outputs if written is not None else outputs or []
-    filled = [with_pr_evidence(output, pr) for output in source]
-    injection = check_code_injection(pr, filled, deep=deep)
+    hidden = [hide_output(with_pr_evidence(output, visible), exclusions) for output in source]
+    filled = [item.output for item in hidden]
+    injection = _scan(visible, filled, exclusions, deep=deep)
+    excluded = _union(hidden_pr.excluded, *(item.excluded for item in hidden))
+    named_only = _union(hidden_pr.named_only, *(item.named_only for item in hidden))
     decisions: list[OutputDecision] = []
     unchecked: list[int] = []
     for index, output in enumerate(filled):
-        graded = grade(output, evaluate, rules, follow=follow_guidelines, limits=limits)
+        graded = grade(
+            output, evaluate, rules, follow=follow_guidelines, limits=limits, exclusions=exclusions
+        )
         if _rules_unchecked(graded):
             unchecked.append(index)
         decision = gate(
@@ -84,9 +101,26 @@ def review(
             *guideline_warnings(rules, pr),
             *unchecked_guideline_warnings(unchecked, rules),
             *injection_warnings(injection),
+            *exclusion_warnings(excluded, exclusions, pr, named_only),
         ],
+        excluded_files=excluded,
         outputs=list(source),
     )
+
+
+def _scan(
+    pr: PullRequest, outputs: list[ReviewOutput], exclusions: Exclusions, *, deep: bool
+) -> CheckResult:
+    scanned = without_excluded_diffs(pr, exclusions)
+    result = check_code_injection(scanned, outputs, deep=deep)
+    skipped = [path for path in pr.diffs if path not in scanned.diffs]
+    if skipped:
+        result.metadata["files_excluded"] = list(skipped)
+    return result
+
+
+def _union(*groups: list[str]) -> list[str]:
+    return list(dict.fromkeys(path for group in groups for path in group))
 
 
 class _Written(BaseModel):
@@ -94,12 +128,18 @@ class _Written(BaseModel):
     failure: str | None = None
 
 
-def _write(pr: PullRequest, rules: ReviewGuidelines, limits: EvidenceLimits | None) -> _Written:
+def _write(
+    pr: PullRequest,
+    rules: ReviewGuidelines,
+    limits: EvidenceLimits | None,
+    exclusions: Exclusions,
+) -> _Written:
     """attest's own review, or why it wrote none; a failed call never aborts the review."""
     if not pr.diffs:
         raise ValueError("The pull request has no diffs to review.")
     try:
-        return _Written(outputs=write_review(pr, guidelines=rules, limits=limits))
+        written = write_review(pr, guidelines=rules, limits=limits, exclude=exclusions)
+        return _Written(outputs=written)
     except (BudgetExceeded, ProviderConfigError):
         raise
     except Exception as error:

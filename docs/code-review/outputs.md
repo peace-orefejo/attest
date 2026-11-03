@@ -58,7 +58,8 @@ The whole change. `review()` scans it for injection, and attest's own reviewer w
 | `written` | `True` when attest wrote the outputs itself. |
 | `writer_failure` | Why attest's own reviewer wrote nothing (its call failed or was cut off), or `null`. When set there are no decisions, and `attest review` exits 1. |
 | `reasoning` | The reasoning level each call site was sent, or `null` where the model takes no reasoning setting. See [reasoning](../providers.md#reasoning). |
-| `warnings` | Things to check by hand, e.g. the pull request changes the file its review rules came from, a review attest couldn't write, or an output whose check against your rules couldn't run. |
+| `warnings` | Things to check by hand, e.g. the pull request changes the file its review rules came from, a review attest couldn't write, an output whose check against your rules couldn't run, or some files were excluded and not reviewed. |
+| `excluded_files` | Paths your [exclusion patterns](index.md#leaving-files-out) left out of the evidence. They were not reviewed. |
 | `kept` | Indexes of the outputs to keep. |
 | `dropped` | Indexes of the outputs to drop. |
 
@@ -82,7 +83,7 @@ the kept outputs from the ones `review()` checked, which is how you get attest's
 | `summary` | The faithfulness summary, e.g. "2/2 checkable claims grounded." |
 | `reasons` | The findings that dropped it. Empty when kept. |
 | `notes` | Findings shown alongside it that did not drop it. |
-| `omissions` | Files whose content was left out of the evidence, with the reason. |
+| `omissions` | Files whose content was left out of the evidence, with the reason: `summarized`, `generated`, `truncated`, `budget`, `out_of_scope` or `excluded` (by your exclusion patterns). |
 
 ## GateDecision
 
@@ -104,6 +105,7 @@ decision plus the output's identity and scores.
 | Faithfulness `unverifiable` | keep | drop |
 | A claim no model judged (a failed call, `metadata["checked"]` is `false`) | drop | drop |
 | More claims than `max_claims` (40 by default): each claim past the cap is unchecked | drop | drop |
+| Every file the output is about is [excluded](index.md#leaving-files-out): not graded, one unchecked finding | drop | drop |
 | One of your rules broken (with `follow_guidelines=True`) | drop | drop |
 | Guideline missed (with `follow_guidelines=True`) | keep, listed as a note | keep, listed as a note |
 | Injection `payload` in this output's files | drop | drop |

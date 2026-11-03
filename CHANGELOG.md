@@ -6,6 +6,30 @@ All notable changes to `agent-attest` are documented here. This project follows
 ## [Unreleased]
 
 ### Added
+- User-defined file exclusions, for cost, noise and privacy. Gitignore-style patterns come from
+  `.attestignore` in the current directory (`--no-attestignore` turns that off), then
+  `--exclude-file PATH`, then `--exclude PATTERN` on `attest run` and `attest review`, with a
+  later `!pattern` re-including. In Python: `Attest(exclude=[...])`, `review(..., exclude=...)`,
+  and `load_exclusions(...)`. Excluded files' contents never reach a model or a scan: code
+  review replaces their diffs, reads and grep lines with a one-line note, drops an output about
+  excluded files only as unchecked, and lists them in the new `ReviewResult.excluded_files`
+  (each omission's reason is the new `excluded`); run mode replaces matching artifacts (by
+  `path` or `name`, as written or with symlinks resolved) with a note and lists them in
+  `metadata["artifacts_excluded"]`. Matching fails closed: paths are normalized (`\`, `//`,
+  `./`, `..`), absolute paths match from any segment, case-folded and NFC forms count as the same
+  file, a read is hidden when any path-like argument names an excluded file, a grep naming one
+  anywhere is withheld whole, and a diff whose key or header lines name one is hidden. Matching
+  makes one pass per rule over the path, so the time a deep path or hostile grep output
+  takes is bounded. Reads and grep file names are also matched with symlinks resolved. A read
+  argument too long or with a line break, and a grep file name too deep to check, count as
+  excluded. Hiding caused only by text naming an excluded file (a header-like diff line, a
+  grep line's content) gets its own warning, and a grep cut short by the check is a
+  `truncated` omission. `attest review` refuses (exit 2) when the pull request or any output
+  changes `.attestignore` or an `--exclude-file` it read, matched by path suffix and
+  including rename and copy targets; `--allow-pr-attestignore` overrides. `Attest(exclude=...)` takes a
+  list of patterns or a `Path` to a pattern file; a bare string raises `TypeError`. An
+  unreadable pattern file, one over 1 MB, or more than 1,000 patterns is `invalid_input`
+  (exit 2), or `ExclusionError` in Python.
 - `VerdictPolicy(min_claim_coverage=...)`: a run whose faithfulness check covered less than this
   share of the answer's claims goes to review. Off by default; kept separate from the score.
 - `Report.claim_coverage`: the share of claims faithfulness checked (0 to 1, or `None`).

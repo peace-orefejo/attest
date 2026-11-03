@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import NamedTuple, TypeAlias
 
+from ...exclusions import Exclusions
 from ...results import Report
 from ...trajectory import Trajectory
 from ..adapter import to_run_with_omissions
@@ -12,6 +13,7 @@ from ..evidence import EvidenceLimits, Omission
 from ..guidelines import ReviewGuidelines, check_guidelines
 from ..models import ReviewOutput
 from ..tool_names import READ_GUIDELINES
+from .excluded import entirely_excluded, excluded_report
 
 Evaluator: TypeAlias = Callable[[Trajectory], Report]
 FAITHFULNESS_CHECK = "faithfulness"
@@ -29,10 +31,18 @@ def grade(
     *,
     follow: bool,
     limits: EvidenceLimits | None,
+    exclusions: Exclusions | None = None,
 ) -> Graded:
-    """Run `evaluate` on the output's evidence, adding the guideline check for the team's rules."""
+    """Run `evaluate` on the output's evidence, adding the guideline check for the team's rules.
+
+    An output whose every file is excluded is not graded at all: it gets one unchecked finding.
+    """
     evidence_rules = None if rules.builtin else rules
-    run, omissions = to_run_with_omissions(output, limits=limits, guidelines=evidence_rules)
+    run, omissions = to_run_with_omissions(
+        output, limits=limits, guidelines=evidence_rules, exclude=exclusions
+    )
+    if entirely_excluded(output, omissions):
+        return Graded(report=excluded_report(output, FAITHFULNESS_CHECK), omissions=omissions)
     report = evaluate(run)
     if report.by(FAITHFULNESS_CHECK) is None:
         raise ValueError(

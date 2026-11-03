@@ -168,7 +168,8 @@
             "generated",
             "truncated",
             "budget",
-            "out_of_scope"
+            "out_of_scope",
+            "excluded"
           ],
           "title": "Reason",
           "type": "string"
@@ -361,6 +362,13 @@
             "type": "string"
           },
           "title": "Warnings",
+          "type": "array"
+        },
+        "excluded_files": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Excluded Files",
           "type": "array"
         },
         "reasoning": {
