@@ -30,6 +30,9 @@ class ReviewResult(BaseModel):
     injection: CheckResult
     guidelines: ReviewGuidelines | None = None
     written: bool = False
+    writer_failure: str | None = None
+    """Why attest's own reviewer wrote nothing (a failed or cut-off call), or None. When set,
+    there are no decisions: nothing was checked or kept."""
     warnings: list[str] = Field(default_factory=list[str])
     outputs: list[ReviewOutput] = Field(default_factory=list[ReviewOutput], exclude=True)
 

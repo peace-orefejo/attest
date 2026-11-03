@@ -10,7 +10,7 @@ from ...code_review import PullRequest, ReviewGuidelines, ReviewOutput, load_gui
 from ...code_review.gate.defaults import DEFAULT_MODES
 from ...code_review.models import GATE_MODES, GateMode
 from ..context import require_key
-from ..json_output import emit, json_command
+from ..json_output import EXIT_ERROR, CommandError, emit, json_command
 from ..options import (
     MAX_CLAIMS_OPTION,
     MODEL_OPTION,
@@ -56,7 +56,11 @@ def review(
     model: str | None = MODEL_OPTION,
     reasoning: str = REASONING_OPTION,
 ) -> None:
-    """Check each code review output against the diff and your review rules (needs a key)."""
+    """Check each code review output against the diff and your review rules (needs a key).
+
+    If attest was asked to write the review and its writer call failed, nothing was checked:
+    the command prints a `command_failed` error and exits 1.
+    """
     request = _load_review(path)
     modes = _parse_modes(mode)
     rules = _load_rules(guidelines)
@@ -75,6 +79,8 @@ def review(
         )
     except ValueError as exc:
         raise typer.BadParameter(str(exc), param_hint="PATH") from exc
+    if result.writer_failure is not None:
+        raise CommandError("command_failed", " ".join(result.warnings), EXIT_ERROR)
     emit("review", result)
 
 

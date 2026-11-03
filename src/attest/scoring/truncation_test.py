@@ -177,6 +177,7 @@ def test_writer():
     assert result.decisions == [] and result.written
     assert "wrote no review" in result.warnings[0]
     assert "TruncatedOutput" in result.warnings[0]
+    assert "TruncatedOutput" in (result.writer_failure or "")
     assert messages.sent == ["WrittenReview"]
 
 

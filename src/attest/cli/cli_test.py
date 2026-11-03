@@ -469,6 +469,30 @@ def test_review_passes_guideline_files_and_writes_when_outputs_are_missing(tmp_p
     assert seen["follow_guidelines"] is False
 
 
+def test_review_exits_1_when_attest_could_not_write_the_review(tmp_path, monkeypatch):
+    from attest import Attest, CheckResult
+    from attest.code_review import ReviewResult
+
+    def fake(self, pr, outputs, **kwargs):
+        return ReviewResult(
+            injection=CheckResult(check="code_injection", passed=True),
+            decisions=[],
+            written=True,
+            writer_failure="Writing the review failed (TruncatedOutput: cut off).",
+            warnings=["attest's reviewer wrote no review, so nothing was checked or kept."],
+        )
+
+    monkeypatch.setattr(Attest, "review", fake)
+    monkeypatch.setattr("attest.cli.context.resolve_key", lambda provider: "sk-test")
+    path = tmp_path / "pr.json"
+    path.write_text(json.dumps({"pr": {"diffs": {"a.py": "+x = 1\n"}}}))
+    result = runner.invoke(app, ["review", str(path)])
+    assert result.exit_code == 1
+    payload = _payload(result)
+    assert payload["error"]["code"] == "command_failed"
+    assert "wrote no review" in payload["error"]["message"]
+
+
 def test_review_rejects_an_unreadable_guidelines_file(tmp_path):
     result = runner.invoke(
         app, ["review", _review_file(tmp_path), "-g", str(tmp_path / "missing.md")]

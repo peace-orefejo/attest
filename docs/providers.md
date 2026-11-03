@@ -81,7 +81,17 @@ only for the tokens the model writes. Reasoning tokens are included in the outpu
 reports in `usage`, for every provider.
 
 If a model still stops at its output limit before it finishes, that call is reported as
-`unchecked`, like any other failed judge call, and the run or review carries on.
+`unchecked`, like any other failed judge call, and the run or review carries on. A cut-off call
+is sent once, not retried, since the same request would stop in the same place, and the tokens
+it used still count in `usage` and against a `Budget`.
+
+Code that calls a model directly sees the error instead: `attest.llm.call` and
+`Attest().write_review()` raise `TruncatedOutput` (from `attest.llm`), whose `completion` is
+the provider's response. Under `Attest.review()`, a guideline check that was cut off drops the
+output it was checking, and a review attest was asked to write but couldn't has no decisions,
+a `writer_failure` and a warning. `attest review` turns that last case into a `command_failed`
+error with exit code 1, so a CI job that checks the exit code can't mistake it for a clean
+review. When you call `review()` yourself, check `writer_failure` or `warnings`.
 
 ## Your own client
 

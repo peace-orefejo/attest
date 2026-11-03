@@ -78,6 +78,7 @@ def review(
         injection=injection,
         guidelines=rules,
         written=outputs is None,
+        writer_failure=written.failure if written else None,
         warnings=[
             *writer_warnings(written.failure if written else None),
             *guideline_warnings(rules, pr),
