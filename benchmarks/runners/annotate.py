@@ -1,6 +1,7 @@
 """Blind double labelling for the benchmark: label templates, agreement, settling and merging.
 
     uv run python benchmarks/runners/annotate.py template po --check faithfulness
+    uv run python benchmarks/runners/annotate.py serve po     # label them in your browser
     uv run python benchmarks/runners/annotate.py agreement po vk
     uv run python benchmarks/runners/annotate.py settle inj-clean-output label run none \\
         --how discussion --by po vk --reason "the output only has data"
@@ -14,8 +15,8 @@ files' draft labels, or attest's output until your own labels are done.
 
 For a private dataset (`--datasets` anywhere but benchmarks/datasets), pass `--labels` and
 `--adjudications` outside this repository or under benchmarks/private/: label files copy the
-runs. Each command is held to the paths it reads or writes: `template` and `agreement` to
-`--labels`, `merge` to both, and `settle` to `--adjudications`, plus `--labels` for a
+runs. Each command is held to the paths it reads or writes: `template`, `serve` and
+`agreement` to `--labels`, `merge` to both, and `settle` to `--adjudications`, plus `--labels` for a
 discussion, whose annotators' labels it reads.
 """
 
@@ -28,14 +29,16 @@ from pathlib import Path
 from bench_adjudications import load_adjudications
 from bench_agreement import agreement, markdown
 from bench_annotate_args import parser as annotate_parser
-from bench_annotations import ANNOTATOR_PATTERN, AnnotationError
+from bench_annotations import ANNOTATOR_PATTERN, LABELS_DIR, AnnotationError
 from bench_cases import CHECKS, Case
 from bench_label_files import load_annotations
-from bench_load import DATASETS_DIR, DatasetError, load_datasets
+from bench_load import DATASETS_DIR, DatasetError, Datasets, load_datasets
 from bench_merge import merge
 from bench_settle import Settlement, settle
 from bench_template import write_templates
 from bench_write import write_cases
+from label_ui_api import build_api
+from label_ui_server import serve
 
 REPO_DIR = DATASETS_DIR.parent.parent
 PRIVATE_DIR = DATASETS_DIR.parent / "private"
@@ -55,13 +58,15 @@ def main(argv: list[str] | None = None) -> int:
             )
     if args.command == "agreement" and args.first == args.second:
         parser.error("compare two different annotators")
-    if args.command == "template" and not ANNOTATOR_PATTERN.fullmatch(args.annotator):
+    if args.command in ("template", "serve") and not ANNOTATOR_PATTERN.fullmatch(args.annotator):
         parser.error("annotator names are lowercase initials or ids, such as 'po'")
     try:
         datasets = load_datasets(args.datasets, allow_missing=private)
         if args.command == "template":
             cases = [c for check in args.check or CHECKS for c in datasets.split(check, args.split)]
             return _template(args.labels / args.annotator, cases, private=private)
+        if args.command == "serve":
+            return _serve(args, datasets, private=private)
         cases = {
             case.id: case
             for by_split in datasets.cases.values()
@@ -82,6 +87,20 @@ def _template(folder: Path, cases: list[Case], *, private: bool) -> int:
     for stale in result.stale:
         print(f"stale: {stale.path}: {stale.reason}; delete it and run again")
     return 0
+
+
+def _serve(args: argparse.Namespace, datasets: Datasets, *, private: bool) -> int:
+    flags = f" --datasets {args.datasets}" if private else ""
+    if args.labels.resolve() != LABELS_DIR.resolve():
+        flags += f" --labels {args.labels}"
+    api = build_api(
+        args.annotator,
+        args.labels / args.annotator,
+        datasets,
+        forbidden=_inside_repo if private else None,
+        regenerate=f"uv run python benchmarks/runners/annotate.py{flags} template {args.annotator}",
+    )
+    return serve(api, port=args.port, open_browser=not args.no_open)
 
 
 def _private_paths(args: argparse.Namespace) -> list[tuple[str, Path]]:

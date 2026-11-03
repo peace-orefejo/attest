@@ -197,6 +197,37 @@ would actually land. Pass the paths each command uses outside it or under `bench
 `--labels` for `template`, `agreement` and `merge`, `--adjudications` for `settle` and `merge`,
 and `--labels` for `settle --how discussion`, which reads the annotators' labels.
 
+### Labelling in your browser
+
+Instead of editing the JSON by hand, you can fill in your label files in a local web page:
+
+```bash
+# public datasets
+uv run python benchmarks/runners/annotate.py serve po
+
+# a private dataset, such as the Vera cases: labels outside the repository
+uv run python benchmarks/runners/annotate.py --datasets ~/vera-cases \
+    --labels ~/vera-labels serve po
+```
+
+It opens a browser tab with your cases on the left and one case at a time on the right: the
+task, system prompt, allowed tools, each step (the thought is marked "not evidence"), the
+outputs, artifacts and final answer, and beside them the form for that check. If you have no
+label files yet, it offers to create them, exactly as `template` would. Saving writes the same
+label file `template` gave you; blanks stay blank, so a partly done file is still skipped as
+unfinished. A stale file is shown read-only, with the reason and the command to regenerate it.
+The Guidelines button shows this file, read when the server started. Press `?` for the
+keyboard shortcuts (`1` to `6` pick a label, `j`/`k` move between items, `n` opens the next
+unfinished case, `s` saves). Add `--no-open` to print the link instead, or `--port` to choose
+the port.
+
+It only ever reads and writes your own folder, `<labels>/<you>/`. It never shows other
+annotators' labels, the case files' draft labels, notes or categories, or attest's output, and
+it doesn't show agreement. Everything stays on your machine: the server listens on 127.0.0.1
+only, answers only requests carrying the random token in the link it prints, and the page loads
+nothing from the internet. The same private-path rule applies: with a private `--datasets`, it
+refuses a `--labels` inside this repository.
+
 ## Settling disagreements
 
 Record each settlement with `annotate.py settle`, which appends one line to

@@ -23,6 +23,11 @@ def parser() -> argparse.ArgumentParser:
     blank.add_argument("--check", choices=CHECKS, action="append", default=None)
     blank.add_argument("--split", choices=SPLITS, default="dev")
 
+    serve = commands.add_parser("serve", help="label your own files in a local browser page")
+    serve.add_argument("annotator")
+    serve.add_argument("--port", type=int, default=0, help="default: a random free port")
+    serve.add_argument("--no-open", action="store_true", help="print the link, don't open it")
+
     compare = commands.add_parser("agreement", help="agreement and kappa between two annotators")
     compare.add_argument("first")
     compare.add_argument("second")

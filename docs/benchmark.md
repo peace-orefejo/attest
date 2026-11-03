@@ -135,6 +135,8 @@ A case is confirmed through blind double labelling with `benchmarks/runners/anno
    it labels, so if the run is edited later the file is reported as stale.
 2. Each annotator fills in their own files without opening the case files, anyone else's labels
    or attest's output. The tool doesn't enforce this; it's a procedure reviewers check.
+   **`serve`** opens a local page for this, one case at a time, instead of editing JSON
+   (see below).
 3. **`agreement`** reports, per check, the share of identical labels and Cohen's kappa between
    two annotators, and lists every disagreement. Kappa below 0.6 on a check means the
    guidelines are unclear for it.
@@ -147,6 +149,26 @@ A case is confirmed through blind double labelling with `benchmarks/runners/anno
    ambiguous is never confirmed.
 
 A disagreement is never settled by checking what attest said.
+
+### Labelling in your browser
+
+```bash
+# public datasets
+uv run python benchmarks/runners/annotate.py serve po
+
+# a private dataset (such as the Vera cases), with its labels outside the repository
+uv run python benchmarks/runners/annotate.py --datasets ~/vera-cases \
+    --labels ~/vera-labels serve po
+```
+
+This opens a browser tab where you label your own blank label files one case at a time: the run
+on one side, the form for its check on the other, the guidelines a click away and keyboard
+shortcuts for every label. If you have no label files yet it offers to create them, as
+`template` does. It saves in the same file format, so partial work stays unfinished and
+`agreement` and `merge` read the files as before. It only shows your own folder, never other
+annotators' labels, the cases' draft labels or notes, or attest's output, and it never leaves
+your machine: it listens on 127.0.0.1 only, needs the random token in the link it prints, and
+loads nothing from the internet.
 
 ## Running it
 

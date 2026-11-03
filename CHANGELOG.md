@@ -50,6 +50,10 @@ All notable changes to `agent-attest` are documented here. This project follows
   AgentDojo runs (`benchmarks/converters/agentdojo.py`).
 - Benchmark: 12 draft-labelled ToolBench cases (faithfulness, tool use, recovery) converted from
   vendored, contact-redacted upstream samples by `benchmarks/converters/toolbench.py`.
+- Benchmark: `annotate.py serve <annotator>` opens a local page for filling in your own label
+  files one case at a time, with the guidelines and keyboard shortcuts. Standard library only,
+  127.0.0.1 with a session token, and it never reads other annotators' folders or the case
+  files' draft labels.
 - Benchmark: `annotate.py settle --replace` corrects a settled entry by appending one that
   supersedes it, so the adjudication log stays append-only.
 - Benchmark: `compare.py` reports deltas per origin and fails on a regression in any origin

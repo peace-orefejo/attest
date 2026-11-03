@@ -320,6 +320,11 @@ and origin: `datasets/<check>/<split>-<origin>.jsonl`, such as
    disagreement was settled, and `merge --write` confirms the cases they agree on or have
    settled. See
    [Double labelling](annotations/guidelines.md#double-labelling-and-agreement).
+   To fill in your label files in a local browser page instead of editing JSON, run
+   `annotate.py serve <you>` (for a private dataset add the same `--datasets` and `--labels`
+   as `template`, such as `--datasets ~/vera-cases --labels ~/vera-labels`). It shows only your
+   own folder and never leaves your machine; see
+   [Labelling in your browser](annotations/guidelines.md#labelling-in-your-browser).
 5. Put new cases in `dev` unless you are deliberately growing validation or held-out. Never
    move a case from validation or held-out to dev after its results have been looked at for
    tuning; retire it instead.
@@ -420,6 +425,7 @@ benchmarks/
 ├── private/                     your own cases (git-ignored)
 ├── hf-build/                    the Hugging Face export (git-ignored, rebuilt by export_hf.py)
 ├── runners/                     case model, loading, grading, metrics, reports, compare,
-│                                annotate (templates, agreement, settle, merge), export_hf
+│                                annotate (templates, serve, agreement, settle, merge),
+│                                label_ui* (the local labelling page), export_hf
 └── reports/                     run output; published reports are committed on purpose
 ```

@@ -61,23 +61,23 @@ def template_staleness(path: Path, case: Case) -> str | None:
     fields: dict[str, Any] = raw  # pyright: ignore[reportUnknownVariableType]
     if fields.get("run_sha256") != run_sha256(case):
         return "it is for an older version of its run"
-    if _shape(fields.get("labels")) != _shape(blank_labels(case)):
+    if label_shape(fields.get("labels")) != label_shape(blank_labels(case)):
         return "the items to label changed"
     return None
 
 
-def _shape(value: object) -> object:
+def label_shape(value: object) -> object:
     """`value` with every label blanked and list order ignored, so only the items are compared."""
     if isinstance(value, dict):
         items: dict[str, Any] = value  # pyright: ignore[reportUnknownVariableType]
         return {
-            key: None if key in LABEL_FIELDS else _shape(item)
+            key: None if key in LABEL_FIELDS else label_shape(item)
             for key, item in items.items()
             if key != "run_label"
         }
     if isinstance(value, list):
         entries: list[Any] = value  # pyright: ignore[reportUnknownVariableType]
-        return sorted((_shape(entry) for entry in entries), key=json.dumps)
+        return sorted((label_shape(entry) for entry in entries), key=json.dumps)
     return value
 
 
