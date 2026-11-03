@@ -1,6 +1,6 @@
 ---
-title: "Faithfulness: verify agent claims against tool outputs"
-description: "The faithfulness check splits an agent's answer into claims and verifies each one against the real tool outputs to catch hallucinations."
+title: "Faithfulness: check agent claims against tool outputs"
+description: "The faithfulness check splits an agent's answer into claims, checks each one against the recorded tool outputs, and flags the claims they don't support."
 ---
 
 # Faithfulness
@@ -25,7 +25,9 @@ result = report.by("faithfulness")
    `--max-claims` on `attest run` and `attest review`). Each claim past the cap is reported
    `unverifiable` with `checked` false, so a long answer goes to `review` instead of passing on
    its first 40 claims, and `attest review` drops a code review output with more claims than the
-   cap.
+   cap. The summary says how many claims went unchecked, such as "(checked the first 40 claims;
+   5 more were not checked)", or that no claim was checked when `max_claims` is 0. A negative
+   value raises `ValueError` in Python and is `invalid_input` (exit 2) on the command line.
 3. Each claim gets `supported`, `unsupported` or `unverifiable`, a reason, and the deciding quote.
    When the quote comes from exactly one tool output or artifact, the finding's
    `metadata["location"]` says which, such as `steps[2].tool_call.artifacts[0]`.
@@ -109,8 +111,9 @@ that reads everything, and once with attest:
 attest demo examples/trajectory.json
 ```
 
-Each comparison's `outcome` says who caught what: `caught` means attest found a false claim the
-LLM judge passed. The other outcomes are `both_caught`, `both_passed` and `judge_only`.
-`inconclusive` means attest found nothing false but couldn't check every claim (a call
-failed or was cut off), so it is not a pass. `judge_unchecked` means the plain judge's call
-failed or was cut off: its `judge` is `null` and `judge_error` says why.
+Each comparison's `outcome` says who flagged what: `caught` means attest found a claim the
+evidence contradicts, and the LLM judge passed the answer. The other outcomes are `both_caught`,
+`both_passed` and `judge_only`. `inconclusive` means attest found no contradicted claim but
+couldn't check every claim (a call failed or was cut off), so it is not a pass.
+`judge_unchecked` means the plain judge's call failed or was cut off: its `judge` is `null` and
+`judge_error` says why.
