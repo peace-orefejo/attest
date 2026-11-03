@@ -11,7 +11,7 @@ from ...trajectory import Trajectory
 from ..context import llm_context, require_key
 from ..json_output import DemoComparison, DemoData, DemoOutcome, emit, json_command
 from ..loading import load_trajectories
-from ..options import MODEL_OPTION, PROVIDER_OPTION
+from ..options import MODEL_OPTION, PROVIDER_OPTION, REASONING_OPTION, require_reasoning
 
 _OUTCOMES: dict[tuple[bool, bool], DemoOutcome] = {
     (True, True): "caught",
@@ -26,10 +26,12 @@ def demo(
     path: Path = typer.Argument(Path("examples/trajectory.json")),
     provider: str = PROVIDER_OPTION,
     model: str | None = MODEL_OPTION,
+    reasoning: str = REASONING_OPTION,
 ) -> None:
     """Run the naive LLM-judge and attest side by side — the headline comparison."""
+    policy = require_reasoning(reasoning)
     require_key(provider)
-    with llm_context(provider, model):
+    with llm_context(provider, model, reasoning=policy):
         comparisons = [_compare(traj) for traj in load_trajectories(path)]
     emit("demo", DemoData(comparisons=comparisons))
 

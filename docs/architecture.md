@@ -41,7 +41,7 @@ as an unknown option, as the same JSON error envelope.
 | Data models | `trajectory.py`, `results.py` and `content.py`: `Trajectory`, `Report`, `CheckResult`, `Finding`, `Artifact`. |
 | `disposition_rules.py` | How a finding's check, verdict and severity map to pass, review or block. `VerdictPolicy` passes its choices; a `Report` uses the defaults for findings without a disposition. |
 | `providers.py` | The supported providers, their model lists and API keys, and building a client. |
-| `llm/` | The structured `call()` and `vote()`, the provider clients, response caching, and spend budgets. |
+| `llm/` | The structured `call()` and `vote()`, the provider clients, the reasoning setting and per-model table, response caching, and spend budgets. |
 | `prompts/` | Every prompt attest sends, one module per feature, with `PROMPT_VERSION` in `prompts/version.py`. |
 | `utils/` | Small stateless helpers shared across features: unified-diff parsing, hidden-Unicode and encoded-payload scanning, strict JSON and YAML loading. |
 

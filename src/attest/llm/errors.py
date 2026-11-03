@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import ValidationError
 
+_INSTRUCTOR_TRUNCATED = "IncompleteOutputException"
 _EMPTY_MARKERS = ("has no attribute 'parts'", "'NoneType' object is not iterable")
 
 ConfigProblem = Literal["authentication", "permission", "model_not_found"]
@@ -21,6 +22,14 @@ _CONFIG_MESSAGE: dict[ConfigProblem, str] = {
     "permission": "The API key isn't allowed to use this model or endpoint (HTTP 403).",
     "model_not_found": "The provider doesn't recognise this model (HTTP 404). Check the model id.",
 }
+
+
+class TruncatedOutput(RuntimeError):
+    """The model stopped at `max_tokens` before it finished the structured answer.
+
+    Often the model spent its output budget reasoning. It is not retried, since the same
+    request would stop in the same place; checks report the call as `unchecked`.
+    """
 
 
 class ProviderConfigError(RuntimeError):
@@ -55,6 +64,14 @@ def is_transient(err: Exception) -> bool:
 def api_error(err: Exception) -> BaseException | None:
     """The provider's HTTP error (auth, billing, bad request...) anywhere in the cause chain."""
     return next((e for e in _cause_chain(err) if _http_status(e) is not None), None)
+
+
+def is_truncated(err: Exception) -> bool:
+    """The output was cut off at the token limit (`TruncatedOutput`, or instructor's equivalent)."""
+    return any(
+        isinstance(cause, TruncatedOutput) or type(cause).__name__ == _INSTRUCTOR_TRUNCATED
+        for cause in _cause_chain(err)
+    )
 
 
 def is_empty_response(err: Exception) -> bool:

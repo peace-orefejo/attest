@@ -8,7 +8,7 @@ import pytest
 from pydantic import BaseModel
 
 import run
-from attest import Attest, Budget
+from attest import Attest, Budget, ReasoningPolicy
 from bench_cases import CHECKS, SPLITS
 from bench_check_metrics import Prices, check_metrics
 from bench_grade import GRADERS, Graded, GradeSettings
@@ -366,3 +366,33 @@ def test_external_datasets_folder_gives_a_private_report(
     assert keyed.case_id_key is not None and "secret" not in keyed_out.read_text()
     assert not {row.id for row in keyed.cases} & {row.id for row in report.cases}
     assert "is not set" not in capsys.readouterr().err
+
+
+def test_reasoning_is_parsed_passed_to_the_judge_and_recorded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, Any] = {}
+
+    def fake_run(judge: Attest, datasets: Datasets, **kwargs: Any) -> BenchmarkReport:
+        seen["policy"] = judge.reasoning
+        seen["settings"] = kwargs["settings"]
+        raise SystemExit(0)
+
+    monkeypatch.setattr(run, "run_benchmark", fake_run)
+    with pytest.raises(SystemExit):
+        run.main(["--check", "role_adherence", "--reasoning", "role=high,default=off"])
+    assert seen["policy"] == ReasoningPolicy(default="off", checks={"role": "high"})
+    assert seen["settings"].reasoning == "default=off,role=high"
+
+
+def test_an_offline_run_records_no_reasoning(tmp_path: Path) -> None:
+    out = tmp_path / "offline.json"
+    assert run.main(["--offline", "--out", str(out)]) == 0
+    assert BenchmarkReport.model_validate_json(out.read_text()).settings.reasoning is None
+
+
+def test_a_bad_reasoning_setting_is_refused(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exc:
+        run.main(["--offline", "--reasoning", "extreme"])
+    assert exc.value.code == 2
+    assert "--reasoning" in capsys.readouterr().err

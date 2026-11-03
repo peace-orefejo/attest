@@ -34,8 +34,27 @@ All notable changes to `agent-attest` are documented here. This project follows
   cases (one config per check, a generated card with the draft-label status, provenance,
   licences and citations, and a manifest with the `dataset_version`) and uploads it with
   `huggingface_hub`, installed by the new optional `hf` dependency group.
+- `Attest(reasoning=...)` and `--reasoning` on every command that uses a model choose how much
+  the grading model may reason: `auto` (default), `off`, `low`, `medium` or `high`, or a level
+  per check or call site (`{"faithfulness": "medium", "default": "auto"}`, or
+  `ReasoningPolicy`). Each report records the level each call site used in
+  `metadata["reasoning"]`. See [reasoning](https://peace-orefejo.github.io/attest/providers/#reasoning).
+- `TruncatedOutput`, raised by `attest.llm.call` when the model stops at its output limit
+  before finishing the answer. It isn't retried, since the same request would stop in the same
+  place.
+- Benchmark: `run.py --reasoning` sets the judge's reasoning and records it in the report
+  settings, so `compare.py` refuses to compare runs at different levels, or a new run with a
+  report written before the setting existed.
 
 ### Changed
+- attest now sends a reasoning setting to the models it knows (Claude Haiku, Sonnet and Opus 5.5,
+  OpenAI `gpt-6` models, Gemini 3.8 Flash, 3.5 Flash-Lite and 4 Argon). The default, `auto`, is
+  the provider's adaptive thinking at low effort; before, each provider's own default applied
+  (medium effort on Claude Haiku 5.5). Other models receive no reasoning setting, as before.
+- Calls that may reason get extra output-token room for it (4,096 tokens at `auto`), so small
+  caps such as the 300-token injection confirmations can no longer be used up by reasoning.
+- Reasoning tokens Gemini reports separately (`thoughts_token_count`) now count as output tokens
+  in `usage`. Anthropic and OpenAI already included them.
 - **Breaking:** `Report.passed` now means the run passed: `verdict == "pass"`. It used to mean
   every check passed, so a run needing review could read `passed: true`. The old meaning is
   `Report.checks_passed`. In `attest run`'s JSON, `passed` counts runs whose verdict is `pass`
@@ -86,6 +105,11 @@ All notable changes to `agent-attest` are documented here. This project follows
   `CheckResult.dispositions` or `Report.verdict`.
 
 ### Fixed
+- A failed or cut-off guideline check, guideline confirmation or review-writing call no longer
+  stops `Attest.review()`: the guideline check reports `unchecked` (a reported break that couldn't
+  be confirmed is `unchecked` too, not silently discarded), and a review attest couldn't write
+  has no decisions and a warning saying why. `BudgetExceeded` and `ProviderConfigError` still
+  stop it.
 - A usage error, such as an unknown option, a missing argument or `--max-claims abc`, prints the
   JSON `invalid_input` error on stdout (exit 2) for every command, instead of Click's usage box
   on stderr.

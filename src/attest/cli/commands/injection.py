@@ -13,7 +13,7 @@ from ...checks.injection import (
 )
 from ..context import llm_context, require_key
 from ..json_output import json_command
-from ..options import MODEL_OPTION, PROVIDER_OPTION
+from ..options import MODEL_OPTION, PROVIDER_OPTION, REASONING_OPTION, require_reasoning
 from ..single_check import run_single_check
 
 
@@ -27,6 +27,7 @@ def injection(
     ),
     provider: str = PROVIDER_OPTION,
     model: str | None = MODEL_OPTION,
+    reasoning: str = REASONING_OPTION,
     patterns: Path | None = typer.Option(
         None, "--patterns", help="JSON file containing additional named regex patterns."
     ),
@@ -43,10 +44,11 @@ def injection(
     ),
 ) -> None:
     "Flag prompt-injection payloads in tool outputs — deterministic, NO API key (unless --deep)."
+    policy = require_reasoning(reasoning)
     if deep:
         require_key(provider)
     detectors = _detectors(patterns, patterns_only=patterns_only)
-    with llm_context(provider, model, enabled=deep):
+    with llm_context(provider, model, enabled=deep, reasoning=policy):
         check = partial(
             check_injection,
             deep=deep,

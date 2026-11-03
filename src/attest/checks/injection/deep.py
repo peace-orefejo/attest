@@ -55,6 +55,7 @@ def check_authorization(traj: Trajectory, untrusted_view: str, samples: int = 3)
         output=_AuthOut,
         key=lambda out: out.unauthorized,
         samples=samples,
+        site="injection.deep",
     )
 
 

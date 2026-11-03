@@ -33,6 +33,11 @@ class GradeSettings(BaseModel):
     offline: bool = False
     answer_kind: str = "factual"
     appropriate: bool = False
+    reasoning: str | None = None
+    """The judge's reasoning setting in `--reasoning` form, such as "auto" or
+    "default=auto,faithfulness=medium". None for an offline run, and for reports written before
+    the setting existed (those ran at each provider's own default), so they never match a
+    report that set one."""
 
     @property
     def check_answer(self) -> bool:

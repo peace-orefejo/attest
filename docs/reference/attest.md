@@ -11,6 +11,8 @@ The public API, importable as `from attest import ...`.
 
 ::: attest.Attest
 
+::: attest.ReasoningPolicy
+
 ## Runs
 
 ::: attest.Trajectory

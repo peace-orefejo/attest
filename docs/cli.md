@@ -6,8 +6,14 @@ description: "The attest command line for AI agent evaluation: run, tools, injec
 # Command line
 
 Run commands take a `.json` file with one run, or a `.jsonl` file with one run per line. Every
-command prints [JSON](json-output.md). Commands that use a model accept `--provider` (`-p`) and
-`--model` (`-m`).
+command prints [JSON](json-output.md). Commands that use a model accept `--provider` (`-p`),
+`--model` (`-m`) and `--reasoning`.
+
+`--reasoning` sets how much the grading model may reason before answering: `auto` (the default:
+the provider's adaptive thinking at low effort), `off`, `low`, `medium` or `high`. Set a level
+per check or call site with pairs, such as `--reasoning faithfulness=medium,default=auto`. An
+unknown level or key is invalid input (exit 2). See [reasoning](providers.md#reasoning) for what
+each model receives and the cost trade-off.
 
 | Command | Does | Needs a key? |
 |---|---|---|

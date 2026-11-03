@@ -221,7 +221,9 @@ def _offline_judges(monkeypatch, *, judge_passed: bool, grounded: bool) -> None:
     )
     module = sys.modules["attest.cli.commands.demo"]
     monkeypatch.setattr("attest.cli.context.resolve_key", lambda provider: "sk-test")
-    monkeypatch.setattr(module, "llm_context", lambda provider, model: contextlib.nullcontext())
+    monkeypatch.setattr(
+        module, "llm_context", lambda provider, model, **_: contextlib.nullcontext()
+    )
     monkeypatch.setattr(
         module,
         "naive_judge",

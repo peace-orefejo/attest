@@ -4,16 +4,25 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
+from pydantic import BaseModel, Field
+
+from ...llm import BudgetExceeded, ProviderConfigError
+from ...utils.failures import failure_reason
 from ..evidence import EvidenceLimits
 from ..gate import gate
 from ..gate.defaults import DEFAULT_MODES
-from ..guidelines import GuidelinesInput, load_guidelines
+from ..guidelines import GuidelinesInput, ReviewGuidelines, load_guidelines
 from ..injection import check_code_injection
 from ..models import GateDecision, GateMode, PullRequest, ReviewOutput
 from ..writer import write_review
 from .grade import FAITHFULNESS_CHECK, Evaluator, Graded, grade
 from .models import OutputDecision, ReviewResult
-from .pr_evidence import guideline_warnings, injection_warnings, with_pr_evidence
+from .pr_evidence import (
+    guideline_warnings,
+    injection_warnings,
+    with_pr_evidence,
+    writer_warnings,
+)
 
 
 def review(
@@ -29,7 +38,8 @@ def review(
 ) -> ReviewResult:
     """Scan the pull request for injection once, then grade and gate each output on its evidence.
 
-    With no `outputs`, attest writes the review itself, following `guidelines`.
+    With no `outputs`, attest writes the review itself, following `guidelines`; if that call
+    fails, the result has no decisions and a warning says why.
     `guidelines` are the team's review rules (markdown paths or text). They are evidence, so an
     issue citing one can be checked, and `follow_guidelines` drops outputs that break one. Without
     them, attest's own reviewer follows the built-in general standard, and outputs are checked
@@ -40,7 +50,8 @@ def review(
     chosen: dict[str, GateMode] = dict(modes) if modes else {}
     _check_modes(chosen)
     rules = load_guidelines(guidelines)
-    source = write_review(pr, guidelines=rules, limits=limits) if outputs is None else outputs
+    written = _write(pr, rules, limits) if outputs is None else None
+    source = written.outputs if written is not None else outputs or []
     filled = [with_pr_evidence(output, pr) for output in source]
     injection = check_code_injection(pr, filled, deep=deep)
     decisions: list[OutputDecision] = []
@@ -60,9 +71,30 @@ def review(
         injection=injection,
         guidelines=rules,
         written=outputs is None,
-        warnings=[*guideline_warnings(rules, pr), *injection_warnings(injection)],
+        warnings=[
+            *writer_warnings(written.failure if written else None),
+            *guideline_warnings(rules, pr),
+            *injection_warnings(injection),
+        ],
         outputs=list(source),
     )
+
+
+class _Written(BaseModel):
+    outputs: list[ReviewOutput] = Field(default_factory=list[ReviewOutput])
+    failure: str | None = None
+
+
+def _write(pr: PullRequest, rules: ReviewGuidelines, limits: EvidenceLimits | None) -> _Written:
+    """attest's own review, or why it wrote none; a failed call never aborts the review."""
+    if not pr.diffs:
+        raise ValueError("The pull request has no diffs to review.")
+    try:
+        return _Written(outputs=write_review(pr, guidelines=rules, limits=limits))
+    except (BudgetExceeded, ProviderConfigError):
+        raise
+    except Exception as error:
+        return _Written(failure=failure_reason("Writing the review", error))
 
 
 def _check_modes(modes: Mapping[str, GateMode]) -> None:

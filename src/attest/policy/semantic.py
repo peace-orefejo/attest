@@ -52,6 +52,7 @@ def _judge(rule: EvaluationRule, context: str, *, samples: int) -> PolicyVerdict
         output=PolicyVerdict,
         key=lambda result: result.compliant,
         samples=samples,
+        site="policy",
     )
 
 

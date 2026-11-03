@@ -154,10 +154,13 @@ def test_failed_review_grading_drops_every_output(grader):
     assert result.decisions[0].reasons[0].metadata["checked"] is False
 
 
-def test_failed_guideline_check_raises_a_clear_error(grader):
+def test_failed_guideline_check_is_unchecked_and_the_review_finishes(grader):
     rules = parse_guidelines("- Name the changed line.\n", "REVIEW.md")
-    with pytest.raises((ProviderError, TimeoutError, RuntimeError)):
-        grader.review(PR, OUTPUTS, guidelines=rules)
+    result = grader.review(PR, OUTPUTS, guidelines=rules)
+    notes = result.decisions[0].notes
+    assert [f.verdict for f in notes] == ["unchecked"]
+    assert "The guideline check failed" in notes[0].reason
+    assert result.kept == []
 
 
 MODEL_PATHS = pytest.mark.parametrize(

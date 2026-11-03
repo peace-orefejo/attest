@@ -11,7 +11,14 @@ from ...code_review.gate.defaults import DEFAULT_MODES
 from ...code_review.models import GATE_MODES, GateMode
 from ..context import require_key
 from ..json_output import emit, json_command
-from ..options import MAX_CLAIMS_OPTION, MODEL_OPTION, PROVIDER_OPTION, require_max_claims
+from ..options import (
+    MAX_CLAIMS_OPTION,
+    MODEL_OPTION,
+    PROVIDER_OPTION,
+    REASONING_OPTION,
+    require_max_claims,
+    require_reasoning,
+)
 
 
 class ReviewFile(BaseModel):
@@ -47,15 +54,17 @@ def review(
     max_claims: int = MAX_CLAIMS_OPTION,
     provider: str = PROVIDER_OPTION,
     model: str | None = MODEL_OPTION,
+    reasoning: str = REASONING_OPTION,
 ) -> None:
     """Check each code review output against the diff and your review rules (needs a key)."""
     request = _load_review(path)
     modes = _parse_modes(mode)
     rules = _load_rules(guidelines)
     require_max_claims(max_claims)
+    policy = require_reasoning(reasoning)
     require_key(provider)
     try:
-        result = Attest(provider=provider, model=model).review(
+        result = Attest(provider=provider, model=model, reasoning=policy).review(
             request.pr,
             request.outputs,
             guidelines=rules,

@@ -10,10 +10,19 @@ import instructor
 from pydantic import BaseModel
 
 from ..prompts.guard import GUARD
-from .budget import before_call, record_cache_hit, record_completion
+from .budget import before_call, record_cache_hit
 from .client import resolve_client
-from .errors import api_error, config_error, is_empty_response, is_transient
+from .dispatch import create
+from .errors import (
+    TruncatedOutput,
+    api_error,
+    config_error,
+    is_empty_response,
+    is_transient,
+    is_truncated,
+)
 from .protocol import LLMClient
+from .reasoning_scope import reasoning_for
 from .response_cache import cache_key, response_cache
 
 if TYPE_CHECKING:
@@ -28,6 +37,10 @@ _EMPTY_RESPONSE_MESSAGE = (
     "thinking model exhausting its output-token budget, or a safety/recitation block. "
     "Try a larger max_tokens or a different model."
 )
+_TRUNCATED_MESSAGE = (
+    "The provider stopped at the output-token limit before finishing the answer, often "
+    "because the model spent it reasoning. Try a lower reasoning level or a larger max_tokens."
+)
 
 
 def call(
@@ -41,6 +54,7 @@ def call(
     sample: int = 0,
     prefix: str = "",
     reuse: Reuse | None = None,
+    site: str | None = None,
 ) -> T:
     """Return a validated instance of the Pydantic `output` model from the LLM.
 
@@ -53,7 +67,12 @@ def call(
     `prefix` is shared material (e.g. the evidence) placed first in the user turn so provider
     prompt caches can reuse it. `reuse` says what the caller will resend: "prefix" or the
     "full" prompt; on Anthropic it places cache breakpoints there, elsewhere caching is implicit.
+
+    `site` names the call site (see `attest.llm.reasoning.CALL_SITES`); the active reasoning
+    policy picks its level, and attest's own provider clients add room for that reasoning to
+    `max_tokens`. An answer cut off at the token limit raises `TruncatedOutput` at once.
     """
+    reasoning = reasoning_for(site)
     store = response_cache.get()
     key = cache_key(system, user, output, sample, prefix) if store is not None else ""
     if store is not None and key in store:
@@ -71,11 +90,15 @@ def call(
     for _ in range(max(1, attempts)):
         before_call(guarded_system, prefix, user)
         try:
-            result: object = _create(resolved, output, max_tokens, messages)
+            result: object = create(resolved, output, max_tokens, messages, reasoning)
         except Exception as error:
             misconfigured = config_error(error)
             if misconfigured is not None:
                 raise misconfigured from None
+            if isinstance(error, TruncatedOutput):
+                raise
+            if is_truncated(error):
+                raise TruncatedOutput(_TRUNCATED_MESSAGE) from error
             if is_transient(error):
                 last_error = error
                 continue
@@ -105,6 +128,7 @@ def vote(
     key: Callable[[T], Hashable],
     samples: int = 3,
     client: LLMClient | None = None,
+    site: str | None = None,
 ) -> T:
     """Self-consistency: sample the judge `samples` times and return the majority `key(...)`.
 
@@ -123,6 +147,7 @@ def vote(
             client=client,
             sample=sample,
             reuse="full" if total > 1 else None,
+            site=site,
         )
         results.append(result)
         tally[key(result)] += 1
@@ -152,21 +177,3 @@ def _cached_blocks(prefix: str, user: str, reuse: Reuse) -> list[dict[str, objec
         tail["cache_control"] = _EPHEMERAL
     blocks.append(tail)
     return blocks
-
-
-def _create(
-    client: LLMClient,
-    output: type[T],
-    max_tokens: int,
-    messages: list[ChatCompletionMessageParam],
-) -> T:
-    with_completion = getattr(client, "create_with_completion", None)
-    if with_completion is None:
-        return client.create(
-            response_model=output, max_tokens=max_tokens, temperature=0, messages=messages
-        )
-    result, completion = with_completion(
-        response_model=output, max_tokens=max_tokens, temperature=0, messages=messages
-    )
-    record_completion(completion)
-    return result

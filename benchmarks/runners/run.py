@@ -17,7 +17,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from attest import Attest, Budget
+from attest import Attest, Budget, ReasoningPolicy
+from attest.llm.reasoning import describe_reasoning, parse_reasoning
 from bench_cases import CHECKS, SPLITS, CheckName
 from bench_check_metrics import Prices
 from bench_grade import OFFLINE_CHECKS, GradeSettings
@@ -53,6 +54,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--appropriate", action="store_true", help="tool_use: also run the tool-choice check"
     )
     parser.add_argument("--answer-kind", default="factual", help="faithfulness answer kind")
+    parser.add_argument(
+        "--reasoning",
+        default="auto",
+        help="judge reasoning: auto (default), off, low, medium or high, or per check such as "
+        "faithfulness=medium,default=auto. Recorded in the report's settings",
+    )
     parser.add_argument("--price-per-mtok-in", type=float, default=None)
     parser.add_argument("--price-per-mtok-out", type=float, default=None)
     parser.add_argument(
@@ -82,6 +89,10 @@ def main(argv: list[str] | None = None) -> int:
     if not 0.0 <= args.min_coverage <= 1.0:
         parser.error("--min-coverage must be between 0 and 1")
     checks = _selected_checks(args.check)
+    try:
+        reasoning = parse_reasoning(args.reasoning)
+    except ValueError as exc:
+        parser.error(f"--reasoning: {exc}")
     if args.offline and args.check and "all" not in args.check:
         needs_model = [c for c in checks if c not in OFFLINE_CHECKS]
         if needs_model:
@@ -94,12 +105,15 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     report = run_benchmark(
-        _judge(args),
+        _judge(args, reasoning),
         datasets,
         checks=checks,
         split=args.split,
         settings=GradeSettings(
-            offline=args.offline, answer_kind=args.answer_kind, appropriate=args.appropriate
+            offline=args.offline,
+            answer_kind=args.answer_kind,
+            appropriate=args.appropriate,
+            reasoning=None if args.offline else describe_reasoning(reasoning),
         ),
         prices=Prices(input=args.price_per_mtok_in, output=args.price_per_mtok_out),
         min_coverage=args.min_coverage,
@@ -132,10 +146,12 @@ def _selected_checks(chosen: list[str] | None) -> list[CheckName]:
     return [check for check in CHECKS if check in chosen]
 
 
-def _judge(args: argparse.Namespace) -> Attest:
+def _judge(args: argparse.Namespace, reasoning: ReasoningPolicy) -> Attest:
     budget = Budget(max_calls=args.max_calls) if args.max_calls is not None else None
     cache = str(args.cache_dir) if args.cache_dir is not None else False
-    return Attest(provider=args.provider, model=args.model, cache=cache, budget=budget)
+    return Attest(
+        provider=args.provider, model=args.model, cache=cache, budget=budget, reasoning=reasoning
+    )
 
 
 if __name__ == "__main__":

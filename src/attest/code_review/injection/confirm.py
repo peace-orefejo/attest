@@ -27,7 +27,13 @@ def confirm(
     if not budget.spend(len(user)):
         return None
     try:
-        return call(system=CONFIRM_SYSTEM, user=user, output=ConfirmOut, max_tokens=300)
+        return call(
+            system=CONFIRM_SYSTEM,
+            user=user,
+            output=ConfirmOut,
+            max_tokens=300,
+            site="injection.confirm",
+        )
     except (BudgetExceeded, ProviderConfigError):
         raise
     except Exception:
