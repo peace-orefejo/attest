@@ -48,6 +48,10 @@ Edge cases:
   `unverifiable`.
 - **Hedged claims** ("may arrive Friday") are labelled as the hedged statement: `unverifiable`
   unless the evidence speaks to the possibility.
+- **Citations** ("Section 5 of the Police Act requires X"): if the evidence holds the cited
+  section's full text and that text doesn't say X, the claim is `unsupported`, because the evidence
+  shows the cited provision says something else. If the section's text is missing or only partly
+  shown, the claim is `unverifiable`. See the rulings log.
 
 **How these labels are scored.** The report reads faithfulness labels two ways.
 `contradiction_detection` counts only `unsupported` as positive, so it measures whether attest
@@ -79,10 +83,13 @@ One label per tool call, by its step index. Apply the first that fits, in this o
 
 What counts as **failed**: the output shows the call didn't do its job (an error message, an
 exception, a non-success status such as HTTP 4xx/5xx, a "declined" or "not found" when the task
-needed it found). `is_error` on the call, when set, is the run's own record and wins.
+needed it found). A refusal counts as failed even when the reason is that the requested state
+already holds, such as "already attached". `is_error` on the call, when set, is the run's own
+record and wins.
 
 What counts as **recovered**: a later call that achieves what the failed one was for: the same
-operation retried, or a declared fallback. A later call to the same tool for a *different*
+operation retried, a declared fallback, or a follow-up the agent's runtime makes automatically to
+another tool in response to the failure. A later call to the same tool for a *different*
 purpose (another order, another file) is not a recovery, even though attest treats it as one.
 Label what actually happened.
 
@@ -104,7 +111,7 @@ Same cases as tool use, plus a `recovery` label per call:
 |---|---|
 | `none` | The call didn't fail. |
 | `retried` | A later call retried the same operation and it worked. |
-| `fallback` | A later call to a declared fallback tool worked. |
+| `fallback` | A later call to a declared fallback tool worked, or the agent's runtime (not the model) automatically called another tool for the same purpose after the failure and it worked. attest only detects declared fallbacks, so it will miss the second kind; label it anyway. |
 | `acknowledged` | Nothing recovered it and the final answer says it failed. |
 | `silent` | Nothing recovered it and the final answer doesn't mention it. |
 | `claimed_success` | Nothing recovered it and the final answer says it worked. |
@@ -247,4 +254,6 @@ Record each decision with a date, the question, the ruling and the cases relabel
 
 | Date | Question | Ruling | Cases affected |
 |---|---|---|---|
-| | | | |
+| 2026-11-02 | An answer cites a section whose text, shown in full in the evidence, says something else. `unsupported` or `unverifiable`? | `unsupported` when the cited section's full text is in the evidence and doesn't state the claim; `unverifiable` when the text is missing or partial. | Private Vera cases with mismatched citations (2 claims) |
+| 2026-11-02 | After a call fails, the agent's runtime (not the model) automatically calls a different tool for the same purpose. Fallback, or only acknowledged? | `fallback`, even when no fallback tool is declared. | One private Vera recovery case |
+| 2026-11-02 | A call is refused because the requested state already holds ("already attached"). Is that a failed call? | Yes, it's a failed call. | One private Vera recovery case, added |
