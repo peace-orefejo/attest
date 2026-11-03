@@ -254,6 +254,45 @@ def test_demo_json_names_the_outcome(tmp_path, monkeypatch):
     assert comparison["attest"]["passed"] is False
 
 
+def test_demo_reports_a_failed_naive_judge_and_exits_zero(tmp_path, monkeypatch):
+    from attest.llm import TruncatedOutput
+
+    _offline_judges(monkeypatch, judge_passed=True, grounded=True)
+
+    def cut_off(traj):
+        raise TruncatedOutput("stopped at max_tokens")
+
+    monkeypatch.setattr(sys.modules["attest.cli.commands.demo"], "naive_judge", cut_off)
+    path = tmp_path / "trajectory.json"
+    path.write_text(json.dumps(_trajectory()))
+    result = runner.invoke(app, ["demo", str(path)])
+    assert result.exit_code == 0, result.output
+    comparison = _payload(result)["data"]["comparisons"][0]
+    assert comparison["outcome"] == "judge_unchecked"
+    assert comparison["judge"] is None
+    assert "TruncatedOutput" in comparison["judge_error"]
+
+
+def test_demo_names_an_unchecked_attest_result_inconclusive(tmp_path, monkeypatch):
+    from attest.results import CheckResult, Finding, Severity
+
+    _offline_judges(monkeypatch, judge_passed=True, grounded=True)
+    unchecked = Finding(
+        severity=Severity.WARN, verdict="unverifiable", subject="c", metadata={"checked": False}
+    )
+    monkeypatch.setattr(
+        sys.modules["attest.cli.commands.demo"],
+        "judge_trajectory",
+        lambda traj, extract, verify: CheckResult(
+            check="faithfulness", passed=True, findings=[unchecked]
+        ),
+    )
+    path = tmp_path / "trajectory.json"
+    path.write_text(json.dumps(_trajectory()))
+    result = runner.invoke(app, ["demo", str(path)])
+    assert _payload(result)["data"]["comparisons"][0]["outcome"] == "inconclusive"
+
+
 def _fake_evaluate(monkeypatch, *, stop_after: int | None = None):
     from attest import Attest, BudgetExceeded
     from attest.results import CheckResult, Report

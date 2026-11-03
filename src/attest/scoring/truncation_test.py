@@ -9,6 +9,7 @@ run or review, and is sent only once.
 import types
 
 from attest import Attest, EvaluationPolicy, EvaluationRule
+from attest.checks.judge_baseline import JudgeVerdict
 from attest.code_review import PullRequest, ReviewOutput
 from attest.code_review.guidelines import parse_guidelines
 from attest.code_review.guidelines.check import check_guidelines
@@ -185,3 +186,25 @@ def test_a_whole_review_finishes_when_every_call_is_cut_off():
     assert result.kept == []
     assert "unchecked" in {f.verdict for f in result.decisions[0].reasons}
     assert result.decisions[0].notes == []
+
+
+def _demo(answers):
+    from attest.cli.commands.demo import _compare
+
+    client, messages = _claude(answers)
+    with using(client):
+        return _compare(_run()), messages
+
+
+def test_demo_shows_a_cut_off_attest_check_as_inconclusive_not_passed():
+    comparison, messages = _demo({"JudgeVerdict": JudgeVerdict(passed=True, reason="ok")})
+    assert comparison.outcome == "inconclusive"
+    assert comparison.judge == JudgeVerdict(passed=True, reason="ok")
+    assert messages.sent == ["JudgeVerdict", "ClaimsOut"]
+
+
+def test_demo_shows_a_cut_off_naive_judge_as_unchecked_not_a_failure():
+    comparison, _ = _demo({})
+    assert comparison.outcome == "judge_unchecked"
+    assert comparison.judge is None
+    assert "TruncatedOutput" in (comparison.judge_error or "")

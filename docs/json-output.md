@@ -47,7 +47,7 @@ The exit code says whether the command ran, not whether the agent passed.
 | `run` | `trajectories`: one entry per graded run, each a `task` and its `report`. Then `total` (runs in the file), `evaluated` (runs graded), `verdicts` (how many runs got each verdict: `pass`, `review`, `block`), `passed` (runs whose verdict is `pass`), `checks_passed` (runs whose checks all passed, including runs that still need review), `mean_overall_score`, `usage` (calls and tokens), and `budget_exceeded`: why a budget stopped the run, or `null`. |
 | `tools`, `injection`, `role` | `trajectories`: one entry per run, each a `task` and its `result` |
 | `review` | A [`ReviewResult`](code-review/outputs.md#reviewresult) |
-| `demo` | `comparisons`: one per run, with `task`, `answer`, the plain LLM judge's verdict (`judge`), attest's faithfulness result (`attest`), and `outcome`: `caught` (attest caught a false claim the judge passed), `both_caught`, `both_passed` or `judge_only` |
+| `demo` | `comparisons`: one per run, with `task`, `answer`, the plain LLM judge's verdict (`judge`), attest's faithfulness result (`attest`), and `outcome`: `caught` (attest caught a false claim the judge passed), `both_caught`, `both_passed`, `judge_only`, `inconclusive` (attest found nothing false but left claims unchecked) or `judge_unchecked` (the judge's call failed or was cut off: `judge` is `null` and `judge_error` says why) |
 | `stats` | `rate`, `low`, `high`, `n` |
 | `models` | `provider`, `source` (`live` or `curated`), `models` |
 

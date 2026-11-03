@@ -111,3 +111,6 @@ attest demo examples/trajectory.json
 
 Each comparison's `outcome` says who caught what: `caught` means attest found a false claim the
 LLM judge passed. The other outcomes are `both_caught`, `both_passed` and `judge_only`.
+`inconclusive` means attest found nothing false but couldn't check every claim (a call
+failed or was cut off), so it is not a pass. `judge_unchecked` means the plain judge's call
+failed or was cut off: its `judge` is `null` and `judge_error` says why.
