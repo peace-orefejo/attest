@@ -76,3 +76,16 @@ def test_llm_context_without_cache_leaves_store_unset():
     judge = Attest(key="sk-test")
     with judge._llm_context(required=True):
         assert response_cache_module.response_cache.get() is None
+
+
+def test_cache_key_depends_on_the_reasoning_level():
+    from pydantic import BaseModel as _Model
+
+    class Out(_Model):
+        value: int
+
+    keys = {
+        response_cache_module.cache_key("s", "u", Out, 0, "", level)
+        for level in ("auto", "off", "low", "medium", "high")
+    }
+    assert len(keys) == 5

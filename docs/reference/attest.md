@@ -11,6 +11,8 @@ The public API, importable as `from attest import ...`.
 
 ::: attest.Attest
 
+::: attest.ReasoningPolicy
+
 ## Runs
 
 ::: attest.Trajectory
@@ -90,3 +92,11 @@ The public API, importable as `from attest import ...`.
 ::: attest.difference_is_real
 
 ::: attest.Proportion
+
+## Errors
+
+These stop an evaluation instead of becoming `unchecked` findings.
+
+::: attest.ProviderConfigError
+
+::: attest.BudgetExceeded

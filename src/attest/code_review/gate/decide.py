@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ...checks.claim_findings import is_unchecked
+from ...disposition_rules import is_unjudged
 from ...results import CheckResult, Finding, Report, Severity
 from ..guidelines import GUIDELINES_CHECK
 from ..models import GateDecision, GateMode, OutputType
@@ -22,7 +23,9 @@ def gate(
 
     `reasons` lists the findings that drop it. `notes` lists findings shown beside it that do not.
     Findings against the built-in general standard are always notes; only your own rules drop.
-    A claim no verifier judged (a failed or skipped call) drops the output in every mode.
+    A claim no verifier judged (a failed or skipped call) drops the output in every mode, and so
+    does a guideline check against your own rules that couldn't run, or a reported break of one
+    that couldn't be confirmed.
     """
     resolved = _resolve_mode(output_type, mode)
     planted = injection_findings(injection, paths, output_index)
@@ -57,6 +60,6 @@ def _guideline_findings(report: Report) -> FindingSplit:
     if result.metadata.get("builtin"):
         return FindingSplit(notes=[f for f in result.findings if f.severity is not Severity.PASS])
     return FindingSplit(
-        drops=[f for f in result.findings if f.severity is Severity.FAIL],
-        notes=[f for f in result.findings if f.severity is Severity.WARN],
+        drops=[f for f in result.findings if f.severity is Severity.FAIL or is_unjudged(f)],
+        notes=[f for f in result.findings if f.severity is Severity.WARN and not is_unjudged(f)],
     )

@@ -4,20 +4,31 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
+from pydantic import BaseModel, Field
+
+from ...disposition_rules import is_unjudged
 from ...exclusions import Exclusions, ExclusionsInput, as_exclusions
+from ...llm import BudgetExceeded, ProviderConfigError
 from ...results import CheckResult
+from ...utils.failures import failure_reason
 from ..evidence import EvidenceLimits
 from ..evidence.excluded import hide_output, hide_pull_request, without_excluded_diffs
 from ..gate import gate
 from ..gate.defaults import DEFAULT_MODES
-from ..guidelines import GuidelinesInput, load_guidelines
+from ..guidelines import GUIDELINES_CHECK, GuidelinesInput, ReviewGuidelines, load_guidelines
 from ..injection import check_code_injection
 from ..models import GateDecision, GateMode, PullRequest, ReviewOutput
 from ..writer import write_review
 from .excluded import exclusion_warnings
 from .grade import FAITHFULNESS_CHECK, Evaluator, Graded, grade
 from .models import OutputDecision, ReviewResult
-from .pr_evidence import guideline_warnings, injection_warnings, with_pr_evidence
+from .pr_evidence import (
+    guideline_warnings,
+    injection_warnings,
+    unchecked_guideline_warnings,
+    with_pr_evidence,
+    writer_warnings,
+)
 
 
 def review(
@@ -34,13 +45,16 @@ def review(
 ) -> ReviewResult:
     """Scan the pull request for injection once, then grade and gate each output on its evidence.
 
-    With no `outputs`, attest writes the review itself, following `guidelines`.
+    With no `outputs`, attest writes the review itself, following `guidelines`; if that call
+    fails, the result has no decisions and a warning says why.
     `guidelines` are the team's review rules (markdown paths or text). They are evidence, so an
     issue citing one can be checked, and `follow_guidelines` drops outputs that break one. Without
     them, attest's own reviewer follows the built-in general standard, and outputs are checked
     for faithfulness only. Outputs without their own diffs or
     changed-file list use the pull request's. `evaluate` turns a run into a Report with a
     faithfulness result, and `modes` overrides the default gate mode per output type.
+    An output whose check against your rules couldn't run, or with a reported break that couldn't
+    be confirmed, is dropped in every mode, and a warning names it.
 
     `exclude` takes gitignore-style patterns (or an `Exclusions`). Excluded files' contents
     never reach a model or the injection scan; each appears as a one-line note, and an output
@@ -52,20 +66,20 @@ def review(
     rules = load_guidelines(guidelines)
     hidden_pr = hide_pull_request(pr, exclusions)
     visible = hidden_pr.pr
-    source = (
-        write_review(visible, guidelines=rules, limits=limits, exclude=exclusions)
-        if outputs is None
-        else outputs
-    )
+    written = _write(visible, rules, limits, exclusions) if outputs is None else None
+    source = written.outputs if written is not None else outputs or []
     hidden = [hide_output(with_pr_evidence(output, visible), exclusions) for output in source]
     filled = [item.output for item in hidden]
     injection = _scan(visible, filled, exclusions, deep=deep)
     excluded = _union(hidden_pr.excluded, *(item.excluded for item in hidden))
     decisions: list[OutputDecision] = []
+    unchecked: list[int] = []
     for index, output in enumerate(filled):
         graded = grade(
             output, evaluate, rules, follow=follow_guidelines, limits=limits, exclusions=exclusions
         )
+        if _rules_unchecked(graded):
+            unchecked.append(index)
         decision = gate(
             graded.report,
             output.output_type,
@@ -80,8 +94,11 @@ def review(
         injection=injection,
         guidelines=rules,
         written=outputs is None,
+        writer_failure=written.failure if written else None,
         warnings=[
+            *writer_warnings(written.failure if written else None),
             *guideline_warnings(rules, pr),
+            *unchecked_guideline_warnings(unchecked, rules),
             *injection_warnings(injection),
             *exclusion_warnings(excluded, exclusions, pr),
         ],
@@ -103,6 +120,34 @@ def _scan(
 
 def _union(*groups: list[str]) -> list[str]:
     return list(dict.fromkeys(path for group in groups for path in group))
+
+
+class _Written(BaseModel):
+    outputs: list[ReviewOutput] = Field(default_factory=list[ReviewOutput])
+    failure: str | None = None
+
+
+def _write(
+    pr: PullRequest,
+    rules: ReviewGuidelines,
+    limits: EvidenceLimits | None,
+    exclusions: Exclusions,
+) -> _Written:
+    """attest's own review, or why it wrote none; a failed call never aborts the review."""
+    if not pr.diffs:
+        raise ValueError("The pull request has no diffs to review.")
+    try:
+        written = write_review(pr, guidelines=rules, limits=limits, exclude=exclusions)
+        return _Written(outputs=written)
+    except (BudgetExceeded, ProviderConfigError):
+        raise
+    except Exception as error:
+        return _Written(failure=failure_reason("Writing the review", error))
+
+
+def _rules_unchecked(graded: Graded) -> bool:
+    result = graded.report.by(GUIDELINES_CHECK)
+    return result is not None and any(is_unjudged(f) for f in result.findings)
 
 
 def _check_modes(modes: Mapping[str, GateMode]) -> None:

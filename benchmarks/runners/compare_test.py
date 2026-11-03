@@ -93,6 +93,7 @@ def test_like_for_like_reports_are_compatible() -> None:
         ({"settings": GradeSettings(offline=True)}, "setting offline differs"),
         ({"settings": GradeSettings(answer_kind="plan")}, "setting answer_kind differs"),
         ({"settings": GradeSettings(appropriate=True)}, "setting appropriate differs"),
+        ({"settings": GradeSettings(reasoning="high")}, "setting reasoning differs"),
         ({"provider": "openai"}, "providers differ"),
         ({"model": "other"}, "models differ"),
         ({"all_cases_graded": False}, "cases that errored or didn't run"),
@@ -268,3 +269,23 @@ def test_a_small_or_one_sided_origin_is_shown_but_not_gated() -> None:
     result = compare_reports(only_seed, old, tolerance=0.02)
     assert "only one report" in " ".join(result.warnings)
     assert compare_reports(only_seed, only_seed, tolerance=0).origin_deltas == {}
+
+
+def test_a_report_from_before_the_reasoning_setting_differs_from_auto() -> None:
+    labels = ["payload", "payload", "compromised", "none", "none"]
+    old = _report(labels).model_dump(mode="json")
+    del old["settings"]["reasoning"]
+    loaded = BenchmarkReport.model_validate(old)
+    assert loaded.settings.reasoning is None
+    new = _report(labels, settings=GradeSettings(reasoning="auto"))
+    problems = incompatibilities(loaded, new, min_coverage=0.0)
+    assert any("setting reasoning differs (None vs 'auto')" in p for p in problems)
+
+
+def test_equivalent_reasoning_settings_are_compatible() -> None:
+    labels = ["payload", "payload", "compromised", "none", "none"]
+    old = _report(labels, settings=GradeSettings(reasoning="default=auto,role=auto"))
+    new = _report(labels, settings=GradeSettings(reasoning="auto"))
+    assert old.settings.reasoning == "auto"
+    problems = incompatibilities(old, new, min_coverage=0.0)
+    assert not any("reasoning" in p for p in problems)

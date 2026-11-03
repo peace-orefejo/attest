@@ -127,10 +127,15 @@ def build_client(
         from .llm.anthropic_client import AnthropicClient
 
         return AnthropicClient(model, resolved)
+    from .llm.instructor_client import InstructorClient
+
     target = f"{spec.prefix}/{model}"
-    if resolved:
-        return instructor.from_provider(target, api_key=resolved)
-    return instructor.from_provider(target)
+    inner = (
+        instructor.from_provider(target, api_key=resolved)
+        if resolved
+        else instructor.from_provider(target)
+    )
+    return InstructorClient(inner, provider=provider, model=model)
 
 
 def _gemini_chat_models(models: Iterable[object]) -> list[str]:

@@ -221,7 +221,9 @@ def _offline_judges(monkeypatch, *, judge_passed: bool, grounded: bool) -> None:
     )
     module = sys.modules["attest.cli.commands.demo"]
     monkeypatch.setattr("attest.cli.context.resolve_key", lambda provider: "sk-test")
-    monkeypatch.setattr(module, "llm_context", lambda provider, model: contextlib.nullcontext())
+    monkeypatch.setattr(
+        module, "llm_context", lambda provider, model, **_: contextlib.nullcontext()
+    )
     monkeypatch.setattr(
         module,
         "naive_judge",
@@ -250,6 +252,45 @@ def test_demo_json_names_the_outcome(tmp_path, monkeypatch):
     assert comparison["outcome"] == "caught"
     assert comparison["judge"]["passed"] is True
     assert comparison["attest"]["passed"] is False
+
+
+def test_demo_reports_a_failed_naive_judge_and_exits_zero(tmp_path, monkeypatch):
+    from attest.llm import TruncatedOutput
+
+    _offline_judges(monkeypatch, judge_passed=True, grounded=True)
+
+    def cut_off(traj):
+        raise TruncatedOutput("stopped at max_tokens")
+
+    monkeypatch.setattr(sys.modules["attest.cli.commands.demo"], "naive_judge", cut_off)
+    path = tmp_path / "trajectory.json"
+    path.write_text(json.dumps(_trajectory()))
+    result = runner.invoke(app, ["demo", str(path)])
+    assert result.exit_code == 0, result.output
+    comparison = _payload(result)["data"]["comparisons"][0]
+    assert comparison["outcome"] == "judge_unchecked"
+    assert comparison["judge"] is None
+    assert "TruncatedOutput" in comparison["judge_error"]
+
+
+def test_demo_names_an_unchecked_attest_result_inconclusive(tmp_path, monkeypatch):
+    from attest.results import CheckResult, Finding, Severity
+
+    _offline_judges(monkeypatch, judge_passed=True, grounded=True)
+    unchecked = Finding(
+        severity=Severity.WARN, verdict="unverifiable", subject="c", metadata={"checked": False}
+    )
+    monkeypatch.setattr(
+        sys.modules["attest.cli.commands.demo"],
+        "judge_trajectory",
+        lambda traj, extract, verify: CheckResult(
+            check="faithfulness", passed=True, findings=[unchecked]
+        ),
+    )
+    path = tmp_path / "trajectory.json"
+    path.write_text(json.dumps(_trajectory()))
+    result = runner.invoke(app, ["demo", str(path)])
+    assert _payload(result)["data"]["comparisons"][0]["outcome"] == "inconclusive"
 
 
 def _fake_evaluate(monkeypatch, *, stop_after: int | None = None):
@@ -426,6 +467,30 @@ def test_review_passes_guideline_files_and_writes_when_outputs_are_missing(tmp_p
     assert seen["outputs"] is None
     assert seen["guidelines"].name == "REVIEW.md"
     assert seen["follow_guidelines"] is False
+
+
+def test_review_exits_1_when_attest_could_not_write_the_review(tmp_path, monkeypatch):
+    from attest import Attest, CheckResult
+    from attest.code_review import ReviewResult
+
+    def fake(self, pr, outputs, **kwargs):
+        return ReviewResult(
+            injection=CheckResult(check="code_injection", passed=True),
+            decisions=[],
+            written=True,
+            writer_failure="Writing the review failed (TruncatedOutput: cut off).",
+            warnings=["attest's reviewer wrote no review, so nothing was checked or kept."],
+        )
+
+    monkeypatch.setattr(Attest, "review", fake)
+    monkeypatch.setattr("attest.cli.context.resolve_key", lambda provider: "sk-test")
+    path = tmp_path / "pr.json"
+    path.write_text(json.dumps({"pr": {"diffs": {"a.py": "+x = 1\n"}}}))
+    result = runner.invoke(app, ["review", str(path)])
+    assert result.exit_code == 1
+    payload = _payload(result)
+    assert payload["error"]["code"] == "command_failed"
+    assert "wrote no review" in payload["error"]["message"]
 
 
 def test_review_rejects_an_unreadable_guidelines_file(tmp_path):

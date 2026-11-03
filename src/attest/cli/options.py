@@ -3,6 +3,7 @@ from __future__ import annotations
 import typer
 
 from ..checks.verify import MAX_CLAIMS
+from ..llm.reasoning import ReasoningPolicy, parse_reasoning
 from ..providers import DEFAULT_PROVIDER
 
 PROVIDER_OPTION = typer.Option(
@@ -36,3 +37,22 @@ def require_max_claims(value: int) -> int:
     if value < 0:
         raise typer.BadParameter(f"must be 0 or more, not {value}.", param_hint="--max-claims")
     return value
+
+
+REASONING_OPTION = typer.Option(
+    "auto",
+    "--reasoning",
+    help=(
+        "How much the judge model may reason before answering: 'auto' (default: the "
+        "provider's adaptive thinking at low effort), 'off', 'low', 'medium' or 'high'. "
+        "Per check or call site: 'faithfulness=medium,default=auto'."
+    ),
+)
+
+
+def require_reasoning(value: str) -> ReasoningPolicy:
+    """`--reasoning` as a policy, rejected as invalid input when a level or key is unknown."""
+    try:
+        return parse_reasoning(value)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--reasoning") from exc

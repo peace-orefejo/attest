@@ -1,4 +1,4 @@
-"""Structured output through Anthropic's native `messages.parse`, without forced tool use."""
+"""Structured output through Anthropic's native JSON-schema outputs, without forced tool use."""
 
 from __future__ import annotations
 
@@ -7,10 +7,20 @@ from collections.abc import Mapping, Sequence
 from typing import Literal, TypeVar
 
 import instructor
-from anthropic import Anthropic, omit
-from anthropic.types import CacheControlEphemeralParam, MessageParam, TextBlockParam
-from anthropic.types.parsed_message import ParsedMessage
+from anthropic import Anthropic, Omit, omit, transform_schema
+from anthropic.types import (
+    CacheControlEphemeralParam,
+    Message,
+    MessageParam,
+    OutputConfigParam,
+    TextBlockParam,
+    ThinkingConfigParam,
+)
 from pydantic import BaseModel
+
+from .anthropic_answer import structured_answer
+from .reasoning import Reasoning, answer_room
+from .thinking import ClaudePlan, claude_plan, model_takes_reasoning
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -25,18 +35,28 @@ def accepts_temperature(model: str) -> bool:
 
 
 class AnthropicClient:
-    """Structured output through Anthropic's native `messages.parse` (no forced tool use).
+    """Structured output through Anthropic's native JSON-schema outputs (no forced tool use).
 
     Claude 5.5-generation models reject forced `tool_choice`, `anthropic` 1.x dropped the
     `temperature` keyword, and Claude Opus 4.7+ rejects sampling parameters outright, so this
     path uses JSON-schema structured outputs and only sends `temperature` to models that take it.
+    The answer is validated here rather than by the SDK's `messages.parse`, so a cut-off answer
+    raises `TruncatedOutput` carrying the billed message instead of a bare validation error.
+    A `reasoning` level becomes `thinking` and `output_config.effort` for the models listed in
+    `attest.llm.thinking`, with room for the thinking added to `max_tokens`.
     """
 
     provider = instructor.Provider.ANTHROPIC
+    supports_reasoning = True
 
     def __init__(self, model: str, api_key: str | None = None) -> None:
         self.model = model
         self.client = Anthropic(api_key=api_key) if api_key else Anthropic()
+
+    @property
+    def sends_reasoning(self) -> bool:
+        """Whether this model receives a reasoning setting (see `attest.llm.thinking`)."""
+        return model_takes_reasoning("anthropic", self.model)
 
     def create(
         self,
@@ -45,12 +65,14 @@ class AnthropicClient:
         messages: Sequence[Mapping[str, object]],
         max_tokens: int,
         temperature: float | None = None,
+        reasoning: Reasoning | None = None,
     ) -> T:
         result, _ = self.create_with_completion(
             response_model=response_model,
             messages=messages,
             max_tokens=max_tokens,
             temperature=temperature,
+            reasoning=reasoning,
         )
         return result
 
@@ -61,27 +83,45 @@ class AnthropicClient:
         messages: Sequence[Mapping[str, object]],
         max_tokens: int,
         temperature: float | None = None,
-    ) -> tuple[T, ParsedMessage[T]]:
+        reasoning: Reasoning | None = None,
+    ) -> tuple[T, Message]:
         system = system_text(messages)
-        response = self.client.messages.parse(
+        plan = claude_plan(self.model, reasoning) if reasoning is not None else None
+        response = self.client.messages.create(
             model=self.model,
-            max_tokens=max_tokens,
+            max_tokens=answer_room(max_tokens, plan.room) if plan else max_tokens,
             messages=conversation_turns(messages),
-            output_format=response_model,
             system=system or omit,
-            extra_body=self._sampling(temperature),
+            thinking=_thinking(plan),
+            output_config=_output_config(response_model, plan),
+            extra_body=self._body(temperature, plan),
         )
-        if response.parsed_output is None:
-            raise RuntimeError(
-                f"{self.model} returned no structured output (stop_reason="
-                f"{response.stop_reason!r}). Try a larger max_tokens or a different model."
-            )
-        return response.parsed_output, response
+        return structured_answer(response, response_model, self.model), response
 
-    def _sampling(self, temperature: float | None) -> dict[str, object] | None:
-        if temperature is None or not accepts_temperature(self.model):
-            return None
-        return {"temperature": temperature}
+    def _body(self, temperature: float | None, plan: ClaudePlan | None) -> dict[str, object] | None:
+        body: dict[str, object] = {}
+        if temperature is not None and accepts_temperature(self.model):
+            body["temperature"] = temperature
+        if plan is not None and plan.thinking == "between_tools":
+            body["thinking"] = {"type": "between_tools"}
+        return body or None
+
+
+def _thinking(plan: ClaudePlan | None) -> ThinkingConfigParam | Omit:
+    if plan is None or plan.thinking is None or plan.thinking == "between_tools":
+        return omit
+    if plan.thinking == "disabled":
+        return {"type": "disabled"}
+    return {"type": "adaptive"}
+
+
+def _output_config(output: type[BaseModel], plan: ClaudePlan | None) -> OutputConfigParam:
+    config: OutputConfigParam = {
+        "format": {"type": "json_schema", "schema": transform_schema(output.model_json_schema())}
+    }
+    if plan is not None:
+        config["effort"] = plan.effort
+    return config
 
 
 class _TextPart(BaseModel):

@@ -15,7 +15,9 @@ class TokenCounts(BaseModel):
 
 
 def token_counts(completion: object) -> TokenCounts:
-    """Normalize provider usage. `input` always includes cached tokens."""
+    """Normalize provider usage. `input` always includes cached tokens; `output` includes
+    reasoning tokens. Anthropic's `output_tokens` and OpenAI's `completion_tokens` already
+    count them; Gemini reports `thoughts_token_count` apart from the answer, so it is added."""
     usage = getattr(completion, "usage", None)
     if usage is not None and hasattr(usage, "input_tokens"):
         return _anthropic_counts(usage)
@@ -50,7 +52,7 @@ def _openai_counts(usage: object) -> TokenCounts:
 def _gemini_counts(meta: object) -> TokenCounts:
     return TokenCounts(
         input=_int_attr(meta, "prompt_token_count"),
-        output=_int_attr(meta, "candidates_token_count"),
+        output=_int_attr(meta, "candidates_token_count") + _int_attr(meta, "thoughts_token_count"),
         cached=_int_attr(meta, "cached_content_token_count"),
     )
 

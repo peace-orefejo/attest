@@ -62,7 +62,7 @@ Every check returns a result with the same fields:
 | Field | Meaning |
 |---|---|
 | `check` | The check's name: `faithfulness`, `tool_use`, `injection`, `role` or `policy`. |
-| `passed` | Whether the check passed. |
+| `passed` | Whether the check itself passed. Whether the run passed is the report's `verdict`. |
 | `score` | Between 0 and 1, or `null` for checks that don't score (role, injection). |
 | `summary` | One line for people. |
 | `findings` | One per claim, tool call or payload. |
@@ -99,9 +99,10 @@ or `--kind` to `attest run`:
 `evaluate()` runs faithfulness and tool use by default; pass `checks=` for others. It returns a
 `Report` with one result per check, plus a `policy` result when the `Attest` has a
 [policy](checks/policies.md). `passed` is true when the report's `verdict` (below) is
-`pass`; `checks_passed` is true when every check passed, even if something still needs review. Its
-`overall_score` is the mean of the scores that aren't `null`, and `scores` gives each check's
-score by name.
+`pass`; `checks_passed` is true when every check passed, even if something still needs review.
+Until JSON schema version 2, `passed` meant what `checks_passed` means now, so a run that needed
+review could read `passed: true`. Its `overall_score` is the mean of the scores that aren't
+`null`, and `scores` gives each check's score by name.
 
 Checks say what happened. A `VerdictPolicy` decides what happens because of it: each finding
 gets a `disposition` of `pass`, `review` or `block`, and the report's `verdict` is the strictest
@@ -114,11 +115,14 @@ reported as success, a `compromised` injection, an out-of-scope request the agen
 and a failed `fail`-severity policy rule. These go to review: a tool error the agent ignored, an
 unnecessary tool call, a `warn`-severity policy rule, and a faithfulness result where no claim
 could be checked against the evidence. Injection warnings pass, and so do `unverifiable` claims
-when at least one other claim was checked. Any other failed finding blocks. A finding nothing
-checked (`unchecked`, or `metadata["checked"]` false) goes to review, or follows its rule when
-that is stricter, so a stricter policy never makes it weaker. The exception is a claim whose
-check failed: `on_inconclusive_faithfulness` decides it. A `Report` you build yourself, without
-`evaluate()`, gets the verdict the default policy would give it.
+when at least one other claim was checked. Any other failed finding blocks.
+
+A finding nothing checked (`unchecked`, or `metadata["checked"]` false) is never treated as a
+pass by default. In every check and under every `VerdictPolicy`, it gets the stricter of
+`review` and the disposition its rule gives, so a stricter policy never makes it weaker: an
+unchecked `fail` finding blocks, and with `on_injection_warning="block"` an unchecked injection
+warning blocks too. The one exception is faithfulness: `on_inconclusive_faithfulness` is the
+rule for claims that couldn't be checked, so setting it to `pass` lets them pass.
 
 ```python
 from attest import Attest, ToolUsePolicy, VerdictPolicy
@@ -139,6 +143,28 @@ if report.verdict == "block":
 `VerdictPolicy` also takes `on_inconclusive_faithfulness` (default `review`) and
 `min_claim_coverage`, the lowest share of claims faithfulness must check before a run can pass
 (off by default).
+
+### Reading each finding's disposition
+
+`CheckResult.dispositions` lists each finding's disposition, in order: the one `evaluate()`
+assigned or, for a finding without one, the one the default `VerdictPolicy()` gives it. So a
+`Report` you build yourself, without `evaluate()`, gets the verdict the default policy would
+give it:
+
+```python
+from attest import CheckResult, Finding, Report
+
+claim = Finding(severity="warn", verdict="unverifiable", subject="The museum opened in 1998.")
+result = CheckResult(check="faithfulness", passed=True, findings=[claim])
+report = Report(results=[result])
+
+print(result.dispositions)                                    # ['review']: no claim was checked
+print(report.verdict, report.passed, report.checks_passed)    # review False True
+```
+
+`Finding.effective_disposition` is deprecated and warns with `DeprecationWarning`. A finding on
+its own doesn't know its check or the rest of its result, so it can disagree with the verdict:
+for the claim above it says `pass`. Use `CheckResult.dispositions` or `Report.verdict` instead.
 
 ## Pass rates and confidence
 

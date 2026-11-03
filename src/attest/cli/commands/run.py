@@ -23,7 +23,9 @@ from ..options import (
     MAX_CLAIMS_OPTION,
     MODEL_OPTION,
     PROVIDER_OPTION,
+    REASONING_OPTION,
     require_max_claims,
+    require_reasoning,
 )
 from ..outcomes import RunOutcome
 
@@ -43,6 +45,7 @@ def run(
     max_claims: int = MAX_CLAIMS_OPTION,
     provider: str = PROVIDER_OPTION,
     model: str | None = MODEL_OPTION,
+    reasoning: str = REASONING_OPTION,
     max_calls: int | None = typer.Option(
         None, "--max-calls", help="Stop before exceeding this many judge calls."
     ),
@@ -60,6 +63,7 @@ def run(
     selected = _selected_checks(checks, kind)
     require_max_claims(max_claims)
     exclusions = cli_exclusions(exclude, exclude_file, attestignore)
+    policy = require_reasoning(reasoning)
     require_key(provider)
     trajectories = load_trajectories(path)
 
@@ -69,6 +73,7 @@ def run(
         budget=_budget(max_calls, max_tokens),
         cache=cache_dir or False,
         exclude=exclusions,
+        reasoning=policy,
     )
     settings = EvaluationSettings(
         checks=selected, appropriate=appropriate, kind=kind, max_claims=max_claims

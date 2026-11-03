@@ -18,8 +18,15 @@ from ..exclusions import (
     cli_exclusions,
     refuse_pr_edited_exclusions,
 )
-from ..json_output import emit, json_command
-from ..options import MAX_CLAIMS_OPTION, MODEL_OPTION, PROVIDER_OPTION, require_max_claims
+from ..json_output import EXIT_ERROR, CommandError, emit, json_command
+from ..options import (
+    MAX_CLAIMS_OPTION,
+    MODEL_OPTION,
+    PROVIDER_OPTION,
+    REASONING_OPTION,
+    require_max_claims,
+    require_reasoning,
+)
 
 
 class ReviewFile(BaseModel):
@@ -59,17 +66,25 @@ def review(
     exclude_file: list[Path] = EXCLUDE_FILE_OPTION,
     attestignore: bool = ATTESTIGNORE_OPTION,
     allow_pr_attestignore: bool = ALLOW_PR_EXCLUSIONS_OPTION,
+    reasoning: str = REASONING_OPTION,
 ) -> None:
-    """Check each code review output against the diff and your review rules (needs a key)."""
+    """Check each code review output against the diff and your review rules (needs a key).
+
+    If attest was asked to write the review and its writer call failed, nothing was checked:
+    the command prints a `command_failed` error and exits 1.
+    """
     request = _load_review(path)
     modes = _parse_modes(mode)
     rules = _load_rules(guidelines)
     require_max_claims(max_claims)
     exclusions = cli_exclusions(exclude, exclude_file, attestignore)
     refuse_pr_edited_exclusions(exclusions, request.pr, allowed=allow_pr_attestignore)
+    policy = require_reasoning(reasoning)
     require_key(provider)
     try:
-        result = Attest(provider=provider, model=model, exclude=exclusions).review(
+        result = Attest(
+            provider=provider, model=model, exclude=exclusions, reasoning=policy
+        ).review(
             request.pr,
             request.outputs,
             guidelines=rules,
@@ -80,6 +95,8 @@ def review(
         )
     except ValueError as exc:
         raise typer.BadParameter(str(exc), param_hint="PATH") from exc
+    if result.writer_failure is not None:
+        raise CommandError("command_failed", " ".join(result.warnings), EXIT_ERROR)
     emit("review", result)
 
 

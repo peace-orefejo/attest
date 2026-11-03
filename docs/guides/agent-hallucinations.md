@@ -1,6 +1,6 @@
 ---
 title: "Detecting hallucinations in tool-using AI agents"
-description: "How to detect hallucinations in AI agents that call tools: check each claim against the tool outputs, and catch failed actions reported as success."
+description: "How to detect hallucinations in AI agents that call tools: check each claim against the tool outputs, and flag failed actions reported as success."
 ---
 
 # Detecting hallucinations in tool-using agents
@@ -30,7 +30,7 @@ claims and checks each one against the run's tool outputs and artifacts:
 |---|---|---|
 | `supported` | The evidence backs the claim. | `pass` |
 | `unsupported` | The evidence contradicts the claim. | `block` |
-| `unverifiable` | The evidence doesn't say either way. | `pass` if other claims were checked, otherwise `review` |
+| `unverifiable` | The evidence doesn't say either way. | `pass` if other claims were checked; `review` if no claim could be checked, or if this claim's own check failed |
 
 The grading model sees each claim with the tool outputs, and never the agent's reasoning, so a
 persuasive chain of thought can't argue a wrong claim into a pass. Each finding quotes the
@@ -58,9 +58,9 @@ unverifiable, either the agent is inventing or your runs are missing tool output
 worth knowing. `report.claim_coverage` gives the share of claims that were checked, and
 `VerdictPolicy(min_claim_coverage=...)` sends low-coverage runs to review.
 
-## Catch failed actions reported as success
+## Flag failed actions reported as success
 
-A failed tool call followed by a confident "done" is caught by the
+A failed tool call followed by a confident "done" is flagged by the
 [tool-use check](../checks/tool-use.md). It follows each tool error to see whether the agent
 retried it, used a declared fallback, or told the user. With `check_answer=True`, a model reads
 the final answer to tell an error the agent reported from one it covered up:
@@ -106,7 +106,8 @@ attest demo examples/trajectory.json
 ```
 
 This shows the difference on one run. It isn't a measurement of attest's accuracy, which hasn't
-been measured on a labelled benchmark yet; see [Limitations](../limitations.md).
+been measured on a labelled benchmark yet; see [Limitations](../limitations.md) and the
+[Benchmark](../benchmark.md).
 
 ## Next
 

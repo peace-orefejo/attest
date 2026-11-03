@@ -42,8 +42,13 @@ def write_review(
     rules = load_guidelines(guidelines)
     exclusions = as_exclusions(exclude)
     visible = hide_pull_request(pr, exclusions).pr
-    user = _user(visible, rules, limits, exclusions)
-    written = call(system=WRITE_PROMPT, user=user, output=WrittenReview, max_tokens=8192)
+    written = call(
+        system=WRITE_PROMPT,
+        user=_user(visible, rules, limits, exclusions),
+        output=WrittenReview,
+        max_tokens=8192,
+        site="writer",
+    )
     return to_outputs(written, visible)
 
 

@@ -131,7 +131,13 @@ def ask_effect(payload: str, output: ReviewOutput, budget: CharBudget) -> Effect
     if not budget.spend(len(user)):
         return None
     try:
-        return call(system=EFFECT_SYSTEM, user=user, output=EffectOut, max_tokens=300)
+        return call(
+            system=EFFECT_SYSTEM,
+            user=user,
+            output=EffectOut,
+            max_tokens=300,
+            site="injection.effect",
+        )
     except (BudgetExceeded, ProviderConfigError):
         raise
     except Exception:

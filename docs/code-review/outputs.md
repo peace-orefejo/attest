@@ -26,7 +26,7 @@ ReviewOutput(
 | `output_type` | `issue`, `diff_summary`, `group_summary` or `canvas_answer`. |
 | `text` | What the reviewer said. |
 | `diffs` | Unified diff for each file the output talks about, keyed by path. |
-| `changed_files` | The whole pull request's list of changed files, not just this output's. Lets attest catch a wrong "this PR also changes X". Usually left out: `review()` copies it from the pull request. |
+| `changed_files` | The whole pull request's list of changed files, not just this output's. Lets attest flag a wrong "this PR also changes X". Usually left out: `review()` copies it from the pull request. |
 | `reads` | Other code the reviewer looked at. Each `FileRead` has a `tool` (`read_file`, the default, or `grep`), its `arguments` and its `output`. |
 | `question` | The question, for a `canvas_answer`. |
 | `group_name` | The group's name, for a `group_summary`. |
@@ -56,7 +56,9 @@ The whole change. `review()` scans it for injection, and attest's own reviewer w
 | `injection` | The `code_injection` check result for the pull request. |
 | `guidelines` | The `ReviewGuidelines` used: your rules, or the general standard (`builtin=True`). |
 | `written` | `True` when attest wrote the outputs itself. |
-| `warnings` | Things to check by hand, e.g. the pull request changes the file its review rules came from, or some files were excluded and not reviewed. |
+| `writer_failure` | Why attest's own reviewer wrote nothing (its call failed or was cut off), or `null`. When set there are no decisions, and `attest review` exits 1. |
+| `reasoning` | The reasoning level each call site was sent, or `null` where the model takes no reasoning setting. See [reasoning](../providers.md#reasoning). |
+| `warnings` | Things to check by hand, e.g. the pull request changes the file its review rules came from, a review attest couldn't write, an output whose check against your rules couldn't run, or some files were excluded and not reviewed. |
 | `excluded_files` | Paths your [exclusion patterns](index.md#leaving-files-out) left out of the evidence. They were not reviewed. |
 | `kept` | Indexes of the outputs to keep. |
 | `dropped` | Indexes of the outputs to drop. |

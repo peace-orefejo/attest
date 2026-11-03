@@ -42,14 +42,14 @@ as an unknown option, as the same JSON error envelope.
 | `exclusions/` | The user's gitignore-style exclusion patterns: loading `.attestignore` and other pattern files within limits, and swapping excluded artifacts for notes. The matcher itself is `utils/ignore_rules.py`, with path normalization in `utils/ignore_paths.py`. |
 | `disposition_rules.py` | How a finding's check, verdict and severity map to pass, review or block. `VerdictPolicy` passes its choices; a `Report` uses the defaults for findings without a disposition. |
 | `providers.py` | The supported providers, their model lists and API keys, and building a client. |
-| `llm/` | The structured `call()` and `vote()`, the provider clients, response caching, and spend budgets. |
+| `llm/` | The structured `call()` and `vote()`, the provider clients, the reasoning setting and per-model table, response caching, and spend budgets. |
 | `prompts/` | Every prompt attest sends, one module per feature, with `PROMPT_VERSION` in `prompts/version.py`. |
 | `utils/` | Small stateless helpers shared across features: unified-diff parsing, hidden-Unicode and encoded-payload scanning, strict JSON and YAML loading. |
 
 ## Design rules
 
 - **Tool outputs are the only evidence.** No check reads the agent's `thought` text when
-  deciding whether a claim is true.
+  deciding whether a claim is supported.
 - **Untrusted text is data.** Anything an attacker could write reaches a judge only inside a
   bounded, escaped, clearly delimited block, framed as content to judge.
 - **Prompts live in one place.** All prompt text is in `prompts/`. Each answer kind has its own

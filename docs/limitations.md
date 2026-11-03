@@ -8,8 +8,12 @@ description: "What attest assumes, what it can't establish, and how to use its r
 attest evaluates a recorded run against the evidence in that record. It is an evaluation
 toolkit, not a guarantee: its own accuracy hasn't been measured on a labelled benchmark yet, and
 several of its checks rest on assumptions you should know before you rely on a result.
-That accuracy will be measured, per check, by the labelled benchmark in
-[`benchmarks/`](https://github.com/peace-orefejo/attest/tree/main/benchmarks).
+That accuracy will be measured, per check, by the labelled [benchmark](benchmark.md), whose
+labels are all still drafts.
+
+attest checks whether an answer's claims are supported by the run's recorded tool outputs. It
+doesn't establish that a claim is true: a claim backed by a wrong tool output comes back
+`supported`, and a true claim no tool output mentions comes back `unverifiable`.
 
 ## What attest assumes
 
@@ -61,7 +65,9 @@ No failure and no missing input turns into a `pass`.
 | The role, deep injection, tool-choice or policy (`evidence`, `rubric`) model call fails | An `unchecked` finding with the error. Verdict `review`. |
 | The tool-error answer question fails | The error's `recovery` is `unchecked`, so the call is `error_silent`. Verdict `review`. |
 | A code review injection confirmation fails | The hit stays unconfirmed and coverage is incomplete, so the scan is never `clean`. |
-| A code review guideline check or writer call fails | Raised. The CLI prints a `command_failed` error and exits 1. |
+| A code review guideline check, or the confirmation of a reported break, fails or is cut off | An `unchecked` finding. With your own rules the output is dropped in every gate mode, and `ReviewResult.warnings` names it. |
+| attest's own review writer fails or is cut off | `Attest.review()` returns no decisions, `writer_failure` says why and a warning says nothing was checked. `attest review` prints a `command_failed` error and exits 1. A direct `write_review()` call raises the error (`TruncatedOutput` for a cut-off). |
+| A judge call stops at its output-token limit | `TruncatedOutput`, not retried. Checks report the call `unchecked`; `attest.llm.call` and `write_review()` raise it. Its tokens still count in `usage` and against a budget. |
 | No steps | Claims have no evidence, so they're `unverifiable` (`review`). Tool use and injection have nothing to flag. |
 | An empty final answer, or one with no claims | Faithfulness has nothing to check and passes. Unrecovered tool errors are still checked. |
 | No system prompt | Role is `unchecked` (`review`), with no model call. |
@@ -71,7 +77,8 @@ No failure and no missing input turns into a `pass`.
 | Control characters, markup or odd arguments | Treated as data: escaped in prompts and printed as valid JSON. |
 | A file that isn't valid UTF-8 or valid JSON | The CLI prints an `invalid_input` error and exits 2. |
 
-A malformed or empty model response is retried twice, then fails like any other call. In
+A malformed, empty or wrongly typed model response is retried twice, then fails like any other
+call. In
 `evaluate()`, a failed call never stops the other checks: only the affected findings are
 inconclusive. The exceptions are a budget stop and a provider configuration error, which stop
 the evaluation.

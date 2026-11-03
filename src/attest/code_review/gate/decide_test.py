@@ -448,3 +448,47 @@ def test_a_claim_no_verifier_judged_drops_the_output_in_every_mode(mode):
     decision = gate(report, "issue", mode=mode)
     assert not decision.keep
     assert decision.reasons == [unchecked]
+
+
+@pytest.mark.parametrize("mode", ["lenient", "strict"])
+@pytest.mark.parametrize(
+    "unchecked",
+    [
+        Finding(
+            severity=Severity.WARN,
+            verdict="unchecked",
+            subject="REVIEW.md",
+            metadata={"checked": False},
+        ),
+        Finding(
+            severity=Severity.WARN,
+            verdict="unchecked",
+            subject="G1: rule",
+            evidence="quote",
+            metadata={"rule": "G1", "checked": False},
+        ),
+    ],
+    ids=["check_failed", "confirm_failed"],
+)
+def test_an_unchecked_guideline_finding_drops_the_output_in_every_mode(mode, unchecked):
+    report = faithfulness("supported")
+    report.results.append(CheckResult(check="guidelines", passed=True, findings=[unchecked]))
+    decision = gate(report, "issue", mode=mode)
+    assert not decision.keep
+    assert decision.reasons == [unchecked]
+    assert decision.notes == []
+
+
+def test_an_unchecked_built_in_standard_is_only_a_note():
+    unchecked = Finding(
+        severity=Severity.WARN, verdict="unchecked", subject="general", metadata={"checked": False}
+    )
+    report = faithfulness("supported")
+    report.results.append(
+        CheckResult(
+            check="guidelines", passed=True, metadata={"builtin": True}, findings=[unchecked]
+        )
+    )
+    decision = gate(report, "issue")
+    assert decision.keep
+    assert decision.notes == [unchecked]

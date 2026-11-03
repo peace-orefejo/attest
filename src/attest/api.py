@@ -20,7 +20,19 @@ from .code_review.guidelines import GuidelinesInput
 from .code_review.models import GateMode
 from .exclusions import ExclusionsInput, as_exclusions, exclude_artifacts, record_excluded
 from .extraction import ExtractionLimits
-from .llm import Budget, DiskCache, LLMClient, Usage, metering, using, using_cache
+from .llm import (
+    Budget,
+    DiskCache,
+    LLMClient,
+    ReasoningInput,
+    Usage,
+    metering,
+    reasoning_policy,
+    recording_reasoning,
+    using,
+    using_cache,
+    using_reasoning,
+)
 from .llm.response_cache import ResponseStore
 from .policy import EvaluationPolicy, PolicyInput, check_policy, load_policy
 from .providers import (
@@ -54,6 +66,12 @@ class Attest:
     `Exclusions` from `load_exclusions`, for files attest must leave out (a bare string raises
     `TypeError`): artifacts whose path or name matches are never read, scanned or sent to a
     model, and code review leaves those files' diffs and reads out.
+    `reasoning` sets how much the judge model may reason before answering: `"auto"` (default,
+    the provider's adaptive thinking at low effort), `"off"`, `"low"`, `"medium"` or `"high"`,
+    or a mapping per check such as `{"faithfulness": "medium", "default": "auto"}`, or a
+    `ReasoningPolicy`. Each report records the level each call site was sent in
+    `metadata["reasoning"]`, and `review()` in `ReviewResult.reasoning`; a site whose model
+    takes no reasoning setting is recorded as None.
     """
 
     def __init__(
@@ -71,6 +89,7 @@ class Attest:
         allow_paths: bool = False,
         verdict_policy: VerdictPolicy | None = None,
         exclude: ExclusionsInput = None,
+        reasoning: ReasoningInput = "auto",
     ) -> None:
         self.provider = provider
         self.model = model or default_model(provider)
@@ -82,6 +101,7 @@ class Attest:
         self.budget = budget
         self.verdict_policy = verdict_policy or VerdictPolicy()
         self.usage = Usage()
+        self.reasoning = reasoning_policy(reasoning)
         self.artifact_extraction = ArtifactExtraction(
             enabled=extract_artifacts, allow_paths=allow_paths
         )
@@ -109,7 +129,11 @@ class Attest:
         ) or (policy is not None and policy.needs_llm)
         needs_llm = needs_llm or ("tool_use" in selected and self._has_credentials())
         before = self.usage.model_copy()
-        with self._llm_context(needs_llm), extracting_artifacts(self.artifact_extraction):
+        with (
+            self._llm_context(needs_llm),
+            extracting_artifacts(self.artifact_extraction),
+            recording_reasoning() as levels,
+        ):
             report = evaluate(
                 traj,
                 checks=selected,
@@ -127,6 +151,8 @@ class Attest:
                 report = apply_verdict_policy(report, self.verdict_policy)
         report.metadata["usage"] = self.usage.since(before).as_dict()
         record_excluded(report, hidden.excluded)
+        if levels:
+            report.metadata["reasoning"] = dict(sorted(levels.items()))
         return report
 
     def review(
@@ -156,8 +182,8 @@ class Attest:
                 run, checks=("faithfulness",), answer_kind=answer_kind, max_claims=max_claims
             )
 
-        with self._llm_context():
-            return review_outputs(
+        with self._llm_context(), recording_reasoning() as levels:
+            result = review_outputs(
                 pr,
                 outputs,
                 evaluate=grade,
@@ -168,6 +194,8 @@ class Attest:
                 limits=limits,
                 exclude=self.exclusions,
             )
+        result.reasoning = dict(sorted(levels.items()))
+        return result
 
     def write_review(
         self,
@@ -283,6 +311,7 @@ class Attest:
         with contextlib.ExitStack() as stack:
             stack.enter_context(using(client))
             stack.enter_context(metering(self.usage, self.budget))
+            stack.enter_context(using_reasoning(self.reasoning))
             if self._cache is not None:
                 stack.enter_context(using_cache(self._cache))
             yield

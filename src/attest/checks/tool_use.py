@@ -136,6 +136,7 @@ def _check_appropriate(
         user=appropriate_user(tool_call),
         output=_AppropriatenessOut,
         reuse="prefix" if shared else None,
+        site="tool_use.appropriate",
     )
 
 
