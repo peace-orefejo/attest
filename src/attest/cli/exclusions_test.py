@@ -125,3 +125,45 @@ def test_too_many_patterns_is_invalid_input(tmp_path, monkeypatch, seen):
     result = runner.invoke(app, args)
     assert result.exit_code == 2
     assert "Too many exclusion patterns" in _error(result)
+
+
+def _review_changing(tmp_path, *paths: str) -> str:
+    review = tmp_path / "review.json"
+    diffs = {path: f"--- a/{path}\n+++ b/{path}\n@@ -0,0 +1 @@\n+src/evil.py\n" for path in paths}
+    review.write_text(json.dumps({"pr": {"diffs": {"src/evil.py": "+x\n", **diffs}}}))
+    return str(review)
+
+
+def test_a_pull_request_editing_the_discovered_attestignore_is_refused(tmp_path, monkeypatch, seen):
+    (tmp_path / ".attestignore").write_text("src/evil.py\n")
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["review", _review_changing(tmp_path, ".attestignore")])
+    assert result.exit_code == 2
+    message = _error(result)
+    assert "could hide its own changes" in message
+    assert "--allow-pr-attestignore" in message and "base branch" in message
+    assert "exclusions" not in seen
+
+
+def test_a_pull_request_editing_an_exclude_file_in_the_repo_is_refused(tmp_path, monkeypatch, seen):
+    (tmp_path / "ci").mkdir()
+    (tmp_path / "ci" / "team.ignore").write_text("src/evil.py\n")
+    sub = tmp_path / "packages" / "app"
+    sub.mkdir(parents=True)
+    monkeypatch.chdir(sub)
+    args = ["review", _review_changing(tmp_path, "ci/team.ignore"), "--exclude-file"]
+    result = runner.invoke(app, [*args, str(tmp_path / "ci" / "team.ignore")])
+    assert result.exit_code == 2
+    assert "ci/team.ignore" in _error(result)
+
+
+def test_the_override_flag_or_untouched_files_let_the_review_run(tmp_path, monkeypatch, seen):
+    (tmp_path / ".attestignore").write_text("src/evil.py\n")
+    monkeypatch.chdir(tmp_path)
+    allowed = ["review", _review_changing(tmp_path, ".attestignore"), "--allow-pr-attestignore"]
+    assert runner.invoke(app, allowed).exit_code == 0
+    assert seen["exclusions"].excludes("src/evil.py")
+    other = ["review", _review_changing(tmp_path, "docs/.attestignore")]
+    assert runner.invoke(app, other).exit_code == 0
+    no_discovery = ["review", _review_changing(tmp_path, ".attestignore"), "--no-attestignore"]
+    assert runner.invoke(app, no_discovery).exit_code == 0

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path, PurePath
 
 from pydantic import BaseModel, Field
@@ -60,8 +61,11 @@ def record_excluded(target: Report | CheckResult, excluded: list[str]) -> None:
 
 
 def is_excluded_artifact(artifact: Artifact, exclusions: Exclusions) -> bool:
-    """True when the artifact's path, its path relative to the working directory, or its name
-    is excluded."""
+    """True when the artifact's name or path is excluded, as written or with symlinks resolved.
+
+    An absolute path inside the working directory is matched relative to it; any other
+    absolute path is matched from every one of its segments.
+    """
     return any(exclusions.excludes(candidate) for candidate in _candidates(artifact))
 
 
@@ -90,16 +94,34 @@ def _note(artifact: Artifact) -> Artifact:
 
 
 def _candidates(artifact: Artifact) -> list[str]:
-    candidates = [value for value in (artifact.path, artifact.name) if value]
-    if artifact.path and PurePath(artifact.path).is_absolute():
-        relative = _relative_to_cwd(artifact.path)
-        if relative is not None:
-            candidates.append(relative)
-    return candidates
+    candidates = [artifact.name] if artifact.name else []
+    if not artifact.path:
+        return candidates
+    for path in (artifact.path, _resolved(artifact.path)):
+        if path is not None:
+            candidates.append(_within_cwd(path))
+    return list(dict.fromkeys(candidates))
 
 
-def _relative_to_cwd(path: str) -> str | None:
+def _resolved(path: str) -> str | None:
     try:
-        return Path(path).relative_to(Path.cwd()).as_posix()
-    except ValueError:
+        return os.path.realpath(path)
+    except (OSError, ValueError):
         return None
+
+
+def _within_cwd(path: str) -> str:
+    if not PurePath(path).is_absolute():
+        return path
+    absolute = Path(os.path.normpath(path))
+    for root in _cwd_forms():
+        try:
+            return absolute.relative_to(root).as_posix()
+        except ValueError:
+            continue
+    return path
+
+
+def _cwd_forms() -> list[Path]:
+    cwd = Path.cwd()
+    return list(dict.fromkeys([cwd, cwd.resolve()]))

@@ -66,6 +66,52 @@ def test_paths_match_as_written_or_relative_to_the_working_directory(tmp_path, m
     assert not is_excluded_artifact(Artifact(text="x"), Exclusions(patterns=("*",)))
 
 
+@pytest.fixture
+def linked(tmp_path, monkeypatch):
+    secret = tmp_path / "secrets" / "prod.env"
+    secret.parent.mkdir()
+    secret.write_text(f"TOKEN={SECRET}\n")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "notes.txt").symlink_to(secret)
+    (tmp_path / "docs" / "alias").symlink_to(tmp_path / "secrets")
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "notes.txt",
+        "docs/alias/prod.env",
+        "./notes.txt",
+        "x/../notes.txt",
+        "docs/../secrets/prod.env",
+    ],
+)
+def test_a_symlink_or_dot_dot_path_to_an_excluded_file_is_excluded(linked, path):
+    exclusions = Exclusions(patterns=("/secrets/",))
+    assert is_excluded_artifact(Artifact(name="notes", path=path), exclusions)
+    assert is_excluded_artifact(Artifact(path=str(linked / path)), exclusions)
+
+
+def test_the_literal_path_still_counts_when_the_target_is_not_excluded(linked):
+    assert is_excluded_artifact(Artifact(path="notes.txt"), Exclusions(patterns=("notes.txt",)))
+    assert not is_excluded_artifact(Artifact(path="notes.txt"), Exclusions(patterns=("/docs/",)))
+
+
+def test_an_absolute_path_outside_the_working_directory_matches_from_any_segment(linked):
+    outside = Artifact(path="/srv/other/secrets/prod.env")
+    assert is_excluded_artifact(outside, Exclusions(patterns=("/secrets/",)))
+
+
+def test_evaluate_never_sends_a_symlinked_excluded_artifact(linked):
+    call = ToolCall(name="read", output="ok", artifacts=[Artifact(name="n", path="notes.txt")])
+    run = Trajectory(task="t", steps=[Step(tool_call=call)], final_answer="Done.")
+    hidden = exclude_artifacts(run, Exclusions(patterns=("/secrets/",)))
+    assert hidden.excluded == ["steps[0].tool_call.artifacts[0]"]
+    assert SECRET not in hidden.run.model_dump_json()
+
+
 def test_evaluate_never_reads_an_excluded_path_artifact(tmp_path, monkeypatch):
     read: list[str] = []
     real = EXTRACTION.extract_artifact

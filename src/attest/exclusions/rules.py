@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+import unicodedata
+from collections.abc import Iterable
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
-from ..utils.ignore_rules import IgnoreRule, is_ignored, parse_rules
+from ..utils.ignore_paths import split_path
+from ..utils.ignore_rules import IgnoreRule, parse_rules, parts_ignored
 
 MAX_PATTERNS = 1_000
+MAX_PATH_CHARS = 4_096
+MAX_PATH_DEPTH = 1_024
 EXCLUDED_REASON = "excluded by the user's exclusion rules"
 
 
@@ -22,6 +26,14 @@ class Exclusions(BaseModel):
     Patterns apply in order and the last one matching a path decides, so a later `!` pattern
     re-includes a file. `sources` names the pattern files they were read from. More than
     `MAX_PATTERNS` patterns (blank lines and comments aside) raise `ExclusionError`.
+
+    Matching fails closed. A path is normalized first (`\\` is a separator, `//` and `.` are
+    dropped, `..` is resolved), and an absolute path, or one that climbs out with `..`, is
+    matched from every one of its segments, since attest can't know where the repository
+    starts. A path is also excluded when its case-folded, NFC-normalized form (with trailing
+    spaces and dots trimmed from each segment) matches the case-folded patterns, because
+    macOS and Windows treat those as the same file. A path over `MAX_PATH_CHARS` characters
+    or `MAX_PATH_DEPTH` segments is always excluded.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -29,6 +41,7 @@ class Exclusions(BaseModel):
     patterns: tuple[str, ...] = ()
     sources: tuple[str, ...] = ()
     _compiled: list[IgnoreRule] | None = PrivateAttr(default=None)
+    _folded: list[IgnoreRule] | None = PrivateAttr(default=None)
 
     def __init__(self, **data: object) -> None:
         super().__init__(**data)
@@ -41,7 +54,21 @@ class Exclusions(BaseModel):
 
     def excludes(self, path: str, *, directory: bool = False) -> bool:
         """True when `path` (a directory, with `directory=True`) is excluded."""
-        return is_ignored(path, self._rules(), is_dir=directory)
+        rules = self._rules()
+        if not rules:
+            return False
+        if len(path) > MAX_PATH_CHARS:
+            return True
+        split = split_path(path)
+        if len(split.parts) > MAX_PATH_DEPTH:
+            return True
+        floating = split.floating
+        if parts_ignored(split.parts, rules, is_dir=directory, floating=floating):
+            return True
+        folded = tuple(_fold_segment(part) for part in split.parts)
+        if folded == split.parts and self._folded is rules:
+            return False
+        return parts_ignored(folded, self._folded or [], is_dir=directory, floating=floating)
 
     def excluded(self, paths: Iterable[str]) -> list[str]:
         """The excluded paths among `paths`, in order and without repeats."""
@@ -54,25 +81,20 @@ class Exclusions(BaseModel):
                 raise ExclusionError(
                     f"Too many exclusion patterns: {len(rules)}; the limit is {MAX_PATTERNS}."
                 )
+            folded = [_fold(pattern) for pattern in self.patterns]
             self._compiled = rules
+            self._folded = rules if folded == list(self.patterns) else parse_rules(folded)
         return self._compiled
-
-
-ExclusionsInput = Exclusions | str | Sequence[str] | None
-"""An `Exclusions`, one pattern, a list of patterns, or None for no exclusions."""
-
-
-def as_exclusions(value: ExclusionsInput) -> Exclusions:
-    """Turn any accepted exclusion input into `Exclusions`."""
-    if value is None:
-        return Exclusions()
-    if isinstance(value, Exclusions):
-        return value
-    if isinstance(value, str):
-        return Exclusions(patterns=(value,))
-    return Exclusions(patterns=tuple(value))
 
 
 def excluded_note(path: str) -> str:
     """The one-line note that stands in for an excluded file's contents."""
     return f"{path}: {EXCLUDED_REASON}"
+
+
+def _fold(text: str) -> str:
+    return unicodedata.normalize("NFC", unicodedata.normalize("NFC", text).casefold())
+
+
+def _fold_segment(part: str) -> str:
+    return _fold(part).rstrip(" .") or part

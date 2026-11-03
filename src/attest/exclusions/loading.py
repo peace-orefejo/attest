@@ -13,6 +13,30 @@ MAX_PATTERN_FILE_BYTES = 1_048_576
 
 PathInput = str | os.PathLike[str]
 
+ExclusionsInput = Exclusions | os.PathLike[str] | Sequence[str] | None
+"""An `Exclusions`, a list of patterns, a path to a pattern file, or None for no exclusions."""
+
+
+def as_exclusions(value: ExclusionsInput) -> Exclusions:
+    """Turn any accepted exclusion input into `Exclusions`.
+
+    A `Path` (any `os.PathLike`) is read as a pattern file. A bare string is refused with
+    `TypeError`: it would be ambiguous between one pattern and a file name, so pass
+    `["*.env"]` for one pattern or `Path("team.attestignore")` for a file.
+    """
+    if value is None:
+        return Exclusions()
+    if isinstance(value, Exclusions):
+        return value
+    if isinstance(value, os.PathLike):
+        return load_exclusions(files=[value])
+    if isinstance(value, str):
+        raise TypeError(
+            f"exclude={value!r} is a bare string. Pass a list of patterns, such as "
+            f"[{value!r}], or a Path to read patterns from a file, such as Path({value!r})."
+        )
+    return Exclusions(patterns=tuple(value))
+
 
 def load_exclusions(
     patterns: Sequence[str] = (),

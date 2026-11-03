@@ -1,9 +1,12 @@
 """Excluded files in code review evidence: diffs, reads, grep lines and the changed-file list."""
 
+import pytest
+
 from attest import Exclusions
 from attest.code_review import FileRead, PullRequest, ReviewOutput, to_run_with_omissions
 from attest.code_review.evidence import render_diffs
 from attest.code_review.evidence.excluded import (
+    HiddenRead,
     changed_files_listing,
     hide_output,
     hide_pull_request,
@@ -68,7 +71,7 @@ def test_a_grep_inside_an_excluded_directory_becomes_a_note():
     assert hide_read(read, EXCLUDE).read.output == f"secrets: {NOTE}"
 
 
-def test_a_grep_loses_only_the_excluded_files_lines():
+def test_a_grep_naming_an_excluded_file_is_withheld_whole():
     output = "\n".join(
         [
             "app/main.py:2:y = 1",
@@ -82,13 +85,103 @@ def test_a_grep_loses_only_the_excluded_files_lines():
     hidden = hide_read(read, EXCLUDE)
     assert SECRET not in hidden.read.output
     assert hidden.read.output.split("\n") == [
-        "app/main.py:2:y = 1",
         f"secrets/prod.env: {NOTE}",
         f"poetry.lock: {NOTE}",
-        "app/util.py-3-context",
+        f"[grep output withheld: it names files {NOTE}]",
     ]
     assert hidden.excluded == ["secrets/prod.env", "poetry.lock"]
     assert hide_read(hidden.read, EXCLUDE).read.output == hidden.read.output
+
+
+def test_a_grep_naming_no_excluded_file_is_kept():
+    read = FileRead(tool="grep", arguments={"pattern": "y"}, output="app/main.py:2:y = 1")
+    assert hide_read(read, EXCLUDE) == HiddenRead(read=read)
+
+
+def test_the_search_text_is_not_treated_as_a_path():
+    read = FileRead(tool="grep", arguments={"pattern": "secrets"}, output="app/a.py:1:secrets")
+    assert hide_read(read, EXCLUDE).excluded == []
+
+
+ANCHORED = Exclusions(patterns=("/secrets/", "fixtures/**"))
+
+
+@pytest.mark.parametrize(
+    ("arguments", "named"),
+    [
+        ({"path": "/home/u/repo/fixtures/users.json"}, "/home/u/repo/fixtures/users.json"),
+        ({"path": "src/../secrets/k.env"}, "src/../secrets/k.env"),
+        ({"path": "secrets\\k.env"}, "secrets\\k.env"),
+        ({"path": "a/..//./secrets/k.env"}, "a/..//./secrets/k.env"),
+        ({"path": "../secrets/k.env"}, "../secrets/k.env"),
+        ({"path": "C:\\repo\\secrets\\k.env"}, "C:\\repo\\secrets\\k.env"),
+        ({"file_path": "secrets/k.env"}, "secrets/k.env"),
+        ({"paths": ["app/ok.py", "secrets/k.env"]}, "secrets/k.env"),
+        ({"target": {"nested": "x"}, "filename": "/repo/secrets/k.env"}, "/repo/secrets/k.env"),
+    ],
+)
+def test_every_path_form_of_a_read_argument_is_caught(arguments, named):
+    read = FileRead(arguments=arguments, output=f"TOKEN={SECRET}")
+    hidden = hide_read(read, ANCHORED)
+    assert SECRET not in hidden.read.output
+    assert hidden.excluded == [named]
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        f"secrets/k.env\n1:TOKEN={SECRET}\n2-other",
+        f"/home/u/repo/secrets/k.env:1:TOKEN={SECRET}",
+        f"/home/u/repo/secrets/k.env\n1:TOKEN={SECRET}",
+        f"secrets/k.env\x001:TOKEN={SECRET}",
+        f"./src/../secrets/k.env-2-TOKEN={SECRET}",
+        f"app/a.py:1:x\r\nsecrets/k.env:1:TOKEN={SECRET}",
+    ],
+)
+def test_every_grep_output_form_naming_an_excluded_file_is_withheld(output):
+    read = FileRead(tool="grep", arguments={"pattern": "TOKEN"}, output=output)
+    hidden = hide_read(read, ANCHORED)
+    assert SECRET not in hidden.read.output
+    assert hidden.excluded
+    assert hidden.read.output.endswith("[grep output withheld: it names files " + NOTE + "]")
+
+
+@pytest.mark.parametrize(
+    ("key", "text"),
+    [
+        ("b/secrets/k.env", _diff("secrets/k.env", f"TOKEN={SECRET}")),
+        ("./secrets/k.env", _diff("secrets/k.env", f"TOKEN={SECRET}")),
+        (
+            "app/x.py",
+            _diff("app/x.py", "z = 2")
+            + "diff --git a/secrets/k.env b/secrets/k.env\n"
+            + _diff("secrets/k.env", f"TOKEN={SECRET}"),
+        ),
+        (
+            "app/x.py",
+            _diff("app/x.py", "z = 2") + _diff("secrets/k.env", f"TOKEN={SECRET}"),
+        ),
+        (
+            "app/k.env",
+            "diff --git a/secrets/k.env b/app/k.env\nrename from secrets/k.env\n"
+            "rename to app/k.env\n" + _diff("app/k.env", f"TOKEN={SECRET}"),
+        ),
+    ],
+)
+def test_a_diff_naming_an_excluded_file_in_its_key_or_headers_is_hidden(key, text):
+    exclusions = Exclusions(patterns=("/secrets/",))
+    pr = PullRequest(diffs={"app/main.py": DIFFS["app/main.py"], key: text})
+    hidden = hide_pull_request(pr, exclusions)
+    assert SECRET not in hidden.pr.model_dump_json()
+    assert hidden.excluded == [key]
+    assert list(without_excluded_diffs(pr, exclusions).diffs) == ["app/main.py"]
+    assert SECRET not in render_diffs(list(pr.diffs.items()), exclusions=exclusions)[1].text
+
+
+def test_content_lines_that_look_like_headers_do_not_hide_a_diff():
+    text = _diff("app/q.sql", "x") + "--- see secrets/k.env\n+++ secrets/k.env\n context\n"
+    pr = PullRequest(diffs={"app/q.sql": text})
+    assert hide_pull_request(pr, Exclusions(patterns=("secrets/",))).excluded == []
 
 
 def test_hiding_an_output_covers_diffs_reads_and_changed_files():

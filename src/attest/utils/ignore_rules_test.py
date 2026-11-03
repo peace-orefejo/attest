@@ -4,7 +4,13 @@ import time
 
 import pytest
 
-from attest.utils.ignore_rules import is_ignored, normalize_path, parse_rule, parse_rules
+from attest.utils.ignore_rules import (
+    is_ignored,
+    normalize_path,
+    parse_rule,
+    parse_rules,
+    parts_ignored,
+)
 
 
 def _ignored(patterns: str, path: str, *, is_dir: bool = False) -> bool:
@@ -117,9 +123,40 @@ def test_matching_is_case_sensitive():
 def test_paths_are_normalized():
     assert normalize_path("./a//b\\c.txt") == "a/b/c.txt"
     assert normalize_path("/abs/path") == "abs/path"
+    assert normalize_path("src/../secrets/./k.env") == "secrets/k.env"
     assert _ignored("/src/x.py", "./src/x.py")
+    assert _ignored("/secrets/", "src/../secrets/k.env")
     assert not _ignored("*", "")
     assert not is_ignored("a.txt", [])
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/home/u/repo/fixtures/users.json",
+        "C:\\Users\\u\\repo\\fixtures\\users.json",
+        "../fixtures/users.json",
+        "src/../../fixtures/users.json",
+    ],
+)
+def test_a_path_with_an_unknown_root_matches_anchored_patterns_from_any_segment(path):
+    assert _ignored("fixtures/**", path)
+    assert _ignored("/fixtures/", path)
+    assert not _ignored("/fixtures/", "src/fixtures/users.json")
+
+
+def test_a_floating_path_is_ignored_when_any_start_ignores_it():
+    rules = "/a/*.env\n!/b/a/keep.env\n"
+    assert _ignored(rules, "/b/a/keep.env")
+    assert not _ignored(rules, "b/a/keep.env")
+
+
+def test_one_pass_gives_every_parent_directory_its_verdict():
+    rules = parse_rules(["deep/", "!x"])
+    path = "/".join(["a"] * 50 + ["deep"] + ["b"] * 50 + ["x"])
+    assert is_ignored(path, rules)
+    assert parts_ignored(path.split("/"), rules, is_dir=False)
+    assert not is_ignored(path.replace("deep", "shallow"), rules)
 
 
 def test_hostile_patterns_match_in_linear_time():
@@ -128,4 +165,16 @@ def test_hostile_patterns_match_in_linear_time():
     rules = parse_rules([pattern, "*a*a*a*a*a*a*a*a*a*a*a*b"])
     started = time.perf_counter()
     assert not is_ignored(path + "/" + "a" * 250, rules)
+    assert time.perf_counter() - started < 2
+
+
+@pytest.mark.parametrize("prefix", ["", "/"])
+def test_a_deep_path_against_many_glob_rules_is_not_quadratic(prefix):
+    # The old matcher re-ran every rule for each parent directory: about 20 s here.
+    rules = parse_rules(
+        [f"*.ext{i}" for i in range(25)] + [f"**/d{i}*/**/*.y{i}" for i in range(25)]
+    )
+    path = prefix + "/".join(["d1"] * 2000) + "/file.txt"
+    started = time.perf_counter()
+    assert not is_ignored(path, rules)
     assert time.perf_counter() - started < 2

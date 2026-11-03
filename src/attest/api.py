@@ -50,9 +50,10 @@ class Attest:
     are read from disk only when `allow_paths=True` too. Without it, only text artifacts and
     tool outputs are evidence.
 
-    `exclude` takes gitignore-style patterns (or an `Exclusions` from `load_exclusions`) for
-    files attest must leave out: artifacts whose path or name matches are never read, scanned
-    or sent to a model, and code review leaves those files' diffs and reads out.
+    `exclude` takes a list of gitignore-style patterns, a `Path` to a pattern file, or an
+    `Exclusions` from `load_exclusions`, for files attest must leave out (a bare string raises
+    `TypeError`): artifacts whose path or name matches are never read, scanned or sent to a
+    model, and code review leaves those files' diffs and reads out.
     """
 
     def __init__(

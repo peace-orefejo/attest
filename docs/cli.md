@@ -77,6 +77,7 @@ The file holds a [`PullRequest`](code-review/outputs.md#pullrequest) and its
 | `--exclude PATTERN` | none | Leave out files matching this pattern. Repeatable. See [Excluding files](#excluding-files). |
 | `--exclude-file PATH` | none | Read exclusion patterns from this file. Repeatable. |
 | `--attestignore` / `--no-attestignore` | on | Read `.attestignore` from the current directory when it exists. |
+| `--allow-pr-attestignore` | off | Use pattern files even when the pull request changes them. Without it, that is refused. See [In CI](#in-ci-read-patterns-from-the-base-branch). |
 
 ## Excluding files
 
@@ -116,10 +117,11 @@ pattern excluded. A pattern file that can't be read, isn't UTF-8 or is over 1 MB
 1,000 patterns in all, are `invalid_input` errors (exit 2); attest never skips them silently.
 In Python, `load_exclusions(patterns, files=[...], discover=True)` reads files the same way and
 raises `ExclusionError` (a `ValueError`); `Attest(exclude=...)` never reads `.attestignore` by
-itself.
+itself. `Attest(exclude=...)` takes a list of patterns, a `Path` to one pattern file, or the
+result of `load_exclusions`. A bare string raises `TypeError`, because `"team.attestignore"`
+could mean a pattern or a file: write `["*.env"]` or `Path("team.attestignore")`.
 
-**Pattern syntax** is the gitignore subset below. Matching is case-sensitive and uses `/` in
-paths.
+**Pattern syntax** is the gitignore subset below.
 
 | Pattern | Matches |
 |---|---|
@@ -134,19 +136,61 @@ paths.
 
 As in git, a file inside an excluded directory can't be re-included: after `secrets/`,
 `!secrets/public.txt` has no effect. Write `secrets/*` and then `!secrets/public.txt` instead.
+One difference from git: a pattern with an unclosed character class, such as `a[b`, matches the
+literal name `a[b` in attest and nothing in git.
+
+**How paths are matched.** Paths reach attest in many forms (diff keys, a reviewer's read
+arguments, grep output, artifact paths), so matching fails closed, leaning towards leaving a
+file out:
+
+- A path is normalized first: `\` counts as `/`, `//` and `./` are collapsed, and `..` is
+  resolved, so `src/../secrets/k.env` is `secrets/k.env`.
+- An absolute path (`/home/me/repo/fixtures/users.json`, `C:\repo\...`), or one that climbs
+  above its start with `..`, is matched from every one of its segments, since attest can't know
+  where your repository starts. So `fixtures/**` and `/fixtures/` both match
+  `/home/me/repo/fixtures/users.json`. This can over-match: `/build/` also matches
+  `/home/me/build/repo/app.py`. In `attest run`, an artifact path inside the current directory
+  is matched relative to it instead.
+- A path also counts as excluded when its case-folded, NFC-normalized form matches the
+  case-folded patterns, with trailing spaces and dots trimmed from each segment. macOS and
+  Windows treat `Secrets/k.env`, `secrets/k.env` and a decomposed `café.env` as the same file,
+  so attest does too, on every platform. A `!` pattern re-includes a file only if both forms
+  agree.
+- A path over 4,096 characters or 1,024 segments is always excluded.
 
 **What an exclusion covers.** In [code review](code-review/index.md#leaving-files-out), excluded
-files' diffs, file reads and grep lines are replaced by a one-line note everywhere: in the
-grading evidence, attest's own reviewer, the guideline check and the injection scan. In
+files' diffs and reads are replaced by a one-line note everywhere: in the grading evidence,
+attest's own reviewer, the guideline check and the injection scan. A read is hidden when any of
+its path-like arguments (`path`, `file_path`, a `paths` list, any string but the search text)
+names an excluded file or directory. A grep whose output names an excluded file anywhere (a
+`path:line:` prefix, a ripgrep heading line, a NUL-separated name, absolute or relative) is
+withheld whole, since its other lines may belong to that file. A grep too long to check
+(50,000 path segments' worth of candidate names) keeps only the lines checked so far. In
 `attest run`, an artifact whose `path` or `name` matches is replaced by a one-line note before
 any check runs: it is never read, scanned or sent to a model, and its location is listed in
-`metadata["artifacts_excluded"]`. A `path` is matched as written and, when it is absolute and
-inside the current directory, relative to it. Tool outputs are not files, so patterns never
-apply to them, and nor do they apply to an output's or answer's own text.
+`metadata["artifacts_excluded"]`. Its `path` is matched as written and with symlinks resolved,
+so a link to an excluded file is excluded too. Tool outputs are not files, so patterns never
+apply to them.
+
+Exclusions cover file contents only. They don't apply to the text of a review output or an
+answer, which is checked as written, nor to file paths, which still appear in notes, the
+changed-file list and the result.
 
 Exclusions only remove evidence. A `!` pattern re-includes only what another of your patterns
 excluded; it can't bring back a generated file or lockfile attest leaves out by itself.
 
-In CI, read exclusion files from the base branch: a pull request that edits `.attestignore` could
-otherwise hide its own changes from the review. `attest review` warns when the pull request
-changes a file the patterns came from.
+### In CI: read patterns from the base branch
+
+A pull request that edits `.attestignore` could hide its own changes from the review. So
+`attest review` refuses with `invalid_input` (exit 2) when the pull request's diffs or
+changed-file list touch `.attestignore` or any `--exclude-file` it read, matched against the
+current directory and every directory above it. Read the patterns from the base branch instead:
+
+```bash
+git show origin/main:.attestignore > "$RUNNER_TEMP/base.attestignore"
+attest review review.json --no-attestignore --exclude-file "$RUNNER_TEMP/base.attestignore"
+```
+
+Pass `--allow-pr-attestignore` to use the pull request's own patterns anyway, for example when
+you trust its author. In Python, `review()` doesn't refuse; it adds a warning when the pull
+request changes a file named like one the patterns came from.

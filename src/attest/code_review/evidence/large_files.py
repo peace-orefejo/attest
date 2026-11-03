@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ...exclusions import Exclusions
 from ...utils.diff import FileDiff, cut_hunks, parse_unified_diff
-from .excluded import excluded_diff
+from .excluded import diff_excluded, excluded_diff
 from .generated import is_generated
 from .lockfiles import parser_for, summarize_lockfile
 from .models import EvidenceLimits, Omission, OmissionReason, RenderedDiff
@@ -36,7 +36,7 @@ def render_diffs(
     used = 0
     exhausted = False
     for path, diff_text in diffs:
-        if exclusions is not None and exclusions.excludes(path):
+        if exclusions is not None and diff_excluded(path, diff_text, exclusions):
             rendered.append(excluded_diff(path))
             continue
         item = None if exhausted else render_diff(path, diff_text, limits)

@@ -65,13 +65,45 @@ def test_an_output_about_excluded_files_only_is_dropped_as_unchecked_in_every_mo
     )
     for mode in ("lenient", "strict"):
         result = review(
-            PR, [output], evaluate=_Grader(), deep=False, modes={"issue": mode}, exclude="secrets/"
+            PR,
+            [output],
+            evaluate=_Grader(),
+            deep=False,
+            modes={"issue": mode},
+            exclude=["secrets/"],
         )
         decision = result.decisions[0]
         assert not decision.keep
         assert decision.score is None
         assert "every file this output is about is excluded" in decision.summary
         assert decision.reasons[0].metadata == {"checked": False, "excluded": True}
+
+
+class _ContradictedBySecret:
+    """Contradicts the claim when the excluded file's content is in the evidence."""
+
+    def __call__(self, run: Trajectory) -> Report:
+        verdict = "unsupported" if SECRET in run.evidence() else "unverifiable"
+        finding = Finding(severity=Severity.FAIL, verdict=verdict, subject=run.final_answer)
+        result = CheckResult(check="faithfulness", passed=False, score=0.0, findings=[finding])
+        return Report(results=[result])
+
+
+def test_excluding_the_contradicting_file_never_keeps_an_issue_in_strict_mode():
+    issue = ReviewOutput(output_type="issue", text="The token in secrets/prod.env is empty.")
+
+    def kept(mode: str, exclude: list[str] | None) -> bool:
+        grader = _ContradictedBySecret()
+        modes = {"issue": mode}
+        result = review(PR, [issue], evaluate=grader, deep=False, modes=modes, exclude=exclude)
+        return result.decisions[0].keep
+
+    assert not kept("strict", None)
+    assert not kept("lenient", None)
+    assert not kept("strict", ["secrets/"])
+    # Lenient mode keeps unverifiable claims, and with the contradicting file excluded the
+    # claim can only be unverifiable: the documented cost of excluding evidence.
+    assert kept("lenient", ["secrets/"])
 
 
 def test_an_output_with_some_excluded_files_is_still_graded_on_the_rest():

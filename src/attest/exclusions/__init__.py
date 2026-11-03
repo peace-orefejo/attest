@@ -9,14 +9,22 @@ from .artifacts import (
     is_excluded_artifact,
     record_excluded,
 )
-from .loading import ATTESTIGNORE, MAX_PATTERN_FILE_BYTES, load_exclusions, read_pattern_file
+from .changed_sources import changed_sources
+from .loading import (
+    ATTESTIGNORE,
+    MAX_PATTERN_FILE_BYTES,
+    ExclusionsInput,
+    as_exclusions,
+    load_exclusions,
+    read_pattern_file,
+)
 from .rules import (
     EXCLUDED_REASON,
+    MAX_PATH_CHARS,
+    MAX_PATH_DEPTH,
     MAX_PATTERNS,
     ExclusionError,
     Exclusions,
-    ExclusionsInput,
-    as_exclusions,
     excluded_note,
 )
 
@@ -24,6 +32,8 @@ __all__ = [
     "ARTIFACTS_EXCLUDED",
     "ATTESTIGNORE",
     "EXCLUDED_REASON",
+    "MAX_PATH_CHARS",
+    "MAX_PATH_DEPTH",
     "MAX_PATTERNS",
     "MAX_PATTERN_FILE_BYTES",
     "ExcludedRun",
@@ -31,6 +41,7 @@ __all__ = [
     "Exclusions",
     "ExclusionsInput",
     "as_exclusions",
+    "changed_sources",
     "exclude_artifacts",
     "excluded_note",
     "is_excluded_artifact",

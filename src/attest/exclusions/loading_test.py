@@ -2,7 +2,7 @@
 
 import pytest
 
-from attest import ExclusionError, Exclusions, load_exclusions
+from attest import Attest, ExclusionError, Exclusions, load_exclusions
 from attest.exclusions import (
     MAX_PATTERN_FILE_BYTES,
     MAX_PATTERNS,
@@ -98,12 +98,27 @@ def test_exclusion_errors_are_value_errors():
     assert issubclass(ExclusionError, ValueError)
 
 
-def test_as_exclusions_accepts_one_pattern_a_list_or_exclusions():
+def test_as_exclusions_accepts_a_list_or_exclusions():
     assert not as_exclusions(None).active
-    assert as_exclusions("*.env").excludes("a.env")
     assert as_exclusions(["*.env", "!keep.env"]).excluded(["a.env", "keep.env"]) == ["a.env"]
+    assert as_exclusions(("*.env",)).excludes("a.env")
     ready = Exclusions(patterns=("x",))
     assert as_exclusions(ready) is ready
+
+
+def test_a_path_is_read_as_a_pattern_file(tmp_path):
+    team = tmp_path / "team.attestignore"
+    team.write_text("*.env\n!keep.env\n")
+    exclusions = as_exclusions(team)
+    assert exclusions.excluded(["a.env", "keep.env", "team.attestignore"]) == ["a.env"]
+    assert exclusions.sources == (str(team),)
+
+
+def test_a_bare_string_is_refused_rather_than_guessed():
+    with pytest.raises(TypeError, match=r"bare string.*\['team.attestignore'\].*Path"):
+        as_exclusions("team.attestignore")
+    with pytest.raises(TypeError, match="bare string"):
+        Attest(exclude="*.env")
 
 
 def test_excluded_lists_matches_once_in_order():

@@ -119,6 +119,8 @@ fixtures, snapshots, large data files. Patterns use gitignore syntax; the
 and the limits.
 
 ```python
+from pathlib import Path
+
 from attest import Attest, load_exclusions
 
 judge = Attest(exclude=["secrets/", "*.pem", "fixtures/**", "!fixtures/schema.json"])
@@ -127,6 +129,9 @@ result.excluded_files              # ["secrets/prod.env", ...]: left out, not re
 
 # or read .attestignore from the current directory, plus a team file
 judge = Attest(exclude=load_exclusions(files=["team.attestignore"], discover=True))
+
+# or one pattern file (a bare string is refused: is it a pattern or a file?)
+judge = Attest(exclude=Path("team.attestignore"))
 ```
 
 ```text
@@ -138,18 +143,34 @@ fixtures/**
 ```
 
 From the shell, `attest review` reads `.attestignore` from the current directory and takes
-`--exclude PATTERN` and `--exclude-file PATH`.
+`--exclude PATTERN` and `--exclude-file PATH`. It refuses (exit 2) when the pull request
+changes one of those pattern files, unless you pass `--allow-pr-attestignore`; in CI, read the
+patterns from the base branch (see [the command line page](../cli.md#in-ci-read-patterns-from-the-base-branch)).
 
-An excluded file's contents never reach a model or the injection scan. Each excluded diff, file
-read or grep line is replaced by one line, such as
+An excluded file's contents never reach a model or the injection scan. Each excluded diff or
+file read is replaced by one line, such as
 `secrets/prod.env: excluded by the user's exclusion rules`, in the grading evidence, in
 attest's own reviewer when it [writes the review](writing.md), and in the guideline check. The
 changed-file list keeps every path, marking excluded ones, so it stays complete.
 
+Matching fails closed, because paths arrive in many forms. A path is normalized (`\`, `//`,
+`./` and `..`), an absolute path is matched from every segment, and case and Unicode variants
+count as the same file. A read is hidden when any path-like argument names an excluded file,
+and a grep whose output names one anywhere is withheld whole. The
+[command line page](../cli.md#excluding-files) has the details.
+
+Key each diff in `PullRequest.diffs` (and an output's `diffs`) by one repo-relative file, as
+git names it: `secrets/prod.env`, not `b/secrets/prod.env`, and one file's diff per key. A diff
+that breaks this still fails closed: if its key or any of its header lines (`diff --git`,
+`---`/`+++`, `rename`, `copy`) names an excluded file, the whole diff is hidden, including any
+other files under that key.
+
 Excluding a file doesn't count as reviewing it:
 
-- A claim that rests only on an excluded file has no evidence, so it comes out `unverifiable`
-  (an issue is kept in lenient mode, as with any claim the shown code can't settle).
+- A claim that rests only on an excluded file has no evidence, so it comes out `unverifiable`.
+  In strict mode it is dropped. In lenient mode (the default for issues) it is kept, as with any
+  claim the shown code can't settle, even when the excluded file would have contradicted it:
+  excluding a file never makes a strict gate keep an output, but in lenient mode it can.
 - An output about excluded files only (every path it names is excluded) is not graded at all. It
   is dropped in every mode, with one unchecked finding in `reasons` and a `summary` saying every
   file it is about was excluded. Dropping is the conservative choice: attest can't vouch for it.
@@ -158,11 +179,11 @@ Excluding a file doesn't count as reviewing it:
   `metadata["files_excluded"]` lists the diffs it skipped, and `warnings` says how many files
   were not reviewed.
 
-Exclusions cover file contents only. The paths themselves still appear, and the text of a
-review output is checked as written, so a reviewer that quoted a secret in its comment still
-sends that comment to the grading model. A pull request that edits `.attestignore` (or another
-file the patterns came from) gets a warning, since it could hide its own changes: load
-exclusions from the base branch in CI.
+Exclusions cover file contents only. File paths still appear (in notes, the changed-file list
+and `excluded_files`), and the text of a review output is checked as written, so a reviewer
+that quoted a secret in its comment still sends that comment to the grading model. In Python,
+`review()` warns, rather than refuses, when the pull request edits `.attestignore` or another
+file the patterns came from: load exclusions from the base branch in CI.
 
 ## Next
 

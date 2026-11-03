@@ -11,10 +11,12 @@ from ...code_review.gate.defaults import DEFAULT_MODES
 from ...code_review.models import GATE_MODES, GateMode
 from ..context import require_key
 from ..exclusions import (
+    ALLOW_PR_EXCLUSIONS_OPTION,
     ATTESTIGNORE_OPTION,
     EXCLUDE_FILE_OPTION,
     EXCLUDE_OPTION,
     cli_exclusions,
+    refuse_pr_edited_exclusions,
 )
 from ..json_output import emit, json_command
 from ..options import MAX_CLAIMS_OPTION, MODEL_OPTION, PROVIDER_OPTION, require_max_claims
@@ -56,6 +58,7 @@ def review(
     exclude: list[str] = EXCLUDE_OPTION,
     exclude_file: list[Path] = EXCLUDE_FILE_OPTION,
     attestignore: bool = ATTESTIGNORE_OPTION,
+    allow_pr_attestignore: bool = ALLOW_PR_EXCLUSIONS_OPTION,
 ) -> None:
     """Check each code review output against the diff and your review rules (needs a key)."""
     request = _load_review(path)
@@ -63,6 +66,7 @@ def review(
     rules = _load_rules(guidelines)
     require_max_claims(max_claims)
     exclusions = cli_exclusions(exclude, exclude_file, attestignore)
+    refuse_pr_edited_exclusions(exclusions, request.pr, allowed=allow_pr_attestignore)
     require_key(provider)
     try:
         result = Attest(provider=provider, model=model, exclude=exclusions).review(

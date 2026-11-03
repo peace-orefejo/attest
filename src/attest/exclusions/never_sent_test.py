@@ -120,6 +120,60 @@ def test_code_review_never_sends_excluded_content(written):
     assert MARKER not in result.model_dump_json()
 
 
+def _read(arguments: dict[str, object], output: str = f"TOKEN={MARKER}") -> FileRead:
+    return FileRead(arguments=arguments, output=output)
+
+
+def _grep(output: str, path: str = ".") -> FileRead:
+    return FileRead(tool="grep", arguments={"pattern": "TOKEN", "path": path}, output=output)
+
+
+_FORMS: dict[str, tuple[list[str], list[FileRead], dict[str, str]]] = {
+    "absolute read, docs example": (
+        ["fixtures/**"],
+        [_read({"path": "/home/u/repo/fixtures/users.json"})],
+        {},
+    ),
+    "dot-dot read": (["/secrets/"], [_read({"path": "src/../secrets/k.env"})], {}),
+    "backslash read": (["/secrets/"], [_read({"path": "secrets\\k.env"})], {}),
+    "file_path argument": (["secrets/"], [_read({"file_path": "secrets/k.env"})], {}),
+    "paths list argument": (["secrets/"], [_read({"paths": ["app/x.py", "secrets/k.env"]})], {}),
+    "case variant": (["secrets/"], [_read({"path": "Secrets/k.env"})], {}),
+    "NFD variant": (["café.env"], [_read({"path": "café.env"})], {}),
+    "ripgrep heading": (["secrets/"], [_grep(f"secrets/k.env\n1:TOKEN={MARKER}")], {}),
+    "grep absolute anchored": (
+        ["/secrets/"],
+        [_grep(f"/home/u/repo/secrets/k.env:1:TOKEN={MARKER}")],
+        {},
+    ),
+    "grep NUL separated": (["secrets/"], [_grep(f"secrets/k.env\x001:TOKEN={MARKER}")], {}),
+    "grep in excluded directory": (["/secrets/"], [_grep(f"k.env:1:{MARKER}", "./secrets/")], {}),
+    "diff keyed with side prefix": (
+        ["/secrets/"],
+        [],
+        {"b/secrets/k.env": _diff("secrets/k.env", [f"TOKEN={MARKER}"])},
+    ),
+    "two files' diffs under one key": (
+        ["secrets/"],
+        [],
+        {"app/x.py": _diff("app/x.py", ["z = 2"]) + _diff("secrets/k.env", [MARKER])},
+    ),
+}
+
+
+@pytest.mark.parametrize("form", list(_FORMS))
+def test_every_path_form_is_excluded_and_recorded(form):
+    patterns, reads, diffs = _FORMS[form]
+    recorder = _Recorder()
+    pr = PullRequest(diffs={"app/main.py": _diff("app/main.py", ["y = 1"]), **diffs})
+    output = ReviewOutput(output_type="issue", text="y is set to 1.", reads=reads)
+    result = Attest(client=recorder, exclude=patterns).review(pr, [output], deep=True)
+    _assert_never_sent(recorder)
+    assert result.excluded_files
+    assert any("not reviewed" in warning for warning in result.warnings)
+    assert MARKER not in result.model_dump_json()
+
+
 def test_without_exclusions_the_marker_would_be_sent():
     recorder = _Recorder()
     Attest(client=recorder).review(_pull_request(), _outputs(), deep=True)

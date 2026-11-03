@@ -49,9 +49,11 @@ You can also tell attest which files to leave out of the evidence, with gitignor
 in `.attestignore`, `--exclude` or `Attest(exclude=[...])`. An artifact whose `path` or `name`
 matches, or a matching file in [code review](code-review/index.md#leaving-files-out), is
 replaced by a one-line note before any check runs, so its contents are never read, scanned or
-sent to a model. The result lists what was left out: `metadata["artifacts_excluded"]` beside
-`artifacts_unread`, or `excluded_files` in code review. Patterns never apply to tool outputs,
-which aren't files. See [Excluding files](cli.md#excluding-files).
+sent to a model. Matching fails closed: paths are normalized, absolute paths and symlinks are
+matched too, and case and Unicode variants count as the same file. The result lists what was
+left out: `metadata["artifacts_excluded"]` beside `artifacts_unread`, or `excluded_files` in
+code review. Patterns never apply to tool outputs, which aren't files, nor to the text of an
+answer or a review comment. See [Excluding files](cli.md#excluding-files).
 
 ## Results and findings
 
