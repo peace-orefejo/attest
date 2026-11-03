@@ -26,6 +26,9 @@ class ReasoningClient(Protocol):
 
     supports_reasoning: Literal[True]
 
+    @property
+    def sends_reasoning(self) -> bool: ...
+
     def create_with_completion(
         self,
         *,
@@ -40,6 +43,11 @@ class ReasoningClient(Protocol):
 def takes_reasoning(client: LLMClient) -> TypeGuard[ReasoningClient]:
     """Only attest's own provider clients get a level; a custom client's calls are unchanged."""
     return getattr(client, "supports_reasoning", False) is True
+
+
+def reasoning_sent(client: LLMClient, level: Reasoning) -> Reasoning | None:
+    """The level `client` sends for a call at `level`, or None when it sends no setting."""
+    return level if takes_reasoning(client) and client.sends_reasoning else None
 
 
 def create(

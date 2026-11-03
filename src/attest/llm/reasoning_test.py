@@ -12,7 +12,12 @@ from attest.llm.reasoning import (
     parse_reasoning,
     reasoning_policy,
 )
-from attest.llm.reasoning_scope import reasoning_for, recording_reasoning, using_reasoning
+from attest.llm.reasoning_scope import (
+    reasoning_for,
+    record_sent,
+    recording_reasoning,
+    using_reasoning,
+)
 
 
 def test_the_default_is_auto_everywhere():
@@ -82,12 +87,39 @@ def test_small_caps_can_no_longer_starve_the_answer():
         assert answer_room(300, level) >= 300 + 4096
 
 
-def test_the_scope_sets_the_level_and_records_each_site():
-    with using_reasoning(reasoning_policy({"role": "high"})), recording_reasoning() as used:
+def test_the_scope_sets_the_level_of_each_site():
+    with using_reasoning(reasoning_policy({"role": "high"})):
         assert reasoning_for("role") == "high"
         assert reasoning_for("faithfulness.verify") == "auto"
         assert reasoning_for(None) == "auto"
-    assert used == {"role": "high", "faithfulness.verify": "auto"}
+
+
+def test_a_recording_keeps_what_was_sent_and_adds_to_an_outer_one():
+    with recording_reasoning() as outer:
+        record_sent("writer", "auto")
+        with recording_reasoning() as inner:
+            record_sent("role", None)
+            record_sent(None, "high")
+        assert inner == {"role": None}
+    assert outer == {"writer": "auto", "role": None}
+
+
+@pytest.mark.parametrize(
+    ("text", "described"),
+    [
+        ("auto", "auto"),
+        ("default=auto,role=auto", "auto"),
+        ("default=off,faithfulness=off,faithfulness.verify=off", "off"),
+        ("faithfulness=high,faithfulness.verify=high", "default=auto,faithfulness=high"),
+        (
+            "faithfulness=high,faithfulness.verify=auto",
+            "default=auto,faithfulness=high,faithfulness.verify=auto",
+        ),
+        ("role=high,default=off", "default=off,role=high"),
+    ],
+)
+def test_equivalent_policies_are_described_the_same(text, described):
+    assert describe_reasoning(parse_reasoning(text)) == described
 
 
 def test_without_a_scope_calls_use_auto():

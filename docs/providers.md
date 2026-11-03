@@ -56,8 +56,11 @@ A mapping sets a level per check (`faithfulness`, `tool_use`, `injection`, `role
 pass `--reasoning` to any command that uses a model, for example `--reasoning off` or
 `--reasoning faithfulness=medium,default=auto`.
 
-Each report records the level every call site used in `metadata["reasoning"]`, so you can
-compare levels on the same runs. A run keeps one level per call site, which keeps the
+Each report records the level every call site was sent in `metadata["reasoning"]`, and
+`Attest.review()` records its call sites (the writer, injection confirmation, guideline check
+and faithfulness) in `ReviewResult.reasoning`, so you can compare levels on the same runs. A
+call site whose model or client takes no reasoning setting is recorded as `null`, since nothing
+was sent. A run keeps one level per call site, which keeps the
 provider's prompt cache valid between calls.
 
 ### What each model receives

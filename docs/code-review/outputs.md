@@ -57,6 +57,7 @@ The whole change. `review()` scans it for injection, and attest's own reviewer w
 | `guidelines` | The `ReviewGuidelines` used: your rules, or the general standard (`builtin=True`). |
 | `written` | `True` when attest wrote the outputs itself. |
 | `writer_failure` | Why attest's own reviewer wrote nothing (its call failed or was cut off), or `null`. When set there are no decisions, and `attest review` exits 1. |
+| `reasoning` | The reasoning level each call site was sent, or `null` where the model takes no reasoning setting. See [reasoning](../providers.md#reasoning). |
 | `warnings` | Things to check by hand, e.g. the pull request changes the file its review rules came from, a review attest couldn't write, or an output whose check against your rules couldn't run. |
 | `kept` | Indexes of the outputs to keep. |
 | `dropped` | Indexes of the outputs to drop. |

@@ -363,6 +363,27 @@
           "title": "Warnings",
           "type": "array"
         },
+        "reasoning": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "off",
+                  "low",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Reasoning",
+          "type": "object"
+        },
         "kept": {
           "items": {
             "type": "integer"

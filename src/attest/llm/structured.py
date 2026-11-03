@@ -11,8 +11,8 @@ from pydantic import BaseModel
 
 from ..prompts.guard import GUARD
 from .budget import before_call, record_cache_hit
-from .client import resolve_client
-from .dispatch import create
+from .client import has_active_client, resolve_client
+from .dispatch import create, reasoning_sent
 from .errors import (
     TruncatedOutput,
     api_error,
@@ -23,7 +23,7 @@ from .errors import (
     is_truncated,
 )
 from .protocol import LLMClient
-from .reasoning_scope import reasoning_for
+from .reasoning_scope import reasoning_for, record_sent
 from .response_cache import cache_key, response_cache
 
 if TYPE_CHECKING:
@@ -79,10 +79,14 @@ def call(
     key = cache_key(system, user, output, sample, prefix, reasoning) if store is not None else ""
     if store is not None and key in store:
         record_cache_hit()
+        known = client or (resolve_client() if has_active_client() else None)
+        if known is not None:
+            record_sent(site, reasoning_sent(known, reasoning))
         hit = store[key]
         return hit if isinstance(hit, output) else output.model_validate(hit)
 
     resolved = client or resolve_client()
+    record_sent(site, reasoning_sent(resolved, reasoning))
     guarded_system = f"{GUARD}\n\n{system}"
     messages: list[ChatCompletionMessageParam] = [
         {"role": "system", "content": guarded_system},

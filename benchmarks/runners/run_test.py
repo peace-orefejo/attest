@@ -385,6 +385,23 @@ def test_reasoning_is_parsed_passed_to_the_judge_and_recorded(
     assert seen["settings"].reasoning == "default=off,role=high"
 
 
+def test_a_model_that_takes_no_reasoning_setting_records_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, Any] = {}
+
+    def fake_run(judge: Attest, datasets: Datasets, **kwargs: Any) -> BenchmarkReport:
+        seen["settings"] = kwargs["settings"]
+        raise SystemExit(0)
+
+    monkeypatch.setattr(run, "run_benchmark", fake_run)
+    with pytest.raises(SystemExit):
+        run.main(
+            ["--check", "role_adherence", "--model", "claude-haiku-4-5", "--reasoning", "high"]
+        )
+    assert seen["settings"].reasoning is None
+
+
 def test_an_offline_run_records_no_reasoning(tmp_path: Path) -> None:
     out = tmp_path / "offline.json"
     assert run.main(["--offline", "--out", str(out)]) == 0

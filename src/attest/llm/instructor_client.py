@@ -11,7 +11,7 @@ from .errors import TruncatedOutput, UnreadableOutput, failed_completions
 from .reasoning import Reasoning, answer_room
 from .received import listen, receiving
 from .stop_reasons import stopped_at_limit
-from .thinking import gemini_plan, openai_plan
+from .thinking import gemini_plan, model_takes_reasoning, openai_plan
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -40,6 +40,11 @@ class InstructorClient:
         self.provider_name = provider
         self.model = model
         listen(inner)
+
+    @property
+    def sends_reasoning(self) -> bool:
+        """Whether this model receives a reasoning setting (see `attest.llm.thinking`)."""
+        return model_takes_reasoning(self.provider_name, self.model)
 
     def create(
         self,

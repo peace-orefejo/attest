@@ -20,7 +20,7 @@ from pydantic import BaseModel
 
 from .anthropic_answer import structured_answer
 from .reasoning import Reasoning, answer_room
-from .thinking import ClaudePlan, claude_plan
+from .thinking import ClaudePlan, claude_plan, model_takes_reasoning
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -52,6 +52,11 @@ class AnthropicClient:
     def __init__(self, model: str, api_key: str | None = None) -> None:
         self.model = model
         self.client = Anthropic(api_key=api_key) if api_key else Anthropic()
+
+    @property
+    def sends_reasoning(self) -> bool:
+        """Whether this model receives a reasoning setting (see `attest.llm.thinking`)."""
+        return model_takes_reasoning("anthropic", self.model)
 
     def create(
         self,

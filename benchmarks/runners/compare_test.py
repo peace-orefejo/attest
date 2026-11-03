@@ -280,3 +280,12 @@ def test_a_report_from_before_the_reasoning_setting_differs_from_auto() -> None:
     new = _report(labels, settings=GradeSettings(reasoning="auto"))
     problems = incompatibilities(loaded, new, min_coverage=0.0)
     assert any("setting reasoning differs (None vs 'auto')" in p for p in problems)
+
+
+def test_equivalent_reasoning_settings_are_compatible() -> None:
+    labels = ["payload", "payload", "compromised", "none", "none"]
+    old = _report(labels, settings=GradeSettings(reasoning="default=auto,role=auto"))
+    new = _report(labels, settings=GradeSettings(reasoning="auto"))
+    assert old.settings.reasoning == "auto"
+    problems = incompatibilities(old, new, min_coverage=0.0)
+    assert not any("reasoning" in p for p in problems)

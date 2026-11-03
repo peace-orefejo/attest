@@ -118,8 +118,24 @@ def parse_reasoning(text: str) -> ReasoningPolicy:
 
 
 def describe_reasoning(policy: ReasoningPolicy) -> str:
-    """The policy in the `--reasoning` text form, such as `"auto"` or `"default=auto,role=high"`."""
-    if not policy.checks:
+    """The policy in the `--reasoning` text form, such as `"auto"` or `"default=auto,role=high"`.
+
+    Equivalent policies read the same: an override that sets the level its site would get
+    anyway is left out, so `"default=auto,role=auto"` reads `"auto"`.
+    """
+    checks = normalized(policy).checks
+    if not checks:
         return policy.default
-    overrides = (f"{key}={level}" for key, level in sorted(policy.checks.items()))
+    overrides = (f"{key}={level}" for key, level in sorted(checks.items()))
     return ",".join([f"default={policy.default}", *overrides])
+
+
+def normalized(policy: ReasoningPolicy) -> ReasoningPolicy:
+    """The same policy without overrides that change nothing."""
+    by_check = {k: v for k, v in policy.checks.items() if "." not in k and v != policy.default}
+    by_site = {
+        k: v
+        for k, v in policy.checks.items()
+        if "." in k and v != by_check.get(k.split(".")[0], policy.default)
+    }
+    return ReasoningPolicy(default=policy.default, checks={**by_check, **by_site})

@@ -19,6 +19,7 @@ from pathlib import Path
 
 from attest import Attest, Budget, ReasoningPolicy
 from attest.llm.reasoning import describe_reasoning, parse_reasoning
+from attest.llm.thinking import model_takes_reasoning
 from bench_cases import CHECKS, SPLITS, CheckName
 from bench_check_metrics import Prices
 from bench_grade import OFFLINE_CHECKS, GradeSettings
@@ -104,8 +105,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"dataset error: {exc}", file=sys.stderr)
         return 2
 
+    judge = _judge(args, reasoning)
+    sent = not args.offline and model_takes_reasoning(judge.provider, judge.model)
     report = run_benchmark(
-        _judge(args, reasoning),
+        judge,
         datasets,
         checks=checks,
         split=args.split,
@@ -113,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
             offline=args.offline,
             answer_kind=args.answer_kind,
             appropriate=args.appropriate,
-            reasoning=None if args.offline else describe_reasoning(reasoning),
+            reasoning=describe_reasoning(reasoning) if sent else None,
         ),
         prices=Prices(input=args.price_per_mtok_in, output=args.price_per_mtok_out),
         min_coverage=args.min_coverage,

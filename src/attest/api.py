@@ -64,8 +64,9 @@ class Attest:
     `reasoning` sets how much the judge model may reason before answering: `"auto"` (default,
     the provider's adaptive thinking at low effort), `"off"`, `"low"`, `"medium"` or `"high"`,
     or a mapping per check such as `{"faithfulness": "medium", "default": "auto"}`, or a
-    `ReasoningPolicy`. Each report records the level each call site used in
-    `metadata["reasoning"]`.
+    `ReasoningPolicy`. Each report records the level each call site was sent in
+    `metadata["reasoning"]`, and `review()` in `ReviewResult.reasoning`; a site whose model
+    takes no reasoning setting is recorded as None.
     """
 
     def __init__(
@@ -171,8 +172,8 @@ class Attest:
                 run, checks=("faithfulness",), answer_kind=answer_kind, max_claims=max_claims
             )
 
-        with self._llm_context():
-            return review_outputs(
+        with self._llm_context(), recording_reasoning() as levels:
+            result = review_outputs(
                 pr,
                 outputs,
                 evaluate=grade,
@@ -182,6 +183,8 @@ class Attest:
                 deep=deep,
                 limits=limits,
             )
+        result.reasoning = dict(sorted(levels.items()))
+        return result
 
     def write_review(
         self,

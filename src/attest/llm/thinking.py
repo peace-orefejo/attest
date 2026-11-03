@@ -130,6 +130,17 @@ def gemini_plan(model: str, level: Reasoning) -> GeminiPlan | None:
     return GeminiPlan(level=named[_EFFORT[level]], room=level)
 
 
+def model_takes_reasoning(provider: str, model: str) -> bool:
+    """Whether attest sends `model` a reasoning setting: it is listed here for `provider`."""
+    if provider == "anthropic":
+        return claude_plan(model, "auto") is not None
+    if provider == "openai":
+        return openai_plan(model, "auto") is not None
+    if provider == "gemini":
+        return gemini_plan(model, "auto") is not None
+    return False
+
+
 def _lookup(model: str, table: dict[str, V]) -> V | None:
     """The row for `model`, matching an exact id or one with a version suffix (`-20260101`)."""
     name = model.removeprefix("models/")
