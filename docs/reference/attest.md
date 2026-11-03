@@ -21,6 +21,14 @@ The public API, importable as `from attest import ...`.
 
 ::: attest.Artifact
 
+## Exclusions
+
+::: attest.Exclusions
+
+::: attest.load_exclusions
+
+::: attest.ExclusionError
+
 ## Results
 
 ::: attest.Report

@@ -18,6 +18,7 @@ from .code_review import review as review_outputs
 from .code_review import write_review as write_pr_review
 from .code_review.guidelines import GuidelinesInput
 from .code_review.models import GateMode
+from .exclusions import ExclusionsInput, as_exclusions, exclude_artifacts, record_excluded
 from .extraction import ExtractionLimits
 from .llm import Budget, DiskCache, LLMClient, Usage, metering, using, using_cache
 from .llm.response_cache import ResponseStore
@@ -48,6 +49,10 @@ class Attest:
     evidence, through the same bounded extraction the injection scan uses; `path` artifacts
     are read from disk only when `allow_paths=True` too. Without it, only text artifacts and
     tool outputs are evidence.
+
+    `exclude` takes gitignore-style patterns (or an `Exclusions` from `load_exclusions`) for
+    files attest must leave out: artifacts whose path or name matches are never read, scanned
+    or sent to a model, and code review leaves those files' diffs and reads out.
     """
 
     def __init__(
@@ -64,6 +69,7 @@ class Attest:
         extract_artifacts: bool = False,
         allow_paths: bool = False,
         verdict_policy: VerdictPolicy | None = None,
+        exclude: ExclusionsInput = None,
     ) -> None:
         self.provider = provider
         self.model = model or default_model(provider)
@@ -78,6 +84,7 @@ class Attest:
         self.artifact_extraction = ArtifactExtraction(
             enabled=extract_artifacts, allow_paths=allow_paths
         )
+        self.exclusions = as_exclusions(exclude)
 
     def evaluate(
         self,
@@ -93,6 +100,8 @@ class Attest:
         enforce_policy: bool | None = None,
     ) -> Report:
         selected = validate_evaluation_options(checks, answer_kind, max_claims)
+        hidden = exclude_artifacts(traj, self.exclusions)
+        traj = hidden.run
         policy = self._active_policy(enforce_policy)
         needs_llm = _checks_need_llm(
             selected, appropriate=appropriate, deep=deep, extract=extract, verify=verify
@@ -116,6 +125,7 @@ class Attest:
                 report.metadata.update(self.policy_identity())
                 report = apply_verdict_policy(report, self.verdict_policy)
         report.metadata["usage"] = self.usage.since(before).as_dict()
+        record_excluded(report, hidden.excluded)
         return report
 
     def review(
@@ -155,6 +165,7 @@ class Attest:
                 modes=modes,
                 deep=deep,
                 limits=limits,
+                exclude=self.exclusions,
             )
 
     def write_review(
@@ -166,14 +177,19 @@ class Attest:
     ) -> list[ReviewOutput]:
         """Write a review of the pull request without checking it: issues, summaries, overview."""
         with self._llm_context():
-            return write_pr_review(pr, guidelines=guidelines, limits=limits)
+            return write_pr_review(
+                pr, guidelines=guidelines, limits=limits, exclude=self.exclusions
+            )
 
     def policy_check(self, traj: Trajectory) -> CheckResult:
         """Evaluate the instance policy directly without running the standard checks."""
         if self.policy is None:
             raise ValueError("No evaluation policy is configured on this Attest instance.")
+        hidden = exclude_artifacts(traj, self.exclusions)
         with self._llm_context(self.policy.needs_llm):
-            return check_policy(traj, self.policy)
+            result = check_policy(hidden.run, self.policy)
+        record_excluded(result, hidden.excluded)
+        return result
 
     def policy_identity(self) -> JsonObject:
         if self.policy is None:
@@ -192,8 +208,11 @@ class Attest:
         """Run the tool-use check. `check_answer=True` reads the final answer for unrecovered
         tool errors without the per-call tool-choice check; it defaults to `appropriate`."""
         answer = appropriate if check_answer is None else check_answer
+        hidden = exclude_artifacts(traj, self.exclusions)
         with self._llm_context(appropriate or answer):
-            return check_tool_use(traj, appropriate=appropriate, check_answer=answer)
+            result = check_tool_use(hidden.run, appropriate=appropriate, check_answer=answer)
+        record_excluded(result, hidden.excluded)
+        return result
 
     def injection(
         self,
@@ -205,23 +224,29 @@ class Attest:
         allow_paths: bool = False,
         extraction_limits: ExtractionLimits = ExtractionLimits(),
     ) -> CheckResult:
+        hidden = exclude_artifacts(traj, self.exclusions)
         with self._llm_context(deep):
-            return check_injection(
-                traj,
+            result = check_injection(
+                hidden.run,
                 deep=deep,
                 detectors=detectors,
                 extract_files=extract_files,
                 allow_paths=allow_paths,
                 extraction_limits=extraction_limits,
             )
+        record_excluded(result, hidden.excluded)
+        return result
 
     def role_adherence(self, traj: Trajectory) -> CheckResult:
+        hidden = exclude_artifacts(traj, self.exclusions)
         with self._llm_context():
-            return check_role_adherence(traj)
+            result = check_role_adherence(hidden.run)
+        record_excluded(result, hidden.excluded)
+        return result
 
     def judge(self, traj: Trajectory) -> JudgeVerdict:
         with self._llm_context():
-            return naive_judge(traj)
+            return naive_judge(exclude_artifacts(traj, self.exclusions).run)
 
     @staticmethod
     def stats(successes: int, n: int) -> Proportion:

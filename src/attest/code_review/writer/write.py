@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from ...exclusions import Exclusions, ExclusionsInput, as_exclusions
 from ...llm import call
 from ...prompts.code_review.writer import WRITE_PROMPT, write_user
 from ..evidence import EvidenceLimits, render_diffs
+from ..evidence.excluded import changed_files_listing, hide_pull_request
 from ..guidelines import GuidelinesInput, ReviewGuidelines, general_guidelines, load_guidelines
 from ..models import PullRequest, ReviewOutput
 from .models import WrittenIssue, WrittenReview, WrittenSummary
@@ -28,26 +30,38 @@ def write_review(
     *,
     guidelines: GuidelinesInput = None,
     limits: EvidenceLimits | None = None,
+    exclude: ExclusionsInput = None,
 ) -> list[ReviewOutput]:
-    """Review a pull request: issues, one summary per changed file, and an overview."""
+    """Review a pull request: issues, one summary per changed file, and an overview.
+
+    Files that `exclude` names reach the writer only as one-line notes, and the outputs carry
+    those notes in place of their diffs.
+    """
     if not pr.diffs:
         raise ValueError("The pull request has no diffs to review.")
     rules = load_guidelines(guidelines)
-    written = call(
-        system=WRITE_PROMPT, user=_user(pr, rules, limits), output=WrittenReview, max_tokens=8192
-    )
-    return to_outputs(written, pr)
+    exclusions = as_exclusions(exclude)
+    visible = hide_pull_request(pr, exclusions).pr
+    user = _user(visible, rules, limits, exclusions)
+    written = call(system=WRITE_PROMPT, user=user, output=WrittenReview, max_tokens=8192)
+    return to_outputs(written, visible)
 
 
-def _user(pr: PullRequest, guidelines: ReviewGuidelines, limits: EvidenceLimits | None) -> str:
-    rendered = render_diffs(list(pr.diffs.items()), limits)
+def _user(
+    pr: PullRequest,
+    guidelines: ReviewGuidelines,
+    limits: EvidenceLimits | None,
+    exclusions: Exclusions,
+) -> str:
+    rendered = render_diffs(list(pr.diffs.items()), limits, exclusions)
+    changed = changed_files_listing(pr.changed_files or list(pr.diffs), exclusions)
     return write_user(
         baseline=general_guidelines().render(),
         team_name=None if guidelines.builtin else guidelines.name,
         team_rules="" if guidelines.builtin else guidelines.render(),
         title=_cut(pr.title, MAX_TITLE_CHARS),
         description=_cut(pr.description, MAX_DESCRIPTION_CHARS),
-        changed_files="\n".join(pr.changed_files or list(pr.diffs)),
+        changed_files="\n".join(changed),
         diffs=[(item.path, item.text) for item in rendered],
     )
 

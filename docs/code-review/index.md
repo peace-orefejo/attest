@@ -77,10 +77,12 @@ Options:
 | `limits` | `None` | An `EvidenceLimits` budget for large diffs. |
 | `answer_kind` | `"code"` | The answer kind used to grade each output. |
 | `max_claims` | `40` | The most claims checked per output. An output with more is dropped, since the rest were never checked. |
+| `exclude` | `None` | Gitignore-style patterns for files to [leave out](#leaving-files-out). Set on `Attest(exclude=[...])`, or pass `exclude=` to `attest.code_review.review()`. |
 
 For a custom pipeline, the steps are public too:
 
 - `to_run(output)` turns one output into a run whose tool outputs are its diffs and file reads.
+  Pass `exclude=[...]` to replace excluded files with notes.
 - `check_code_injection(pr, outputs)` scans the pull request (see [Injection in diffs](injection.md)).
 - `gate(report, output_type, injection=..., paths=..., output_index=...)` decides one output.
 
@@ -108,6 +110,59 @@ Each output's evidence is kept within a budget (12,000 characters per file and 6
 default; pass `limits=EvidenceLimits(...)` to change it). Lockfiles are reduced to their version
 changes, generated files to a line count, and large diffs keep whole hunks until the budget runs
 out. The changed-file list is never cut. Each decision's `omissions` says what was left out.
+
+## Leaving files out
+
+Tell attest which files to leave out of the review, for cost, noise or privacy: secrets,
+fixtures, snapshots, large data files. Patterns use gitignore syntax; the
+[command line page](../cli.md#excluding-files) has the full syntax, where patterns come from,
+and the limits.
+
+```python
+from attest import Attest, load_exclusions
+
+judge = Attest(exclude=["secrets/", "*.pem", "fixtures/**", "!fixtures/schema.json"])
+result = judge.review(pr, outputs)
+result.excluded_files              # ["secrets/prod.env", ...]: left out, not reviewed
+
+# or read .attestignore from the current directory, plus a team file
+judge = Attest(exclude=load_exclusions(files=["team.attestignore"], discover=True))
+```
+
+```text
+# .attestignore
+secrets/
+*.pem
+fixtures/**
+!fixtures/schema.json
+```
+
+From the shell, `attest review` reads `.attestignore` from the current directory and takes
+`--exclude PATTERN` and `--exclude-file PATH`.
+
+An excluded file's contents never reach a model or the injection scan. Each excluded diff, file
+read or grep line is replaced by one line, such as
+`secrets/prod.env: excluded by the user's exclusion rules`, in the grading evidence, in
+attest's own reviewer when it [writes the review](writing.md), and in the guideline check. The
+changed-file list keeps every path, marking excluded ones, so it stays complete.
+
+Excluding a file doesn't count as reviewing it:
+
+- A claim that rests only on an excluded file has no evidence, so it comes out `unverifiable`
+  (an issue is kept in lenient mode, as with any claim the shown code can't settle).
+- An output about excluded files only (every path it names is excluded) is not graded at all. It
+  is dropped in every mode, with one unchecked finding in `reasons` and a `summary` saying every
+  file it is about was excluded. Dropping is the conservative choice: attest can't vouch for it.
+- `ReviewResult.excluded_files` lists every excluded path, each decision's `omissions` lists its
+  excluded files with the reason `excluded`, the injection result's
+  `metadata["files_excluded"]` lists the diffs it skipped, and `warnings` says how many files
+  were not reviewed.
+
+Exclusions cover file contents only. The paths themselves still appear, and the text of a
+review output is checked as written, so a reviewer that quoted a secret in its comment still
+sends that comment to the grading model. A pull request that edits `.attestignore` (or another
+file the patterns came from) gets a warning, since it could hide its own changes: load
+exclusions from the base branch in CI.
 
 ## Next
 

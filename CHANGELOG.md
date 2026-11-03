@@ -6,6 +6,17 @@ All notable changes to `agent-attest` are documented here. This project follows
 ## [Unreleased]
 
 ### Added
+- User-defined file exclusions, for cost, noise and privacy. Gitignore-style patterns come from
+  `.attestignore` in the current directory (`--no-attestignore` turns that off), then
+  `--exclude-file PATH`, then `--exclude PATTERN` on `attest run` and `attest review`, with a
+  later `!pattern` re-including. In Python: `Attest(exclude=[...])`, `review(..., exclude=...)`,
+  and `load_exclusions(...)`. Excluded files' contents never reach a model or a scan: code
+  review replaces their diffs, reads and grep lines with a one-line note, drops an output about
+  excluded files only as unchecked, and lists them in the new `ReviewResult.excluded_files`
+  (each omission's reason is the new `excluded`); run mode replaces matching artifacts (by
+  `path` or `name`) with a note and lists them in `metadata["artifacts_excluded"]`. An
+  unreadable pattern file, one over 1 MB, or more than 1,000 patterns is `invalid_input`
+  (exit 2), or `ExclusionError` in Python.
 - `VerdictPolicy(min_claim_coverage=...)`: a run whose faithfulness check covered less than this
   share of the answer's claims goes to review. Off by default; kept separate from the score.
 - `Report.claim_coverage`: the share of claims faithfulness checked (0 to 1, or `None`).

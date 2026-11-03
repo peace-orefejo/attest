@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
+from ..exclusions import Exclusions, ExclusionsInput, as_exclusions
 from ..trajectory import Step, ToolCall, Trajectory
+from .evidence.excluded import changed_files_listing, hide_read
 from .evidence.large_files import render_diffs
 from .evidence.models import EvidenceLimits, Omission
 from .evidence.scoping import Scope, read_label, scope_evidence
@@ -49,15 +51,17 @@ def to_run_with_omissions(
     *,
     limits: EvidenceLimits | None = None,
     guidelines: ReviewGuidelines | None = None,
+    exclude: ExclusionsInput = None,
 ) -> RunWithOmissions:
     """Build the run for a review output and list which files had content left out and why.
 
     `guidelines`, when given, are added as a read_guidelines step so claims citing a rule
-    can be checked.
+    can be checked. Files that `exclude` names appear only as one-line notes, with an
+    `excluded` omission each.
     """
     limits = limits or EvidenceLimits()
     scope = scope_evidence(output)
-    built = _evidence_steps(scope, limits)
+    built = _evidence_steps(scope, limits, as_exclusions(exclude))
     steps = built.steps
     if guidelines is not None:
         steps.append(_step(READ_GUIDELINES, {"name": guidelines.name}, guidelines.render()))
@@ -80,22 +84,26 @@ def to_run(
     *,
     limits: EvidenceLimits | None = None,
     guidelines: ReviewGuidelines | None = None,
+    exclude: ExclusionsInput = None,
 ) -> Trajectory:
     """Build the run for a review output; evidence comes only from tool calls."""
-    return to_run_with_omissions(output, limits=limits, guidelines=guidelines).run
+    return to_run_with_omissions(output, limits=limits, guidelines=guidelines, exclude=exclude).run
 
 
-def _evidence_steps(scope: Scope, limits: EvidenceLimits) -> _Steps:
+def _evidence_steps(scope: Scope, limits: EvidenceLimits, exclusions: Exclusions) -> _Steps:
     steps: list[Step] = []
     omissions: list[Omission] = []
     if scope.changed_files is not None:
-        listing = "\n".join(scope.changed_files) or _NO_CHANGED_FILES
-        steps.append(_step(LIST_CHANGED_FILES, {}, listing))
-    for item in render_diffs(scope.diffs, limits):
+        listing = "\n".join(changed_files_listing(scope.changed_files, exclusions))
+        steps.append(_step(LIST_CHANGED_FILES, {}, listing or _NO_CHANGED_FILES))
+    for item in render_diffs(scope.diffs, limits, exclusions):
         steps.append(_step(READ_DIFF, {"path": item.path}, item.text))
         if item.omission is not None:
             omissions.append(item.omission)
-    for read in scope.reads:
+    for original in scope.reads:
+        hidden = hide_read(original, exclusions)
+        read = hidden.read
+        omissions.extend(Omission(path=path, reason="excluded") for path in hidden.excluded)
         bounded = _bounded_read(read, limits)
         steps.append(_step(read.tool, dict(read.arguments), bounded.text))
         if bounded.omission is not None:

@@ -4,13 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
+from ...exclusions import Exclusions, ExclusionsInput, as_exclusions
+from ...results import CheckResult
 from ..evidence import EvidenceLimits
+from ..evidence.excluded import hide_output, hide_pull_request, without_excluded_diffs
 from ..gate import gate
 from ..gate.defaults import DEFAULT_MODES
 from ..guidelines import GuidelinesInput, load_guidelines
 from ..injection import check_code_injection
 from ..models import GateDecision, GateMode, PullRequest, ReviewOutput
 from ..writer import write_review
+from .excluded import exclusion_warnings
 from .grade import FAITHFULNESS_CHECK, Evaluator, Graded, grade
 from .models import OutputDecision, ReviewResult
 from .pr_evidence import guideline_warnings, injection_warnings, with_pr_evidence
@@ -26,6 +30,7 @@ def review(
     modes: Mapping[str, GateMode] | None = None,
     deep: bool = True,
     limits: EvidenceLimits | None = None,
+    exclude: ExclusionsInput = None,
 ) -> ReviewResult:
     """Scan the pull request for injection once, then grade and gate each output on its evidence.
 
@@ -36,16 +41,31 @@ def review(
     for faithfulness only. Outputs without their own diffs or
     changed-file list use the pull request's. `evaluate` turns a run into a Report with a
     faithfulness result, and `modes` overrides the default gate mode per output type.
+
+    `exclude` takes gitignore-style patterns (or an `Exclusions`). Excluded files' contents
+    never reach a model or the injection scan; each appears as a one-line note, and an output
+    about excluded files only is dropped as unchecked. `excluded_files` lists them.
     """
     chosen: dict[str, GateMode] = dict(modes) if modes else {}
     _check_modes(chosen)
+    exclusions = as_exclusions(exclude)
     rules = load_guidelines(guidelines)
-    source = write_review(pr, guidelines=rules, limits=limits) if outputs is None else outputs
-    filled = [with_pr_evidence(output, pr) for output in source]
-    injection = check_code_injection(pr, filled, deep=deep)
+    hidden_pr = hide_pull_request(pr, exclusions)
+    visible = hidden_pr.pr
+    source = (
+        write_review(visible, guidelines=rules, limits=limits, exclude=exclusions)
+        if outputs is None
+        else outputs
+    )
+    hidden = [hide_output(with_pr_evidence(output, visible), exclusions) for output in source]
+    filled = [item.output for item in hidden]
+    injection = _scan(visible, filled, exclusions, deep=deep)
+    excluded = _union(hidden_pr.excluded, *(item.excluded for item in hidden))
     decisions: list[OutputDecision] = []
     for index, output in enumerate(filled):
-        graded = grade(output, evaluate, rules, follow=follow_guidelines, limits=limits)
+        graded = grade(
+            output, evaluate, rules, follow=follow_guidelines, limits=limits, exclusions=exclusions
+        )
         decision = gate(
             graded.report,
             output.output_type,
@@ -60,9 +80,29 @@ def review(
         injection=injection,
         guidelines=rules,
         written=outputs is None,
-        warnings=[*guideline_warnings(rules, pr), *injection_warnings(injection)],
+        warnings=[
+            *guideline_warnings(rules, pr),
+            *injection_warnings(injection),
+            *exclusion_warnings(excluded, exclusions, pr),
+        ],
+        excluded_files=excluded,
         outputs=list(source),
     )
+
+
+def _scan(
+    pr: PullRequest, outputs: list[ReviewOutput], exclusions: Exclusions, *, deep: bool
+) -> CheckResult:
+    scanned = without_excluded_diffs(pr, exclusions)
+    result = check_code_injection(scanned, outputs, deep=deep)
+    skipped = [path for path in pr.diffs if path not in scanned.diffs]
+    if skipped:
+        result.metadata["files_excluded"] = list(skipped)
+    return result
+
+
+def _union(*groups: list[str]) -> list[str]:
+    return list(dict.fromkeys(path for group in groups for path in group))
 
 
 def _check_modes(modes: Mapping[str, GateMode]) -> None:

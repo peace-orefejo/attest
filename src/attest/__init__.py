@@ -15,6 +15,7 @@ from .checks.role import check_role_adherence
 from .checks.tool_use import check_tool_use
 from .checks.verify import extract_claims, grounded_verifier, judge_trajectory, verify_claims
 from .content import Artifact, Detection, TextSegment
+from .exclusions import ExclusionError, Exclusions, load_exclusions
 from .extraction import ExtractionLimits, ExtractionOutcome, extract_artifact
 from .llm import Budget, BudgetExceeded, DiskCache, LLMClient, ProviderConfigError, Usage
 from .policy import EvaluationPolicy, EvaluationRule, check_policy, load_policy
@@ -38,6 +39,8 @@ __all__ = [
     "DiskCache",
     "EvaluationPolicy",
     "EvaluationRule",
+    "ExclusionError",
+    "Exclusions",
     "ExtractionLimits",
     "ExtractionOutcome",
     "Finding",
@@ -71,6 +74,7 @@ __all__ = [
     "judge_trajectory",
     "list_models",
     "list_providers",
+    "load_exclusions",
     "load_policy",
     "load_regex_detector",
     "naive_judge",

@@ -4,7 +4,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-OmissionReason = Literal["summarized", "generated", "truncated", "budget", "out_of_scope"]
+OmissionReason = Literal[
+    "summarized", "generated", "truncated", "budget", "out_of_scope", "excluded"
+]
 
 
 class EvidenceLimits(BaseModel):

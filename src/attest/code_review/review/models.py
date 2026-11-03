@@ -31,6 +31,7 @@ class ReviewResult(BaseModel):
     guidelines: ReviewGuidelines | None = None
     written: bool = False
     warnings: list[str] = Field(default_factory=list[str])
+    excluded_files: list[str] = Field(default_factory=list[str])
     outputs: list[ReviewOutput] = Field(default_factory=list[ReviewOutput], exclude=True)
 
     @computed_field

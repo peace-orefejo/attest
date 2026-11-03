@@ -45,6 +45,14 @@ uses; `path` artifacts also need `allow_paths=True`. A file that was cut short o
 read is marked `complete="false"`, and the grading model is told not to count its missing parts
 as support. Files left out are listed in the result's `metadata["artifacts_unread"]`.
 
+You can also tell attest which files to leave out of the evidence, with gitignore-style patterns
+in `.attestignore`, `--exclude` or `Attest(exclude=[...])`. An artifact whose `path` or `name`
+matches, or a matching file in [code review](code-review/index.md#leaving-files-out), is
+replaced by a one-line note before any check runs, so its contents are never read, scanned or
+sent to a model. The result lists what was left out: `metadata["artifacts_excluded"]` beside
+`artifacts_unread`, or `excluded_files` in code review. Patterns never apply to tool outputs,
+which aren't files. See [Excluding files](cli.md#excluding-files).
+
 ## Results and findings
 
 Every check returns a result with the same fields:
