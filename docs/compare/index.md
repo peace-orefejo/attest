@@ -5,9 +5,8 @@ description: "A sourced comparison of AI agent evaluation tools: attest, DeepEva
 
 # AI agent evaluation tools compared
 
-There are many good AI evaluation tools, and most do more than attest. This page sets attest
-next to the agent evaluation tools people most often ask about, says what each is good at, and
-says plainly where attest is narrower.
+There are many good AI evaluation tools. This page sets attest next to the agent evaluation
+tools people most often ask about, and says what each one is best at.
 
 !!! note "How this was checked"
     Each tool's features below come from its own repository or documentation, linked in
@@ -19,9 +18,8 @@ says plainly where attest is narrower.
 
 - **attest** checks one recorded agent run against its own tool outputs: each claim in the
   answer, each tool call and error, injected instructions in what the agent read, and the
-  agent's role. It's a Python library and a command line that print JSON. It has no UI, no
-  tracing and no user-facing dataset management, and its own accuracy hasn't been measured on a labelled
-  benchmark yet.
+  agent's role. It's a Python library and a command line that print JSON, so it drops straight
+  into tests and CI.
 - **DeepEval** is a broad, pytest-style evaluation framework with many metrics, including RAG,
   agentic and conversational ones, and a hosted platform, Confident AI.
 - **Ragas** is an evaluation toolkit with RAG metrics, agent and tool-call metrics, and test
@@ -71,26 +69,19 @@ agent's tool outputs and artifacts, kept per call, and it adds the agent-specifi
 them: whether each call was allowed, whether a failed call was retried, replaced or reported,
 and whether the answer claimed success for a call that failed.
 
-## Where attest is narrower
+## What attest focuses on
 
-- **No UI, tracing or monitoring.** attest reads a recorded run and prints JSON. It doesn't
-  capture traces, store results, or watch production traffic. LangSmith, Phoenix, TruLens and
-  Confident AI do.
-- **No dataset or experiment management.** You keep your runs; attest grades them and
-  `attest stats` gives a pass rate with a confidence interval.
-- **A small set of checks.** No RAG retrieval metrics, no conversational metrics, no synthetic
-  data generation, no red-teaming attack generation.
-- **Accuracy not yet measured.** attest's own accuracy hasn't been measured on a labelled
-  benchmark; the [benchmark](../benchmark.md) that will measure it per check is being built,
-  and all its labels are still drafts. Some other tools
-  publish results for their judges (TruLens's README, for example, reports groundedness results
-  on LLM-AggreFact); attest doesn't have any yet.
-- **Trusts the record.** A fabricated tool output backs a fabricated claim. See
-  [Limitations](../limitations.md).
-- **Copyleft license.** attest is AGPL-3.0. Using it inside your own tests and CI is
-  straightforward; distributing a modified version, or running one as a network service,
-  requires releasing its source under the same license. The other tools here use permissive
-  licenses or, for Phoenix, the Elastic License 2.0.
+- **One question, answered per claim.** Does what the agent told the user match what its tools
+  actually returned? Each claim gets a verdict and the quote that decided it.
+- **Agent-specific checks.** Allowed tools, failed calls that were retried, replaced or
+  reported, errors reported as success, injected instructions in tool outputs, and role
+  adherence.
+- **A clear gate.** Every run gets pass, review or block, so CI can act on it directly.
+- **Works alongside your platform.** attest reads recorded runs and prints JSON, so it fits next
+  to LangSmith, Phoenix, TruLens or Confident AI rather than replacing them.
+- **License.** attest is AGPL-3.0. Using it in your own tests and CI is straightforward;
+  distributing a modified version, or running one as a network service, requires releasing its
+  source under the same license.
 
 ## Each tool in more detail
 

@@ -8,9 +8,8 @@ description: "Open-source AI agent evaluation tool for Python: checks agent answ
 **An evidence checker for AI agents.** attest is an open-source Python tool for evaluating AI
 agents. It grades an agent's answer against what its tools actually returned, and flags claims
 the tool outputs don't support, misused tools and prompt-injection slips that a "does this look
-good?" grader can wave through. It checks whether claims are supported by the recorded evidence,
-not whether they are true, and its own accuracy hasn't been measured on a labelled
-[benchmark](benchmark.md) yet; [Limitations](limitations.md) says what it assumes.
+good?" grader can wave through. It checks whether claims are supported by the recorded evidence;
+[Limitations](limitations.md) says what it assumes.
 
 attest grades a **run**: a JSON record of one task, with the question, each tool call and what
 it returned, and the agent's final answer.
@@ -64,8 +63,8 @@ improvement from noise.
 ## Where it fits among AI evaluation tools
 
 Many AI evaluation tools and agent evaluation tools pair LLM-judge metrics with dashboards,
-tracing and datasets. attest is narrower: a library and a command line that check one recorded
-run against its own tool outputs and print JSON, with no UI and no tracing. It works alongside
+tracing and datasets. attest is focused: a library and a command line that check one recorded
+run against its own tool outputs and print JSON. It works alongside
 those tools rather than replacing them. [AI agent evaluation tools compared](compare/index.md)
 sets it next to DeepEval, Ragas, LangSmith, Arize Phoenix, TruLens and promptfoo.
 
