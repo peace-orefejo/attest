@@ -38,21 +38,21 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 dependencies = [
-    "anthropic>=0.77,<2",
-    "pydantic>=2.7",
-    "typer>=0.12",
-    "python-dotenv>=1.0",
-    "instructor>=1.15.3,<2",
-    "regex>=2024.11.6",
+    "anthropic>=2.4.0,<3",
+    "pydantic>=2.14.2",
+    "typer>=0.27.3",
+    "python-dotenv>=1.2.4",
+    "instructor>=1.17.0,<2",
+    "regex>=2026.9.29",
     "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
 openai = ["openai>=1.40"]
-gemini = ["instructor[google-genai]>=1.15.3"]
+gemini = ["instructor[google-genai]>=1.17.0"]
 all = [
     "openai>=1.40",
-    "instructor[google-genai]>=1.15.3",
+    "instructor[google-genai]>=1.17.0",
     "defusedxml>=0.7.1",
     "pillow>=11.0",
     "pypdf>=5.0",
@@ -79,15 +79,15 @@ attest = "attest.cli:app"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0",
+    "pytest>=9.2.0",
     "hypothesis>=6.100",
-    "instructor[google-genai]>=1.15.3",
+    "instructor[google-genai]>=1.17.0",
     "defusedxml>=0.7.1",
     "pillow>=11.0",
     "pypdf>=5.0",
     "pytesseract>=0.3.13",
     "zxing-cpp>=2.3",
-    "types-pyyaml>=6.0.12.20260906",
+    "types-pyyaml>=6.0.12.20261103",
     "pyright>=1.1.414",
     "ruff>=0.17.3",
 ]
@@ -96,7 +96,7 @@ hf = ["huggingface_hub>=0.34"]
 
 docs = [
     "mkdocs-material>=9.5",
-    "mkdocstrings[python]>=0.26",
+    "mkdocstrings[python]>=1.0.8",
     "griffe-pydantic>=1.1",
     "ruff>=0.6",
 ]
