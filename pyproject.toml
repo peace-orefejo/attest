@@ -1,6 +1,6 @@
 [project]
 name = "agent-attest"
-version = "0.8.1"
+version = "0.9.0"
 description = "Evidence-grounded evaluator for AI agent runs: checks agent claims against the recorded tool outputs."
 readme = "README.md"
 requires-python = ">=3.11"
