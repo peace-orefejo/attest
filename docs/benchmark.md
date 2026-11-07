@@ -84,7 +84,7 @@ is stripped before a run becomes a case.
 conversion work on every case) are licensed
 [CC-BY-4.0](https://github.com/peace-orefejo/attest/blob/main/benchmarks/datasets/LICENSE).
 Content converted from an upstream benchmark keeps its own licence (MIT for τ-bench and
-AgentDojo, Apache-2.0 for ToolBench). The benchmark code is AGPL-3.0, like the rest of attest.
+AgentDojo, Apache-2.0 for ToolBench). The benchmark code is Apache-2.0, like the rest of attest.
 
 **Label status.** Every case is `label_status: "draft"`. A case becomes `confirmed` only through
 the double labelling below, with at least two annotators recorded.

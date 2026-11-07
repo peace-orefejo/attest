@@ -19,7 +19,7 @@ DeepEval's features below come from its
 
 | | attest | DeepEval |
 |---|---|---|
-| License | AGPL-3.0 | Apache-2.0 |
+| License | Apache-2.0 | Apache-2.0 |
 | Shape | Library and CLI that grade a recorded run and print JSON | pytest-style framework (`assert_test`, `deepeval test run`) and `evaluate()` |
 | Scope | Tool-using agent runs and AI code review output | RAG, agentic, multi-turn, multimodal and custom metrics |
 | Agent checks | Claims against tool outputs; allowed tools; error recovery and errors reported as success; injection in tool outputs; role adherence; project policies | Task Completion, Tool Correctness, Argument Correctness, Goal Accuracy, Step Efficiency, Plan Adherence, Plan Quality, Tool Use |

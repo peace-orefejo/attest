@@ -16,7 +16,7 @@ Grade an agent's answer against what its tools actually returned.
 [![PyPI](https://img.shields.io/pypi/v/agent-attest)](https://pypi.org/project/agent-attest/)
 [![Python](https://img.shields.io/pypi/pyversions/agent-attest)](https://pypi.org/project/agent-attest/)
 [![CI](https://github.com/peace-orefejo/attest/actions/workflows/ci.yml/badge.svg)](https://github.com/peace-orefejo/attest/actions/workflows/ci.yml)
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 [**Documentation**](https://peace-orefejo.github.io/attest/) ·
 [Getting started](https://peace-orefejo.github.io/attest/getting-started/) ·
@@ -160,6 +160,7 @@ Tests run offline with no API key. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Copyright © 2026 Adepeju Orefejo. Licensed under the [GNU AGPL v3.0](LICENSE): you can use,
-modify and share attest, but any version you distribute or run as a network service must be
-released under the same license, with its source. Versions 0.6.0 and earlier were MIT.
+Copyright © 2026 Adepeju Orefejo. Licensed under the [Apache License 2.0](LICENSE): you can use,
+modify and distribute attest, including in commercial and closed-source software, as long as
+you keep the license and copyright notices. Versions 0.7.0 to 0.8.1 were released under the GNU
+AGPL v3.0, and 0.6.0 and earlier under MIT.

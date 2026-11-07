@@ -4,8 +4,8 @@ version = "0.8.1"
 description = "Evidence-grounded evaluator for AI agent runs: checks agent claims against the recorded tool outputs."
 readme = "README.md"
 requires-python = ">=3.11"
-license = "AGPL-3.0-only"
-license-files = ["LICENSE"]
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Adepeju Orefejo", email = "adepejuorefejo5@gmail.com" }]
 keywords = [
     "evals",
@@ -138,7 +138,7 @@ extend-immutable-calls = ["typer.Option", "typer.Argument", "attest.extraction.l
 [tool.pyright]
 include = ["src", "benchmarks"]
 extraPaths = ["src", "benchmarks/runners", "benchmarks/converters"]
-exclude = ["**/*_test.py", "**/conftest.py", "**/__pycache__"]
+exclude = ["**/*_test.py", "**/conftest.py", "**/__pycache__", "benchmarks/private"]
 pythonVersion = "3.11"
 typeCheckingMode = "strict"
 venvPath = "."

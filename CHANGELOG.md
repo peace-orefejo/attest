@@ -5,6 +5,11 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+### License
+- **attest is now licensed under the Apache License 2.0** (`Apache-2.0`), so it can be used in
+  commercial and closed-source projects. Versions 0.7.0 to 0.8.1 remain available under the
+  GNU AGPL v3.0, and 0.6.0 and earlier under MIT. The benchmark data stays CC-BY-4.0.
+
 ### Added
 - User-defined file exclusions, for cost, noise and privacy. Gitignore-style patterns come from
   `.attestignore` in the current directory (`--no-attestignore` turns that off), then

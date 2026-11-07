@@ -2,7 +2,7 @@
 
 > **Licensing.** The benchmark's data and labels (the attest-seed cases, and the labels, notes
 > and conversion work on every case) are licensed
-> [CC-BY-4.0](datasets/LICENSE). The code is AGPL-3.0, like the rest of attest. Vendored
+> [CC-BY-4.0](datasets/LICENSE). The code is Apache-2.0, like the rest of attest. Vendored
 > upstream content keeps its own licence: see each `sources/<origin>/LICENSE`.
 
 This folder measures how accurate attest's own checks are. It lives outside the package and is

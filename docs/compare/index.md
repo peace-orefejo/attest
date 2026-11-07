@@ -41,7 +41,7 @@ agent told the user match what its tools actually returned?** It can run alongsi
 
 | Tool | License | Form | Agent and tool-call evaluation | UI and tracing |
 |---|---|---|---|---|
-| attest | AGPL-3.0 | Python library and CLI | Claims checked against tool outputs; allowed tools and error recovery; injection in tool outputs; role adherence | None |
+| attest | Apache-2.0 | Python library and CLI | Claims checked against tool outputs; allowed tools and error recovery; injection in tool outputs; role adherence | None |
 | DeepEval | Apache-2.0 | Python framework | Task Completion, Tool Correctness, Argument Correctness, Plan Adherence and other agentic metrics | Tracing with `@observe`; hosted platform (Confident AI) |
 | Ragas | Apache-2.0 | Toolkit | Tool Call Accuracy, Tool Call F1, Agent Goal Accuracy, Topic Adherence | Integrates with observability tools |
 | LangSmith | Platform; SDK is MIT | Hosted platform, with self-hosting on the Enterprise plan | Offline and online evaluators: code, LLM-as-judge, human, pairwise; trajectory evaluators in `agentevals` | Yes, hosted |
@@ -79,9 +79,8 @@ and whether the answer claimed success for a call that failed.
 - **A clear gate.** Every run gets pass, review or block, so CI can act on it directly.
 - **Works alongside your platform.** attest reads recorded runs and prints JSON, so it fits next
   to LangSmith, Phoenix, TruLens or Confident AI rather than replacing them.
-- **License.** attest is AGPL-3.0. Using it in your own tests and CI is straightforward;
-  distributing a modified version, or running one as a network service, requires releasing its
-  source under the same license.
+- **Permissive license.** attest is Apache-2.0, so it can be used in commercial and
+  closed-source projects.
 
 ## Each tool in more detail
 
