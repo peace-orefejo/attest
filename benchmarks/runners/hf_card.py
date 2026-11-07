@@ -193,7 +193,7 @@ def _provenance(manifest: Manifest) -> str:
         f"licence ({', '.join(upstream) or 'none in this export'}), as listed for each origin "
         f"above; the card's `license` field lists all of them. The {DATA_LICENCE} notice is "
         "`LICENSES/attest-seed.txt`; the upstream licence and notice files are copied "
-        "verbatim from the repository. attest's code is separately licensed AGPL-3.0 and is "
+        "verbatim from the repository. attest's code is separately licensed Apache-2.0 and is "
         "not part of this dataset."
     )
     return "\n\n".join(blocks)

@@ -149,7 +149,7 @@ def test_licences_and_notices_are_copied_verbatim(built: Path) -> None:
 def test_card_licences_labels_cc_by_and_upstream_runs_under_their_own(built: Path) -> None:
     card = (built / "README.md").read_text(encoding="utf-8")
     licences = card.split('<a id="licenses"></a>', 1)[1].split("## Citation", 1)[0]
-    assert "AGPL-3.0-only" not in licences
+    assert "AGPL" not in card
     assert "labels, notes and conversion work on every case" in licences
     assert "keeps its upstream licence (Apache-2.0, MIT)" in licences
     assert licences.count("- Labels, notes and conversion: CC-BY-4.0") == 3

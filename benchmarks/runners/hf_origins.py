@@ -20,7 +20,7 @@ REPO_ROOT = BENCHMARKS_DIR.parent
 SOURCES_DIR = BENCHMARKS_DIR / "sources"
 DATA_LICENCE = "CC-BY-4.0"
 """The licence of the benchmark's own data: the seed cases and every case's labels, notes and
-conversion. The code is AGPL-3.0; upstream run content keeps its upstream licence."""
+conversion. The code is Apache-2.0; upstream run content keeps its upstream licence."""
 DATA_HUB_LICENCE = "cc-by-4.0"
 
 
@@ -137,7 +137,7 @@ ATTEST_BIBTEX = f"""@software{{orefejo_attest,
   author = {{Orefejo, Adepeju}},
   title = {{attest: evidence-grounded evaluation for AI agents}},
   url = {{{REPO_URL}}},
-  license = {{AGPL-3.0-only}}
+  license = {{Apache-2.0}}
 }}"""
 
 
