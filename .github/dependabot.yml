@@ -1,6 +1,8 @@
-# Dependency updates: one grouped pull request a week per ecosystem.
-# Patch and minor updates merge automatically once CI passes (see
-# workflows/dependabot-auto-merge.yml); major updates wait for review.
+# Dependency updates: patch and minor bumps come in one grouped pull request a
+# week per ecosystem and merge automatically once CI passes (see
+# workflows/dependabot-auto-merge.yml). Major bumps are kept out of the groups,
+# so each arrives as its own pull request and waits for review without holding
+# back the safe ones.
 version: 2
 updates:
   - package-ecosystem: "uv"
@@ -15,6 +17,7 @@ updates:
       python-version-updates:
         applies-to: version-updates
         patterns: ["*"]
+        update-types: ["minor", "patch"]
       python-security-updates:
         applies-to: security-updates
         patterns: ["*"]
@@ -29,3 +32,4 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
