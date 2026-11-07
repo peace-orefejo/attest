@@ -114,6 +114,7 @@ nav:
       - Policies: checks/policies.md
   - Code review mode:
       - Overview: code-review/index.md
+      - In your review bot: code-review/review-bots.md
       - Review guidelines: code-review/guidelines.md
       - Writing the review: code-review/writing.md
       - Outputs and decisions: code-review/outputs.md

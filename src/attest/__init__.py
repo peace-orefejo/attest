@@ -17,6 +17,7 @@ from .checks.verify import extract_claims, grounded_verifier, judge_trajectory, 
 from .content import Artifact, Detection, TextSegment
 from .exclusions import ExclusionError, Exclusions, load_exclusions
 from .extraction import ExtractionLimits, ExtractionOutcome, extract_artifact
+from .findings import CheckedFinding, check_findings
 from .llm import (
     Budget,
     BudgetExceeded,
@@ -43,6 +44,7 @@ __all__ = [
     "Budget",
     "BudgetExceeded",
     "CheckResult",
+    "CheckedFinding",
     "Detection",
     "DiskCache",
     "EvaluationPolicy",
@@ -68,6 +70,7 @@ __all__ = [
     "Trajectory",
     "Usage",
     "VerdictPolicy",
+    "check_findings",
     "check_injection",
     "check_policy",
     "check_role_adherence",

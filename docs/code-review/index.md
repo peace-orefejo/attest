@@ -11,7 +11,8 @@ mode checks each reviewer output against the code it describes, then decides whe
 ![Code review mode](../assets/diagrams/code-review-flow.svg){ .diagram }
 
 Put it between your review pipeline and the people who read the results. If you don't have a
-reviewer, attest can [write the review itself](writing.md) and check that too.
+reviewer, attest can [write the review itself](writing.md) and check that too. If you have a
+review bot and only want to know which comments to post, [one call](review-bots.md) does it.
 
 ## The four output types
 

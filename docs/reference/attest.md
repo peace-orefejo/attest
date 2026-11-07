@@ -49,6 +49,10 @@ The public API, importable as `from attest import ...`.
 
 ::: attest.evaluate
 
+::: attest.check_findings
+
+::: attest.CheckedFinding
+
 ::: attest.judge_trajectory
 
 ::: attest.extract_claims

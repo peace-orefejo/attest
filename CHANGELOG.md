@@ -5,6 +5,13 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+- `check_findings(diff, findings, answers=...)`: one call for review bots. Pass `git diff`
+  output (or a `{path: diff}` mapping) and the bot's comments, and get back one
+  `CheckedFinding` per comment with `keep` and a one-line `reason`. Answers to questions about
+  the change are held to the strict bar. Review rules are checked only when `guidelines` is
+  passed. See [In your review bot](https://peace-orefejo.github.io/attest/code-review/review-bots/).
+
 ## [0.9.0] - 2026-11-07
 
 ### License
