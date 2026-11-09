@@ -30,7 +30,7 @@ inputs:
     default: ""
   command:
     description: "A comment starting with this asks for a review."
-    default: "/attest review"
+    default: "/attest"
   label:
     description: "Adding this label asks for a review."
     default: "attest"

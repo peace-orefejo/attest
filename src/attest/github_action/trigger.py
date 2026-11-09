@@ -22,7 +22,7 @@ class Trigger(BaseModel):
     number: int
     reason: Reason
     comment_id: int | None = None
-    """The `/attest review` comment, to react to."""
+    """The `/attest` comment, to react to."""
 
     @property
     def asked(self) -> bool:

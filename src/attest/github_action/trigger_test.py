@@ -107,7 +107,7 @@ def test_the_command_from_a_trusted_person_asks_for_a_review(association):
         (_comment_event("/attest review", "CONTRIBUTOR"), "owner, members"),
         (_comment_event("/attest review", "NONE"), "owner, members"),
         (_comment_event("/attest review", user_type="Bot"), "bot"),
-        (_comment_event("/attest reviewing later"), "start with"),
+        (_comment_event("/attestation please"), "start with"),
         (_comment_event("please /attest review"), "start with"),
         (_comment_event("/attest review", action="edited"), "new comments"),
     ],

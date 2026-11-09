@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-DEFAULT_COMMAND = "/attest review"
+DEFAULT_COMMAND = "/attest"
 DEFAULT_LABEL = "attest"
 DEFAULT_GUIDELINES = "REVIEW.md"
 

@@ -8,7 +8,7 @@ All notable changes to `agent-attest` are documented here. This project follows
 ### Added
 - A GitHub Action (`uses: peace-orefejo/attest@...`) that reviews pull requests when asked: when
   your bot account is requested as a reviewer, when someone with write access comments
-  `/attest review`, when the `attest` label is added, or on every update. It writes the review,
+  `/attest`, when the `attest` label is added, or on every update. It writes the review,
   checks each comment against the diff, and posts one comment-only review with only what held
   up. It never runs the pull request's code, and reads `REVIEW.md` and `.attestignore` from the
   base branch. See [GitHub Action](https://peace-orefejo.github.io/attest/github-action/).

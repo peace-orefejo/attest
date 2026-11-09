@@ -1,6 +1,6 @@
 ---
 title: "attest GitHub Action: AI pull request review you can request"
-description: "Add attest to a repository as a reviewer: request it like a teammate, comment /attest review, or add a label, and it posts only the review comments the diff backs up."
+description: "Add attest to a repository as a reviewer: request it like a teammate, comment /attest, or add a label, and it posts only the review comments the diff backs up."
 ---
 
 # GitHub Action
@@ -14,8 +14,12 @@ There are three ways to ask, and you can turn on any of them:
 | Ask by | How |
 |---|---|
 | **Requesting it as a reviewer** | Pick your bot account from the pull request's Reviewers list, like a teammate. Needs a [bot account](#request-it-as-a-reviewer). |
-| **Commenting** | Comment `/attest review` on the pull request. Only the repository's owner, members and collaborators can. |
+| **Commenting** | Comment `/attest` on the pull request. Only the repository's owner, members and collaborators can. |
 | **Labelling** | Add the `attest` label. |
+
+Requesting it is enough: attest reviews straight away, with no comment needed. GitHub tells
+the workflow a reviewer was requested, and attest reviews when that reviewer is your bot
+account. Comment `/attest` to have it review again after new pushes.
 
 It can also review every pull request when it's opened or updated, and draft pull requests are
 skipped.
@@ -50,7 +54,7 @@ jobs:
     # Skip comments that aren't asking, before a runner starts.
     if: >-
       github.event_name != 'issue_comment' ||
-      (github.event.issue.pull_request && startsWith(github.event.comment.body, '/attest review'))
+      (github.event.issue.pull_request && startsWith(github.event.comment.body, '/attest'))
     runs-on: ubuntu-latest
     steps:
       - uses: peace-orefejo/attest@main
@@ -144,7 +148,7 @@ rules it is reviewed by.
 | `reasoning` | `auto` | `auto`, `off`, `low`, `medium` or `high`. |
 | `github-token` | `github.token` | Token used to read the pull request and post the review. |
 | `reviewer` | | Your bot account's login. Requesting it starts a review. |
-| `command` | `/attest review` | A comment starting with this starts a review. If you change it, change the workflow's `if:` too. |
+| `command` | `/attest` | A comment starting with this starts a review. If you change it, change the workflow's `if:` too. |
 | `label` | `attest` | Adding this label starts a review. |
 | `guidelines` | `REVIEW.md` if it exists | Your review rules on the base branch. |
 | `attestignore` | `true` | Read `.attestignore` from the base branch. |
