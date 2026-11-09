@@ -38,7 +38,7 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 dependencies = [
-    "anthropic>=0.77,<2",
+    "anthropic>=2.6.0,<3",
     "pydantic>=2.14.3",
     "typer>=0.28.0",
     "python-dotenv>=1.2.4",
