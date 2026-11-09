@@ -140,7 +140,7 @@ only the review comments the diff backs up. See the
 [GitHub Action guide](https://peace-orefejo.github.io/attest/github-action/).
 
 ```yaml
-- uses: peace-orefejo/attest@main
+- uses: peace-orefejo/attest@<full commit SHA>  # vX.Y.Z
   with:
     api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```

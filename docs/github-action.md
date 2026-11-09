@@ -57,7 +57,7 @@ jobs:
       (github.event.issue.pull_request && startsWith(github.event.comment.body, '/attest'))
     runs-on: ubuntu-latest
     steps:
-      - uses: peace-orefejo/attest@main
+      - uses: peace-orefejo/attest@<full commit SHA>  # vX.Y.Z
         with:
           api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
@@ -71,8 +71,11 @@ To review every pull request as well, add the automatic types:
     types: [opened, synchronize, reopened, ready_for_review, review_requested, labeled]
 ```
 
-Pin `@main` to a release tag or a commit SHA, so a new version of attest only reaches your
-repository when you choose.
+Replace `<full commit SHA>` with the commit of an
+[attest release](https://github.com/peace-orefejo/attest/releases), and keep its version in the
+comment. A commit SHA can never point at different code, while a tag can be moved, so you always
+know exactly what runs with your key and token. Dependabot recognises this format and opens a
+pull request to update both when attest publishes a new release.
 
 ## Request it as a reviewer
 
@@ -89,7 +92,7 @@ Each team uses its own:
 5. Pass the bot's login and token to the Action:
 
 ```yaml
-      - uses: peace-orefejo/attest@main
+      - uses: peace-orefejo/attest@<full commit SHA>  # vX.Y.Z
         with:
           api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           reviewer: yourteam-attest
