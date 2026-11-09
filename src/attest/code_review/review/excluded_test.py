@@ -140,15 +140,17 @@ def test_a_pull_request_that_edits_attestignore_gets_a_warning():
 def test_the_writer_sees_notes_and_its_outputs_about_excluded_files_are_dropped(monkeypatch):
     prompts: list[str] = []
 
-    def fake_call(*, system, user, output, max_tokens, site=None):
-        prompts.append(user)
-        return WrittenReview(
-            issues=[WrittenIssue(file="secrets/prod.env", text="The token is hard-coded.")],
-            summaries=[
-                WrittenSummary(file="app/main.py", text="Sets y to 1."),
-                WrittenSummary(file="secrets/prod.env", text="Adds a token."),
-            ],
-        )
+    written = WrittenReview(
+        issues=[WrittenIssue(file="secrets/prod.env", text="The token is hard-coded.")],
+        summaries=[
+            WrittenSummary(file="app/main.py", text="Sets y to 1."),
+            WrittenSummary(file="secrets/prod.env", text="Adds a token."),
+        ],
+    )
+
+    def fake_call(*, system, user, output, prefix="", **kwargs):
+        prompts.append(prefix + user)
+        return output.model_validate(written.model_dump(include=set(output.model_fields)))
 
     monkeypatch.setattr(WRITE, "call", fake_call)
     grader = _Grader()

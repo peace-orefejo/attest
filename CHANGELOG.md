@@ -5,7 +5,22 @@ All notable changes to `agent-attest` are documented here. This project follows
 
 ## [Unreleased]
 
+### Changed
+- attest's own reviewer (`write_review`, and `review()` / `attest review` with no outputs) now
+  works in three fixed steps: it understands each file, reasons through the design, then finds
+  the problems, each step building on the last. `review()` checks the summaries and overview
+  before the next step uses them, and reuses those checks when gating. The overview now covers
+  how well the approach holds up. It makes three model calls instead of one, sharing a cached
+  prefix. Prompts version 2026.11.09.
+
 ### Added
+- Issues can carry `line` (in the new version of the file) and `suggestion` (the corrected
+  line), on `ReviewOutput` and `OutputDecision`. attest's reviewer fills them, keeping a line
+  only when it is in the diff. Both are optional, so existing outputs and JSON are unchanged.
+- The GitHub Action posts each issue on its line, with a one-click suggestion for one-line
+  fixes, and falls back to listing them in the review if GitHub refuses a line.
+- `write_review(..., check=...)`: a check run on each summary and the overview before the next
+  step builds on it.
 - A GitHub Action (`uses: peace-orefejo/attest@...`) that reviews pull requests when asked: when
   your bot account is requested as a reviewer, when someone with write access comments
   `/attest`, when the `attest` label is added, or on every update. It writes the review,

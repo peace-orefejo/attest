@@ -7,11 +7,11 @@ import sys
 from collections.abc import Callable
 
 from ..api import Attest
-from ..code_review import PullRequest, ReviewGuidelines
+from ..code_review import PullRequest, ReviewGuidelines, ReviewResult
 from ..code_review.guidelines import parse_guidelines
 from ..llm.reasoning import parse_reasoning
-from .comment import failure_body, review_body
-from .github import GitHub, PullRequestData
+from .comment import failure_body, inline_comments, review_body
+from .github import GitHub, GitHubError, PullRequestData
 from .payload import Json, as_obj, obj, text
 from .settings import Settings
 from .trigger import Skip, Trigger, decide
@@ -57,13 +57,9 @@ def _review(settings: Settings, event: Json, trigger: Trigger, github: GitHub) -
     ).review(pr, None, guidelines=rules)
     if result.writer_failure is not None:
         return _fail(settings, trigger, github, result.writer_failure)
-    body = review_body(
-        result,
-        head_sha=data.head_sha,
-        undiffed=undiffed,
-        rules=settings.guidelines if rules is not None else None,
+    url, body = _post(
+        github, data, result, undiffed, settings.guidelines if rules is not None else None
     )
-    url = github.post_review(data.number, data.head_sha, body)
     _summary(settings, body)
     kept = len(result.kept)
     _outputs(
@@ -75,6 +71,27 @@ def _review(settings: Settings, event: Json, trigger: Trigger, github: GitHub) -
     )
     _log(f"Posted the review: {url or '(no URL returned)'}")
     return 0
+
+
+def _post(
+    github: GitHub,
+    data: PullRequestData,
+    result: ReviewResult,
+    undiffed: list[str],
+    rules: str | None,
+) -> tuple[str, str]:
+    """Post issues on their lines; if GitHub refuses a line, post them all in the body instead."""
+    comments = inline_comments(result)
+    body = review_body(result, head_sha=data.head_sha, undiffed=undiffed, rules=rules)
+    if comments:
+        try:
+            return github.post_review(data.number, data.head_sha, body, comments), body
+        except GitHubError as exc:
+            if exc.status != 422:
+                raise
+            _log(f"GitHub refused the line comments ({exc}); posting them in the review body.")
+    body = review_body(result, head_sha=data.head_sha, undiffed=undiffed, rules=rules, inline=False)
+    return github.post_review(data.number, data.head_sha, body), body
 
 
 def _pull_request(data: PullRequestData) -> PullRequest:

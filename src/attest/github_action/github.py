@@ -124,13 +124,18 @@ class GitHub:
         )
         return found if isinstance(found, str) else None
 
-    def post_review(self, number: int, commit_id: str, body: str) -> str:
-        """Post a comment-only review; return its URL."""
-        review = self.request(
-            "POST",
-            f"/repos/{self.repository}/pulls/{number}/reviews",
-            {"commit_id": commit_id, "body": body, "event": "COMMENT"},
-        )
+    def post_review(
+        self,
+        number: int,
+        commit_id: str,
+        body: str,
+        comments: list[dict[str, object]] | None = None,
+    ) -> str:
+        """Post a comment-only review, with `comments` on lines; return its URL."""
+        payload: dict[str, Any] = {"commit_id": commit_id, "body": body, "event": "COMMENT"}
+        if comments:
+            payload["comments"] = comments
+        review = self.request("POST", f"/repos/{self.repository}/pulls/{number}/reviews", payload)
         return text(as_obj(review), "html_url")
 
     def post_comment(self, number: int, body: str) -> str:

@@ -19,6 +19,7 @@ from ..guidelines import GUIDELINES_CHECK, GuidelinesInput, ReviewGuidelines, lo
 from ..injection import check_code_injection
 from ..models import GateDecision, GateMode, PullRequest, ReviewOutput
 from ..writer import write_review
+from ..writer.write import Check
 from .excluded import exclusion_warnings
 from .grade import FAITHFULNESS_CHECK, Evaluator, Graded, grade
 from .models import OutputDecision, ReviewResult
@@ -66,7 +67,28 @@ def review(
     rules = load_guidelines(guidelines)
     hidden_pr = hide_pull_request(pr, exclusions)
     visible = hidden_pr.pr
-    written = _write(visible, rules, limits, exclusions) if outputs is None else None
+    graded_once: dict[str, Graded] = {}
+
+    def grade_once(output: ReviewOutput) -> Graded:
+        key = output.model_dump_json()
+        if key not in graded_once:
+            graded_once[key] = grade(
+                output,
+                evaluate,
+                rules,
+                follow=follow_guidelines,
+                limits=limits,
+                exclusions=exclusions,
+            )
+        return graded_once[key]
+
+    def holds_up(output: ReviewOutput) -> bool:
+        """The writer's check between steps; the grade is reused when the output is gated."""
+        filled = hide_output(with_pr_evidence(output, visible), exclusions).output
+        mode = chosen.get(filled.output_type)
+        return gate(grade_once(filled).report, filled.output_type, mode=mode).keep
+
+    written = _write(visible, rules, limits, exclusions, holds_up) if outputs is None else None
     source = written.outputs if written is not None else outputs or []
     hidden = [hide_output(with_pr_evidence(output, visible), exclusions) for output in source]
     filled = [item.output for item in hidden]
@@ -76,9 +98,7 @@ def review(
     decisions: list[OutputDecision] = []
     unchecked: list[int] = []
     for index, output in enumerate(filled):
-        graded = grade(
-            output, evaluate, rules, follow=follow_guidelines, limits=limits, exclusions=exclusions
-        )
+        graded = grade_once(output)
         if _rules_unchecked(graded):
             unchecked.append(index)
         decision = gate(
@@ -133,12 +153,13 @@ def _write(
     rules: ReviewGuidelines,
     limits: EvidenceLimits | None,
     exclusions: Exclusions,
+    check: Check,
 ) -> _Written:
     """attest's own review, or why it wrote none; a failed call never aborts the review."""
     if not pr.diffs:
         raise ValueError("The pull request has no diffs to review.")
     try:
-        written = write_review(pr, guidelines=rules, limits=limits, exclude=exclusions)
+        written = write_review(pr, guidelines=rules, limits=limits, exclude=exclusions, check=check)
         return _Written(outputs=written)
     except (BudgetExceeded, ProviderConfigError):
         raise
@@ -169,6 +190,8 @@ def _decision(
         output_type=output.output_type,
         text=output.text,
         question=output.question,
+        line=output.line,
+        suggestion=output.suggestion,
         paths=output.paths(),
         keep=decision.keep,
         mode=decision.mode,

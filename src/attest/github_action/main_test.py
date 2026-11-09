@@ -9,7 +9,7 @@ from attest.code_review import ReviewResult
 from attest.code_review.review import OutputDecision
 from attest.github_action import main as action_main
 from attest.github_action.comment import MARKER, review_body
-from attest.github_action.github import GitHub, PullFile, PullRequestData
+from attest.github_action.github import GitHub, GitHubError, PullFile, PullRequestData
 from attest.github_action.settings import Settings
 
 PATCH = "@@ -1 +1 @@\n-total = 0\n+total = 1"
@@ -24,6 +24,8 @@ class FakeGitHub(GitHub):
         self.comments = []
         self.reactions = []
         self.read = []
+        self.line_comments = []
+        self.refuse_lines = False
 
     def pull_request(self, number):
         return PullRequestData(
@@ -40,8 +42,11 @@ class FakeGitHub(GitHub):
         self.read.append((path, ref))
         return self.repo_files.get(path)
 
-    def post_review(self, number, commit_id, body):
+    def post_review(self, number, commit_id, body, comments=None):
+        if comments and self.refuse_lines:
+            raise GitHubError(422, "line must be part of the diff")
         self.reviews.append((number, commit_id, body))
+        self.line_comments.append(comments or [])
         return "https://github.com/o/r/pull/7#review"
 
     def post_comment(self, number, body):
@@ -247,3 +252,43 @@ def test_github_pages_through_files(monkeypatch):
     assert len(data.files) == 101
     assert data.files[-1] == PullFile(path="big.bin", patch=None)
     assert data.body == "" and data.commit_messages == ["m"]
+
+
+ON_LINE = ReviewResult(
+    decisions=[
+        OutputDecision(
+            index=0,
+            output_type="issue",
+            text="total now starts at 1.",
+            keep=True,
+            mode="lenient",
+            paths=["cart.py"],
+            line=1,
+            suggestion="total = 0",
+        ),
+        _decision(1, "issue", "A problem with no single line.", True),
+    ],
+    injection=CheckResult(check="code_injection", passed=True),
+    written=True,
+)
+
+
+def test_issues_on_a_line_are_posted_on_it_with_a_suggestion(tmp_path, monkeypatch):
+    monkeypatch.setattr(Attest, "review", lambda self, pr, outputs, **kw: ON_LINE)
+    github = FakeGitHub()
+    assert action_main(_settings(tmp_path, "pull_request", REQUESTED), github) == 0
+    ((comment,),) = github.line_comments
+    assert comment["path"] == "cart.py" and comment["line"] == 1 and comment["side"] == "RIGHT"
+    assert "```suggestion\ntotal = 0\n```" in comment["body"]
+    body = github.reviews[0][2]
+    assert "Issues (2, 1 posted on their lines)" in body
+    assert "no single line" in body and "starts at 1" not in body
+
+
+def test_line_comments_github_refuses_go_in_the_body(tmp_path, monkeypatch):
+    monkeypatch.setattr(Attest, "review", lambda self, pr, outputs, **kw: ON_LINE)
+    github = FakeGitHub()
+    github.refuse_lines = True
+    assert action_main(_settings(tmp_path, "pull_request", REQUESTED), github) == 0
+    assert github.line_comments == [[]]
+    assert "`cart.py`: total now starts at 1." in github.reviews[0][2]

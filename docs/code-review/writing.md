@@ -40,13 +40,26 @@ attest review pr.json -g REVIEW.md
 
 ## What it produces
 
-`write_review` makes one model call and returns a list of `ReviewOutput`:
+`write_review` works in three steps, always in this order, each building on the last:
+
+1. **Understand.** What each changed file now does, and how it connects to the others.
+2. **Design.** What the whole change does, and where the approach is risky for correctness,
+   security, performance or maintainability.
+3. **Findings.** The concrete problems, each on its line, with a one-line fix where there is one.
+
+Every step reads the same evidence (your rules, the pull request and its diffs, with line
+numbers), sent once so provider prompt caches can reuse it. When `review()` writes the review,
+it checks each summary and the overview before the next step builds on them, so a misreading of
+the code is not carried forward; those checks are reused when the outputs are gated, so nothing
+is graded twice. Call `write_review(pr, check=...)` to pass your own check.
+
+It returns a list of `ReviewOutput`:
 
 | Output | How many | Evidence |
 |---|---|---|
-| `issue` | One per real problem the change introduces, or none. | The diff of the file the issue names (or every diff, if it names a file the pull request doesn't change), plus the changed-file list. |
+| `issue` | One per real problem the change introduces, or none. Its `line` is the line it is about, in the new version of the file, and its `suggestion` the corrected text of that line when the fix is that small. Both are `None` otherwise, or when the line isn't an added or unchanged line of the diff. | The diff of the file the issue names (or every diff, if it names a file the pull request doesn't change), plus the changed-file list. |
 | `diff_summary` | One per changed file. | That file's diff. |
-| `group_summary` | One overview of the whole pull request. | Every diff and the changed-file list. Its `group_name` is the pull request's title. |
+| `group_summary` | One overview of the whole pull request: what it does and how well the approach holds up, in up to three short paragraphs. | Every diff and the changed-file list. Its `group_name` is the pull request's title. |
 
 Each output is scoped to the diffs it is about, so it is graded against the right code.
 

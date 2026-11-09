@@ -30,6 +30,10 @@ class ReviewOutput(BaseModel):
     reads: list[FileRead] = Field(default_factory=list[FileRead])
     question: str | None = None
     group_name: str | None = None
+    line: int | None = None
+    """For an issue: the line it is about, numbered in the new version of its file."""
+    suggestion: str | None = None
+    """For an issue on a line: the full corrected text of that line."""
 
     def paths(self) -> list[str]:
         seen: list[str] = list(self.diffs)

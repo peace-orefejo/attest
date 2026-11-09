@@ -16,6 +16,10 @@ class OutputDecision(BaseModel):
     output_type: OutputType
     text: str = ""
     question: str | None = None
+    line: int | None = None
+    """For an issue: the line it is about, numbered in the new version of its file."""
+    suggestion: str | None = None
+    """For an issue on a line: the full corrected text of that line."""
     paths: list[str] = Field(default_factory=list[str])
     keep: bool
     mode: GateMode

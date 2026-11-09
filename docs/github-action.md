@@ -106,8 +106,9 @@ bot, which completes the request.
 
 One comment-only review. It never approves or requests changes.
 
-- An overview of the change.
-- The issues that held up, each with the file it's about.
+- An overview of the change: what it does and how well the approach holds up.
+- Each issue that held up as a comment on its line, with a one-click suggestion when the fix
+  is one line. Issues no single line shows are listed in the review instead.
 - A collapsed file-by-file summary.
 - **Check by hand**: text in the pull request that looks aimed at AI reviewers, files GitHub
   sent no diff for (binary or too large), and files left out by `.attestignore`.

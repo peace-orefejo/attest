@@ -30,6 +30,8 @@ ReviewOutput(
 | `reads` | Other code the reviewer looked at. Each `FileRead` has a `tool` (`read_file`, the default, or `grep`), its `arguments` and its `output`. |
 | `question` | The question, for a `canvas_answer`. |
 | `group_name` | The group's name, for a `group_summary`. |
+| `line` | For an `issue`: the line it is about, numbered in the new version of its file. Optional. |
+| `suggestion` | For an `issue` on a line: the full corrected text of that line. Optional. |
 
 If `diffs` is empty or `changed_files` is `None`, `review()` fills them from the pull request.
 
@@ -76,6 +78,7 @@ the kept outputs from the ones `review()` checked, which is how you get attest's
 | `output_type` | `issue`, `diff_summary`, `group_summary` or `canvas_answer`. |
 | `text` | What the output said. |
 | `question` | The question, for a `canvas_answer`. |
+| `line`, `suggestion` | Copied from the output, for an issue on a line. |
 | `paths` | The files the output was checked against. |
 | `keep` | Show the output (`True`) or hide it (`False`). |
 | `mode` | The gate mode used. |

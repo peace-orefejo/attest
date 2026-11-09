@@ -225,7 +225,7 @@ def test_follow_guidelines_false_skips_the_check(guideline_calls):
 def test_no_outputs_means_attest_writes_the_review(monkeypatch):
     seen = {}
 
-    def fake_write(pr, *, guidelines, limits, exclude=None):
+    def fake_write(pr, *, guidelines, limits, exclude=None, check=None):
         seen["guidelines"] = guidelines.name
         return [ReviewOutput(output_type="issue", text="written", diffs=dict(pr.diffs))]
 
@@ -435,3 +435,20 @@ def test_a_guideline_check_that_ran_adds_no_warning(monkeypatch):
     result = review(CLEAN_PR, [ISSUE], evaluate=grader, guidelines=RULES, deep=False)
     assert result.kept == [0]
     assert result.warnings == []
+
+
+def test_the_writers_check_between_steps_is_graded_once_and_reused(monkeypatch):
+    checked = []
+
+    def fake_write(pr, *, guidelines, limits, exclude=None, check=None):
+        summary = ReviewOutput(output_type="diff_summary", text="sets total", diffs=dict(pr.diffs))
+        wrong = ReviewOutput(output_type="diff_summary", text="deletes it", diffs=dict(pr.diffs))
+        checked.extend([check(summary), check(wrong)])
+        return [summary, wrong]
+
+    monkeypatch.setattr(RUN, "write_review", fake_write)
+    grade = _grader({"sets total": _report("supported"), "deletes it": _report("unsupported")})
+    result = review(CLEAN_PR, evaluate=grade, deep=False)
+    assert checked == [True, False]
+    assert len(grade.seen) == 2
+    assert result.kept == [0] and result.dropped == [1]
