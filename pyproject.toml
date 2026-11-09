@@ -49,10 +49,10 @@ dependencies = [
 
 [project.optional-dependencies]
 openai = ["openai>=1.40"]
-gemini = ["instructor[google-genai]>=1.15.3"]
+gemini = ["instructor[google-genai]>=1.17.0"]
 all = [
     "openai>=1.40",
-    "instructor[google-genai]>=1.15.3",
+    "instructor[google-genai]>=1.17.0",
     "defusedxml>=0.7.1",
     "pillow>=11.0",
     "pypdf>=5.0",
@@ -81,7 +81,7 @@ attest = "attest.cli:app"
 dev = [
     "pytest>=9.2.0",
     "hypothesis>=6.100",
-    "instructor[google-genai]>=1.15.3",
+    "instructor[google-genai]>=1.17.0",
     "defusedxml>=0.7.1",
     "pillow>=11.0",
     "pypdf>=5.0",
