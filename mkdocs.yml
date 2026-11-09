@@ -118,6 +118,7 @@ nav:
       - Writing the review: code-review/writing.md
       - Outputs and decisions: code-review/outputs.md
       - Injection in diffs: code-review/injection.md
+  - GitHub Action: github-action.md
   - Command line: cli.md
   - JSON output: json-output.md
   - Models and providers: providers.md

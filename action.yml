@@ -1,0 +1,94 @@
+name: "attest review"
+description: "AI pull request review that posts only the comments the diff backs up."
+author: "Peace (Adepeju) Orefejo"
+branding:
+  icon: "check-circle"
+  color: "purple"
+
+inputs:
+  api-key:
+    description: "Model API key, from a repository secret (e.g. secrets.ANTHROPIC_API_KEY)."
+    required: true
+  provider:
+    description: "Model provider: anthropic, openai or gemini."
+    default: "anthropic"
+  model:
+    description: "Model name. Defaults to the provider's default model."
+    default: ""
+  reasoning:
+    description: "Reasoning level: auto, off, low, medium or high."
+    default: "auto"
+  github-token:
+    description: >-
+      Token used to read the pull request and post the review. Leave the default to post as
+      github-actions[bot], or pass your bot account's token to post as that account.
+    default: ${{ github.token }}
+  reviewer:
+    description: >-
+      Login of your bot account. When someone requests it as a reviewer, attest reviews.
+      Leave empty to turn that trigger off.
+    default: ""
+  command:
+    description: "A comment starting with this asks for a review."
+    default: "/attest review"
+  label:
+    description: "Adding this label asks for a review."
+    default: "attest"
+  guidelines:
+    description: >-
+      Path of your review rules on the base branch. Defaults to REVIEW.md when it exists;
+      otherwise attest's general standard applies.
+    default: ""
+  attestignore:
+    description: "Read .attestignore from the base branch and leave matching files out."
+    default: "true"
+  fail-on-error:
+    description: "Fail the job when the review can't be written. By default it only warns."
+    default: "false"
+
+outputs:
+  reviewed:
+    description: "true when a review was posted."
+    value: ${{ steps.review.outputs.reviewed }}
+  kept:
+    description: "How many comments were posted."
+    value: ${{ steps.review.outputs.kept }}
+  dropped:
+    description: "How many comments didn't hold up and weren't posted."
+    value: ${{ steps.review.outputs.dropped }}
+  review-url:
+    description: "Link to the posted review."
+    value: ${{ steps.review.outputs.review-url }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - name: Install attest
+      shell: bash
+      env:
+        ATTEST_PROVIDER: ${{ inputs.provider }}
+      run: |
+        case "$ATTEST_PROVIDER" in
+          openai|gemini) package="$GITHUB_ACTION_PATH[$ATTEST_PROVIDER]" ;;
+          *) package="$GITHUB_ACTION_PATH" ;;
+        esac
+        python -m pip install --quiet --disable-pip-version-check "$package"
+    - name: Review
+      id: review
+      shell: bash
+      env:
+        ATTEST_API_KEY: ${{ inputs.api-key }}
+        ATTEST_PROVIDER: ${{ inputs.provider }}
+        ATTEST_MODEL: ${{ inputs.model }}
+        ATTEST_REASONING: ${{ inputs.reasoning }}
+        ATTEST_GITHUB_TOKEN: ${{ inputs.github-token }}
+        ATTEST_REVIEWER: ${{ inputs.reviewer }}
+        ATTEST_COMMAND: ${{ inputs.command }}
+        ATTEST_LABEL: ${{ inputs.label }}
+        ATTEST_GUIDELINES: ${{ inputs.guidelines }}
+        ATTEST_ATTESTIGNORE: ${{ inputs.attestignore }}
+        ATTEST_FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+      run: python -m attest.github_action

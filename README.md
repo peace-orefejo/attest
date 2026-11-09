@@ -133,6 +133,18 @@ result = Attest().review(pr, outputs, guidelines="REVIEW.md")
 post = result.filter(outputs)         # the outputs worth showing
 ```
 
+**GitHub Action**
+
+Request attest as a reviewer, comment `/attest review`, or add the `attest` label, and it posts
+only the review comments the diff backs up. See the
+[GitHub Action guide](https://peace-orefejo.github.io/attest/github-action/).
+
+```yaml
+- uses: peace-orefejo/attest@main
+  with:
+    api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
 <br>
 
 ## Install options
