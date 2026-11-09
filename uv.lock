@@ -111,7 +111,7 @@ dev = [
 docs = [
     { name = "griffe-pydantic", specifier = ">=1.1" },
     { name = "mkdocs-material", specifier = ">=9.5" },
-    { name = "mkdocstrings", extras = ["python"], specifier = ">=0.26" },
+    { name = "mkdocstrings", extras = ["python"], specifier = ">=1.0.8" },
     { name = "ruff", specifier = ">=0.17.4" },
 ]
 hf = [{ name = "huggingface-hub", specifier = ">=0.34" }]
