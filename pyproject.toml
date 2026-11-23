@@ -39,11 +39,11 @@ classifiers = [
 ]
 dependencies = [
     "anthropic>=0.77,<2",
-    "pydantic>=2.14.3",
-    "typer>=0.28.0",
+    "pydantic>=2.14.4",
+    "typer>=0.29.2",
     "python-dotenv>=1.2.4",
     "instructor>=1.17.0,<2",
-    "regex>=2026.9.29",
+    "regex>=2026.11.19",
     "pyyaml>=6.0",
 ]
 
@@ -80,7 +80,7 @@ attest = "attest.cli:app"
 [dependency-groups]
 dev = [
     "pytest>=9.2.0",
-    "hypothesis>=6.100",
+    "hypothesis>=6.170.17",
     "instructor[google-genai]>=1.15.3",
     "defusedxml>=0.7.1",
     "pillow>=11.0",
@@ -89,16 +89,16 @@ dev = [
     "zxing-cpp>=2.3",
     "types-pyyaml>=6.0.12.20261103",
     "pyright>=1.1.414",
-    "ruff>=0.17.4",
+    "ruff>=0.17.6",
 ]
 
 hf = ["huggingface_hub>=0.34"]
 
 docs = [
-    "mkdocs-material>=9.5",
+    "mkdocs-material>=9.8.2",
     "mkdocstrings[python]>=0.26",
     "griffe-pydantic>=1.1",
-    "ruff>=0.17.4",
+    "ruff>=0.17.6",
 ]
 
 [build-system]
